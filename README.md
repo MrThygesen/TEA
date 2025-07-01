@@ -40,8 +40,6 @@ Deployed on the Polygon Amoy Testnet, TEA leverages Soulbound Tokens (SBTs) to p
 - `TokenVesting`: 
 - `TokenAllocation`: 
 
-*(Replace with actual contract links on Polygonscan)*
-
 ---
 
 ## Roadmap & Future Plans
@@ -69,7 +67,7 @@ Deployed on the Polygon Amoy Testnet, TEA leverages Soulbound Tokens (SBTs) to p
 - 🐛 Report issues and request features  
 - 💬 Join the discussion and organize meetings through our telegram channel (soon coming)  
 - 👩‍💻 Submit pull requests or contact us to contribute
-- ⭐ business inquiries or investor discussions, contact: mt@defineers.com or connect on linkedin.com/in/mortenthygesens/
+- ⭐ business inquiries or investor discussions, contact: morten@defineers.com or connect on linkedin.com/in/mortenthygesens/
 
 ---
 
