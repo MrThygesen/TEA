@@ -1,6 +1,5 @@
 # TEA
-TEA - A web3 trust and identity platform combining meetings, loyalty programs, smart legal contracts and social agreements.
-# TEA Project
+Project TEA - Is a web3 trust and identity platform combining meetings, loyalty programs, smart legal contracts and social agreements.
 
 **A Web3 trust and identity platform combining meetings, loyalty programs, smart legal contracts, and social agreements.**
 
