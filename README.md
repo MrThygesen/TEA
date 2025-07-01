@@ -67,8 +67,9 @@ Deployed on the Polygon Amoy Testnet, TEA leverages Soulbound Tokens (SBTs) to p
 
 - ⭐ Star the repo to stay updated  
 - 🐛 Report issues and request features  
-- 💬 Join the discussion on [Discord/Telegram link] *(Add your community link)*  
-- 👩‍💻 Submit pull requests or contact us to contribute  
+- 💬 Join the discussion and organize meetings through our telegram channel (soon coming)  
+- 👩‍💻 Submit pull requests or contact us to contribute
+- ⭐ business inquiries or investor discussions, contact: mt@defineers.com or connect on linkedin.com/in/mortenthygesens/
 
 ---
 
