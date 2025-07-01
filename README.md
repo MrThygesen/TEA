@@ -36,9 +36,9 @@ Deployed on the Polygon Amoy Testnet, TEA leverages Soulbound Tokens (SBTs) to p
 
 ## Contracts on Polygon Amoy Testnet
 
-- `TEAToken`: [0xYourTokenAddress]  
-- `TokenVesting`: [0xYourVestingAddress]  
-- `TokenAllocation`: [0xYourAllocationAddress]  
+- `TEAToken`: 
+- `TokenVesting`: 
+- `TokenAllocation`: ]  
 
 *(Replace with actual contract links on Polygonscan)*
 
