@@ -1,0 +1,24 @@
+{
+  "name": "Business Meeting Pass",
+  "description": "Access pass for business meetings with legal contract acceptance (NDA) upon claiming this SBT. This pass grants access to exclusive business sessions with up to 25 participants. The legal contract is binding once the wallet receives this token.",
+  "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/assets/business-meeting.png",
+  "attributes": [
+    {
+      "trait_type": "Access Level",
+      "value": "Business Meeting (confidential info)"
+    },
+    {
+      "trait_type": "Max Participants",
+      "value": 25
+    },
+    {
+      "trait_type": "Contract Signed",
+      "value": "Yes (on claim)"
+    },
+    {
+      "trait_type": "Whitelist",
+      "value": "No"
+    }
+  ],
+  "disclaimer": "This token represents a fictional meeting access pass and legal contract for demonstration purposes only. No real legal agreement or meeting access is granted."
+}
