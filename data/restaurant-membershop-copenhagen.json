@@ -3,7 +3,7 @@
   "description": "Exclusive membership token for the Copenhagen Web3 Dining Club. Holders enjoy priority reservations, special dining events, and exclusive perks at partner venues in Copenhagen.",
   "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/assets/restaurant-club.png",
   "attributes": [
-    {
+    { 
       "trait_type": "Membership Level",
       "value": "Exclusive"
     },
