@@ -1,0 +1,28 @@
+{
+  "name": "Copenhagen Restaurant Club Membership",
+  "description": "Exclusive membership token for the Copenhagen Web3 Dining Club. Holders enjoy priority reservations, special dining events, and exclusive perks at partner venues in Copenhagen.",
+  "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/assets/restaurant-club.png",
+  "attributes": [
+    { 
+      "trait_type": "Membership Level",
+      "value": "Exclusive"
+    },
+    {
+      "trait_type": "Location",
+      "value": "Copenhagen"
+    },
+    {
+      "trait_type": "Benefits",
+      "value": "Priority reservations, special events"
+    },
+    {
+      "trait_type": "Validity",
+      "value": "Ongoing"
+    },
+    {
+      "trait_type": "Whitelist",
+      "value": "No"
+    }
+  ],
+  "disclaimer": "This membership token is fictional and for demonstration purposes only. It does not confer any real-world rights or benefits."
+}
