@@ -4,7 +4,6 @@ const nextConfig = {
     if (!isServer && config.optimization.minimizer) {
       config.optimization.minimizer.forEach((plugin) => {
         if (plugin.constructor.name === 'TerserPlugin') {
-          // Exclude HeartbeatWorker.js from minification
           plugin.options.exclude = /HeartbeatWorker\.js$/;
         }
       });
