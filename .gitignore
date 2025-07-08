@@ -32,6 +32,8 @@ scripts/cache/
 .env
 .env.local
 .env.*.local
+.gitignore
+.
 
 # Logs
 npm-debug.log*
