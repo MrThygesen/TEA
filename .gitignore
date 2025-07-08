@@ -20,6 +20,14 @@ contracts/artifacts/
 contracts/cache/
 scripts/cache/
 
+contracts/*.sol
+!contracts/TEAToken.sol
+!contracts/TokenAllocationnew.sol
+!contracts/TokenVesting.sol
+!contracts/WebAccessSBTV3.sol
+
+
+
 # Optional lock files (uncomment if you want to ignore these)
 /package-lock.json
 /frontend/package-lock.json
