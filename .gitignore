@@ -12,6 +12,8 @@ node_modules/
 
 # Ignore frontend build and cache
 frontend/.next/
+!frontend/
+!frontend/**
 
 # Ignore contracts build artifacts and cache
 contracts/artifacts/
