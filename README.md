@@ -9,7 +9,7 @@ Deployed on the Polygon Amoy Testnet, TEA leverages Soulbound Tokens (SBTs) to p
 
 Produt demo is out now on https://tea-dn40fh6q8-metaheads-projects-5a43a03e.vercel.app/
 
-# TEA — Get Your Wallet Running with Ampoy
+# TEA — Get Your Wallet Running with Polygon Amoy
 
 Here’s a clean and well-formatted version of your text in **Markdown** with proper line breaks, lists, and clarity:
 
