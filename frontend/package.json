@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@rainbow-me/rainbowkit": "^2.2.8",
@@ -30,19 +31,5 @@
     "tailwindcss": "^4.1.11",
     "terser-webpack-plugin": "^5.3.14"
   }
-
-"scripts": {
-  "dev": "next dev",
-  "build": "next build",
-  "start": "next start",
-  "postinstall": "patch-package"
 }
-
-}
-
-
-
-
-
-
 
