@@ -63,11 +63,16 @@ Use the following configuration:
 
 ---
 
-## Contracts on Polygon Amoy Testnet
+## 🛠️ Contracts on Polygon Amoy Testnet
 
-TEAToken.sol            0x3477B92C56AFE14859dB695861306273bFC74B69, 
-TokenVesting.sol        0x1e69549fad1495ace3f99f39425240bca74ad6d6,
-TokenAllocationnew.sol  0x0fa9a93918c2e5fff06265d609648b5447fa3616
+- **TEAToken.sol**  
+  `0x3477B92C56AFE14859dB695861306273bFC74B69`
+
+- **TokenVesting.sol**  
+  `0x1e69549fad1495ace3f99f39425240bca74ad6d6`
+
+- **TokenAllocationnew.sol**  
+  `0x0fa9a93918c2e5fff06265d609648b5447fa3616`
 
 
 ---
