@@ -5,6 +5,10 @@
 !.gitignore
 !contracts/
 !contracts/**
+!frontend/
+!frontend/**
+!patches/
+!patches/**
 
 # Ignore node_modules everywhere
 node_modules/
@@ -12,21 +16,18 @@ node_modules/
 
 # Ignore frontend build and cache
 frontend/.next/
-!frontend/
-!frontend/**
 
 # Ignore contracts build artifacts and cache
 contracts/artifacts/
 contracts/cache/
 scripts/cache/
 
+# Track only selected contracts
 contracts/*.sol
 !contracts/TEAToken.sol
 !contracts/TokenAllocationnew.sol
 !contracts/TokenVesting.sol
 !contracts/WebAccessSBTV3.sol
-
-
 
 # Optional lock files (uncomment if you want to ignore these)
 /package-lock.json
@@ -42,10 +43,9 @@ contracts/*.sol
 .env
 .env.local
 .env.*.local
-.gitignore
-.
 
 # Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
