@@ -1,5 +1,5 @@
 # TEA — Web3 Trust, Identity & Loyalty Platform
-
+  
 **Project TEA** is an innovative Web3 platform designed to revolutionize trust and identity by combining decentralized meetings, loyalty programs, smart legal contracts, and social agreements — all powered by blockchain technology.
 
 Deployed on the Polygon Amoy Testnet, TEA leverages Soulbound Tokens (SBTs) to provide verified identity and loyalty perks for individual and group interactions, alongside admin tools for creating enforceable agreements and future-proof escrow solutions.
@@ -11,19 +11,28 @@ Produt demo is out now on https://tea-dn40fh6q8-metaheads-projects-5a43a03e.verc
 
 # TEA — Get Your Wallet Running with Ampoy
 
-If you are new to web3, you could install metamask as a browser extension. 
-and add Polygon Amoy Testnet manually (otherwise it will not work)
+Here’s a clean and well-formatted version of your text in **Markdown** with proper line breaks, lists, and clarity:
 
-The necessary information includes the network name, RPC URL, chain ID, currency symbol, and block explorer URL. 
+---
 
-For Amoy, these are: 
-Chain ID: 80002,
-Network name: Polygon Amoy, 
-New RPC URL: https://polygon-amoy-bor-rpc.publicnode.com, 
-Currency symbol: MATIC, 
-Block explorer URL: https://amoy.polygonscan.com
+### 🧭 Setting Up MetaMask for Web3 Access
 
+If you're new to Web3, you'll need to install [MetaMask](https://metamask.io/) as a browser extension.
+To interact with our demo, you'll also need to **manually add the Polygon Amoy Testnet** to MetaMask (this is required, otherwise it won’t work).
 
+---
+
+### 🔧 Add Polygon Amoy Testnet to MetaMask
+
+Use the following configuration:
+
+```
+📛  Network Name:      Polygon Amoy
+🔗  New RPC URL:       https://polygon-amoy-bor-rpc.publicnode.com
+🆔  Chain ID:          80002
+💰  Currency Symbol:   MATIC
+🔍  Block Explorer:    https://amoy.polygonscan.com
+```
 ---
 
 ## Why TEA?
