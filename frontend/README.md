@@ -5,13 +5,9 @@
 Deployed on the Polygon Amoy Testnet, TEA leverages Soulbound Tokens (SBTs) to provide verified identity and loyalty perks for individual and group interactions, alongside admin tools for creating enforceable agreements and future-proof escrow solutions.
 
 
-# TEA — Produt demo on Polygon Amoy Testnet
+# TEA — Product demo on Polygon Amoy Testnet
 
-Produt demo is out now on https://tea-dn40fh6q8-metaheads-projects-5a43a03e.vercel.app/
-
-# TEA — Get Your Wallet Running with Polygon Amoy
-
-Here’s a clean and well-formatted version of your text in **Markdown** with proper line breaks, lists, and clarity:
+Product demo is out now on https://tea-dn40fh6q8-metaheads-projects-5a43a03e.vercel.app/
 
 ---
 
