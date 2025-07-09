@@ -1,21 +1,30 @@
+
+# Info / Documentation
+!README.md
+
+
 # Ignore everything by default
 /*
 
-# But allow these folders and their contents
+# Allow these folders and their contents
 !.gitignore
 !frontend/
 !frontend/**
 
 !contracts/
+!patches/
+!patches/**
+
+# Allow only selected contract files
 !contracts/TEAToken.sol
 !contracts/TokenAllocationnew.sol
 !contracts/TokenVesting.sol
 !contracts/WebAccessSBTV3.sol
 
-!patches/
-!patches/**
+# Explicitly ignore all other contract Solidity files
+contracts/*.sol
 
-# Exclude unwanted contract subfolders
+# Ignore contract build artifacts and cache
 contracts/artifacts/
 contracts/cache/
 contracts/test/
@@ -28,7 +37,7 @@ node_modules/
 # Frontend build and cache
 frontend/.next/
 
-# Lock files (optional)
+# Optional lock files
 package-lock.json
 frontend/package-lock.json
 contracts/package-lock.json
@@ -49,5 +58,3 @@ yarn-debug.log*
 yarn-error.log*
 
 
-# Info             
-!README.md
