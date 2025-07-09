@@ -4,6 +4,26 @@
 
 Deployed on the Polygon Amoy Testnet, TEA leverages Soulbound Tokens (SBTs) to provide verified identity and loyalty perks for individual and group interactions, alongside admin tools for creating enforceable agreements and future-proof escrow solutions.
 
+
+# TEA — Produt demo on Polygon Amoy Testnet
+
+Produt demo is out now on https://tea-dn40fh6q8-metaheads-projects-5a43a03e.vercel.app/
+
+# TEA — Get Your Wallet Running with Ampoy
+
+If you are new to web3, you could install metamask as a browser extension. 
+and add Polygon Amoy Testnet manually (otherwise it will not work)
+
+The necessary information includes the network name, RPC URL, chain ID, currency symbol, and block explorer URL. 
+
+For Amoy, these are: 
+Chain ID: 80002,
+Network name: Polygon Amoy, 
+New RPC URL: https://polygon-amoy-bor-rpc.publicnode.com, 
+Currency symbol: MATIC, 
+Block explorer URL: https://amoy.polygonscan.com
+
+
 ---
 
 ## Why TEA?

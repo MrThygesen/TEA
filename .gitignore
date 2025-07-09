@@ -1,51 +1,53 @@
 # Ignore everything by default
 /*
 
-# Except these files/folders:
+# But allow these folders and their contents
 !.gitignore
-!contracts/
-!contracts/**
 !frontend/
 !frontend/**
-!patches/
-!patches/**
 
-# Ignore node_modules everywhere
-node_modules/
-**/node_modules/
-
-# Ignore frontend build and cache
-frontend/.next/
-
-# Ignore contracts build artifacts and cache
-contracts/artifacts/
-contracts/cache/
-scripts/cache/
-
-# Track only selected contracts
-contracts/*.sol
+!contracts/
 !contracts/TEAToken.sol
 !contracts/TokenAllocationnew.sol
 !contracts/TokenVesting.sol
 !contracts/WebAccessSBTV3.sol
 
-# Optional lock files (uncomment if you want to ignore these)
-/package-lock.json
-/frontend/package-lock.json
-/contracts/package-lock.json
+!patches/
+!patches/**
 
-# OS and editor files
-.DS_Store
-.vscode/
-.idea/
+# Exclude unwanted contract subfolders
+contracts/artifacts/
+contracts/cache/
+contracts/test/
+scripts/cache/
+
+# Node modules
+node_modules/
+**/node_modules/
+
+# Frontend build and cache
+frontend/.next/
+
+# Lock files (optional)
+package-lock.json
+frontend/package-lock.json
+contracts/package-lock.json
 
 # Environment files
 .env
 .env.local
 .env.*.local
 
+# OS and editor files
+.DS_Store
+.vscode/
+.idea/
+
 # Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+
+# Info             
+!README.md
