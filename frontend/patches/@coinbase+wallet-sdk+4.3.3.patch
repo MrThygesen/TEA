@@ -1,0 +1,27 @@
+diff --git a/node_modules/@coinbase/wallet-sdk/dist/sign/walletlink/relay/connection/HeartbeatWorker.js b/node_modules/@coinbase/wallet-sdk/dist/sign/walletlink/relay/connection/HeartbeatWorker.js
+index 2a4bce6..087b721 100644
+--- a/node_modules/@coinbase/wallet-sdk/dist/sign/walletlink/relay/connection/HeartbeatWorker.js
++++ b/node_modules/@coinbase/wallet-sdk/dist/sign/walletlink/relay/connection/HeartbeatWorker.js
+@@ -48,5 +48,4 @@ function stopHeartbeat() {
+ self.addEventListener('beforeunload', () => {
+     stopHeartbeat();
+ });
+-export {};
+ //# sourceMappingURL=HeartbeatWorker.js.map
+diff --git a/node_modules/@coinbase/wallet-sdk/dist/sign/walletlink/relay/connection/WalletLinkConnection.js b/node_modules/@coinbase/wallet-sdk/dist/sign/walletlink/relay/connection/WalletLinkConnection.js
+index e067384..dee5646 100644
+--- a/node_modules/@coinbase/wallet-sdk/dist/sign/walletlink/relay/connection/WalletLinkConnection.js
++++ b/node_modules/@coinbase/wallet-sdk/dist/sign/walletlink/relay/connection/WalletLinkConnection.js
+@@ -289,8 +289,10 @@ export class WalletLinkConnection {
+         }
+         try {
+             // We put the heartbeat interval on a worker to avoid dropping the websocket connection when the webpage is backgrounded.
+-            const workerUrl = new URL('./HeartbeatWorker.js', import.meta.url);
+-            this.heartbeatWorker = new Worker(workerUrl, { type: 'module' });
++           // const workerUrl = new URL('./HeartbeatWorker.js', import.meta.url);
++           // this.heartbeatWorker = new Worker(workerUrl, { type: 'module' }); 
++           this.heartbeatWorker = null;
++
+             this.setupWorkerListeners();
+             this.heartbeatWorker.postMessage({ type: 'start' });
+         }
