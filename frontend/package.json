@@ -31,4 +31,5 @@
     "tailwindcss": "^4.1.11",
     "terser-webpack-plugin": "^5.3.14"
   }
+}
 
