@@ -71,7 +71,30 @@ Use the following configuration:
   `0x0fa9a93918c2e5fff06265d609648b5447fa3616`
 
 
----
+- **WebAccessSBTV3.sol**  
+  `0x3276C93eeFFad65426B0bd1B4d6eEfa105FEd6B2`
+
+
+- **Investigate your transactions to claim undelivered SBTs**  
+  `0x576c2c7544c180De7EBCa37d25c6c08Db543bBBF` 
+
+
+    In some testnets, the SBT / NFT are not shown directly and has to be imported to be visible in the wallet.
+    This has for instance occured in the metamasks mobilephone wallet.
+
+    Look in the NFT section and insert the contract number: 0x576c2c7544c180De7EBCa37d25c6c08Db543bBBF (this is the main SBT address) and find your token ID and insert
+    it as collectible ID.
+
+    The Token ID is found easily with below link for PolygonScan with your wallet-account-number. Here is the overview of all transactions made with your account on
+    polygon amoy testnet.
+
+    The one you are looking has the Method: claim, click on transaction hash and find the Token ID. Insert numbers and import the file.
+
+    SBT Contract on Polygon Amoy Testnet:
+    https://amoy.polygonscan.com/address/wallet-account-number, 
+
+    Remember that all contracts on testnet are only for testing and development, and does not count for free offers before its announced. 
+
 
 ## Roadmap & Future Plans
 
