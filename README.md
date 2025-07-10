@@ -79,21 +79,29 @@ Use the following configuration:
   `0x576c2c7544c180De7EBCa37d25c6c08Db543bBBF` 
 
 
-    In some testnets, the SBT / NFT are not shown directly and has to be imported to be visible in the wallet.
-    This has for instance occured in the metamasks mobilephone wallet.
+   ## Viewing Your SBT on MetaMask (Polygon Amoy Testnet)
 
-    Look in the NFT section and insert the contract number: 0x576c2c7544c180De7EBCa37d25c6c08Db543bBBF (this is the main SBT address) and find your token ID and insert
-    it as collectible ID.
+In some testnets, SBTs/NFTs are not shown directly in wallets and must be imported manually. This has been observed, for instance, in the MetaMask mobile wallet.
 
-    The Token ID is found easily with below link for PolygonScan with your wallet-account-number. Here is the overview of all transactions made with your account on
-    polygon amoy testnet.
+### How to View Your SBT:
 
-    The one you are looking has the Method: claim, click on transaction hash and find the Token ID. Insert numbers and import the file.
+1. Open MetaMask and go to the **NFT** section.
+2. Click **Import NFTs**.
+3. Insert the contract address:  
+   **`0x576c2c7544c180De7EBCa37d25c6c08Db543bBBF`**  
+   *(This is the main SBT contract address.)*
+4. Find your **Token ID** using the link below:
+   - Go to [PolygonScan Amoy Testnet](https://amoy.polygonscan.com/address/wallet-account-number)
+   - Replace `wallet-account-number` with your actual wallet address.
+   - Look for the transaction with **Method: claim**
+   - Click the **transaction hash**
+   - Find the **Token ID** in the transaction details
+5. Enter the **Token ID** as the *Collectible ID* in MetaMask and complete the import.
 
-    SBT Contract on Polygon Amoy Testnet:
-    https://amoy.polygonscan.com/address/wallet-account-number, 
+---
 
-    Remember that all contracts on testnet are only for testing and development, and does not count for free offers before its announced. 
+> ⚠️ **Important:** All contracts on testnet are for testing and development purposes only. They do **not** represent free offers or real assets unless officially announced.
+
 
 
 ## Roadmap & Future Plans
