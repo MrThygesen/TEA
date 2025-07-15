@@ -1,20 +1,9 @@
 {
-  "name": "Free Yearly Meeting Pass",
-  "description": "This token grants the holder access to the general TEA Project Telegram group for meetings throughout the year. It is valid for one year from the date of claiming.",
-  "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/assets/yearly-pass.png",
-  "attributes": [
-    {
-      "trait_type": "Access Level",
-      "value": "General Telegram Group"
-    },
-    {
-      "trait_type": "Validity",
-      "value": "1 Year"
-    },
-    {
-      "trait_type": "Whitelist",
-      "value": "No"
-    }
-  ],
-  "disclaimer": "This token is fictional and used only for demonstration. Access to any Telegram group is illustrative and not real."
-}
+  "name": "Free Pass",
+  "description": "Holding the Free Pass gives you access to telegram and announced Free meetings",
+  "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/tea.png",
+  "tags": ["Organize", "Hangoout", "Be Cool" ], 
+  "extra Info": ["There will be many perks and good fun to participate in the telegram group" ],
+ 
+  }
+

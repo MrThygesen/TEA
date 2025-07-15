@@ -1,10 +1,8 @@
 {
-  "name": "Business Meeting with confidential information",
-  "description": "This token represents a business meeting under mutual NDA. By claiming, you agree to the attached confidentiality terms.",
-  "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/assets/business-meeting.png",
-  "attributes": [
-    { "trait_type": "Meeting Type", "value": "NDA-bound" },
-    { "trait_type": "Location", "value": "Telegram" }
-  ],
+  "name": "Confidential Business Meeting",
+  "description": "SBT for private discussions over coffee with NDA option.",
+  "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/tea.png",
+  "tags": ["business", "NDA", "whitelist"], 
   "legalDisclaimer": "Claiming this token constitutes agreement to the NDA terms outlined at: https://github.com/MrThygesen/TEA/blob/main/legal/NDA_v1.pdf"
 }
+

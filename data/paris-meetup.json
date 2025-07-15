@@ -1,5 +1,8 @@
 {
-  "name": "Free Coffee - Café Nice Paris",
-  "description": "One free coffee at Café Nice, Paris. Valid during July 2025. (The token is made for a demo, so there is no free coffee) ",
-  "image": "https://yourdomain.com/images/paris-coffee.png"
-}
+  "name": "Coffee and tea in Paris",
+  "description": "Enjoy your 10% while meeting other Web3 people",
+  "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/tea.png",
+  "tags": ["Coffee", "Discount","Social"], 
+  "extra Info": ["Partners with discount in Paris will be announced later" ], 
+  }
+

@@ -1,20 +1,7 @@
 {
   "name": "Free Coffee - Café Nice in Berlin",
-  "description": "Redeemable for one free coffee at any TEA partner venue.",
-  "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/assets/coffee-voucher.png",
-  "attributes": [
-    {
-      "trait_type": "Type",
-      "value": "Loyalty Reward"
-    },
-    {
-      "trait_type": "Redeemable",
-      "value": "Yes"
-    },
-    {
-      "trait_type": "Venue Access",
-      "value": "All"
-    }
-  ],
-  "disclaimer": "This token, including the 'Free Coffee Voucher' and its associated attributes, is entirely fictional and for demonstration purposes only. It does not represent a real, redeemable voucher or digital asset. All content and values are created solely for illustrative purposes and have no actual value or validity."
+  "description": "Tru the new cafe in Berlin with your new Web3 friends and get a free expresso",
+  "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/tea.png",
+  "tags": ["Breakfast", "Dating", "Coffee"]
 }
+
