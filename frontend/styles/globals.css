@@ -1,12 +1,13 @@
+/* globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body {
-  margin: 0;
+html, body {
   padding: 0;
-  font-family: system-ui, sans-serif;
+  margin: 0;
+  min-height: 100%;
+  background-color: #f9fafb; /* light bg */
+  font-family: 'Inter', sans-serif;
 }
-
-
 

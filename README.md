@@ -81,9 +81,13 @@ Use the following configuration:
 
    ## Viewing Your SBT on MetaMask (Polygon Amoy Testnet)
 
-In some testnets, SBTs/NFTs are not shown directly in wallets and must be imported manually. This has been observed, for instance, in the MetaMask mobile wallet.
+1. Open MetaMask and go to the **NFT** section.
+2. View **your SBTs**. 
 
-### How to View Your SBT:
+
+BUT> In some testnets, SBTs/NFTs are not shown directly in wallets and must be imported manually. This has been observed, for instance, in the MetaMask mobile wallet.
+
+### How to View Your SBT is not shown and transaction has been made:
 
 1. Open MetaMask and go to the **NFT** section.
 2. Click **Import NFTs**.
