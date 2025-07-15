@@ -10,7 +10,10 @@
   },
   "dependencies": {
     "@rainbow-me/rainbowkit": "^2.2.8",
+    "@reown/appkit": "^1.7.15",
+    "@reown/appkit-controllers": "^1.7.15",
     "@tanstack/react-query": "^5.0.0",
+    "@walletconnect/ethereum-provider": "^2.18.1",
     "alchemy-sdk": "^2.10.2",
     "ethers": "^6.14.4",
     "lucide-react": "^0.525.0",
@@ -30,6 +33,18 @@
     "postinstall-postinstall": "^2.1.0",
     "tailwindcss": "^4.1.11",
     "terser-webpack-plugin": "^5.3.14"
+  }, 
+"overrides": {
+  "@walletconnect/ethereum-provider": {
+    "@reown/appkit": "1.7.15",
+    "@reown/appkit-controllers": "1.7.15"
+  },
+  "@wagmi/connectors": {
+    "@reown/appkit": "1.7.15",
+    "@reown/appkit-controllers": "1.7.15"
   }
 }
+
+  }
+
 
