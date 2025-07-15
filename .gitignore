@@ -1,0 +1,95 @@
+# Ignore everything by default
+/*
+
+# Ignore lib and embedded git repos
+lib/
+vesting-tests/
+
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+
+# Allow core files
+!.gitignore
+!README.md
+
+# Allow data folder and everything inside
+!data/
+!data/**
+
+# Allow frontend base folder and selected files
+!frontend/
+!frontend/components/
+!frontend/components/WebAccessSBT.js
+!frontend/components/AdminSBTManager.js
+
+!frontend/pages/
+!frontend/pages/_app.js
+!frontend/pages/index.js
+!frontend/pages/tea.png
+
+# Allow other useful frontend folders
+!frontend/styles/
+!frontend/styles/globals.css
+!frontend/public/
+!frontend/public/**
+!frontend/utils/
+!frontend/utils/**
+!frontend/chains/
+!frontend/chains/**
+!frontend/abis/
+!frontend/abis/**
+
+!frontend/jsconfig.json
+!frontend/package.json
+!frontend/next.config.js
+!frontend/tailwind.config.js
+!frontend/postcss.config.js
+!frontend/LICENSE
+!frontend/README.md
+
+# Allow essential contract files
+!contracts/
+!contracts/TEAToken.sol
+!contracts/TokenAllocationnew.sol
+!contracts/TokenVesting.sol
+!contracts/WebAccessSBTV3.sol
+
+# Allow patches
+!patches/
+!patches/**
+
+# Ignore all other .sol files (already covered above but kept for clarity)
+contracts/*.sol
+
+# Ignore contract build artifacts and cache
+contracts/artifacts/
+contracts/cache/
+contracts/test/
+scripts/cache/
+
+# Ignore frontend build artifacts and lock files
+frontend/.next/
+frontend/dist/
+frontend/package-lock.json
+
+# Ignore node_modules
+node_modules/
+**/node_modules/
+
+# Ignore environment files
+.env
+.env.local
+.env.*.local
+
+# Editor/OS files
+.DS_Store
+.vscode/
+.idea/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
