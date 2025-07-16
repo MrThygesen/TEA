@@ -1,0 +1,9 @@
+{
+  "name": "Art Night Entry - Paris Pop-up",
+  "description": "Gain access to our monthly Paris pop-up gallery event with free wine and live art.",
+  "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/tea.png",
+  "tags": ["art", "event", "gallery", "paris"],
+  "external_url": "https://tea-network.xyz/events/paris-art",
+  "social_link": "https://t.me/tea_paris"
+}
+
