@@ -1,0 +1,12 @@
+
+https://example.com/metadata/2.json
+Burnable
+Whitelist
+100
+Create
+Activate
+Deactivate
+👤 Organizer Management
+0x... Organizer
+Set
+✉️ Whitelist Management

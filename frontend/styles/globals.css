@@ -1,13 +1,8 @@
-/* globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-html, body {
-  padding: 0;
-  margin: 0;
-  min-height: 100%;
-  background-color: #f9fafb; /* light bg */
-  font-family: 'Inter', sans-serif;
+html {
+  scroll-behavior: smooth;
 }
 

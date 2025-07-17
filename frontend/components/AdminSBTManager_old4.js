@@ -6,29 +6,7 @@ import { WebAccessSBTV3_ABI } from '../abis/WebAccessSBTV3_ABI'
 import { toast } from 'react-hot-toast'
 
 const CONTRACT_ADDRESS = '0x576c2c7544c180De7EBCa37d25c6c08Db543bBBF'
-const MAX_TYPES = 30
-
-const availableTemplates = [
-  'nightlife-pass.json',
-  'confidential-meeting-pass.json',
-  'coffee-loyalty.json',
-  'paris-art-night.json',
-  'evening-wine-pass.json',
-  'berlin-breakfast.json',
-  'business-meeting.json',
-  'confidential-business-meeting.json',
-  'restaurant-membership-copenhagen.json',
-  'meeting-pass.json',
-  'paris-meetup.json',
-  'free_coffee.json',
-  'restaurant-membership-berlin.json',
-  'berlin.json',
-  'copenhagen.json',
-  'vip-pass.json',
-  'event-entry.json',
-  'discount-card.json',
-  'free-drink.json',
-]
+const MAX_TYPES = 20
 
 export default function AdminSBTManager() {
   const { address } = useAccount()
@@ -41,11 +19,14 @@ export default function AdminSBTManager() {
   const [typeId, setTypeId] = useState(1n)
   const [loading, setLoading] = useState(false)
 
+  const [editUri, setEditUri] = useState('')
+  const [editMaxSupply, setEditMaxSupply] = useState('')
   const [sbtTypesData, setSbtTypesData] = useState([])
   const [burnTokenId, setBurnTokenId] = useState('')
   const [previewData, setPreviewData] = useState(null)
 
-  const isAdmin = address?.toLowerCase() === process.env.NEXT_PUBLIC_ADMIN?.toLowerCase()
+  const isAdmin =
+    address?.toLowerCase() === process.env.NEXT_PUBLIC_ADMIN?.toLowerCase()
 
   useEffect(() => {
     if (!publicClient) return
@@ -60,7 +41,7 @@ export default function AdminSBTManager() {
             functionName: 'sbtTypes',
             args: [i],
           })
-          const [uri, burnableFlag, active, maxSupplyBig, mintedBig] = sbtType
+          const [uri, active, burnableFlag, maxSupplyBig, mintedBig] = sbtType
           const maxSupplyNum = Number(maxSupplyBig.toString())
           const mintedNum = Number(mintedBig.toString())
 
@@ -95,7 +76,7 @@ export default function AdminSBTManager() {
   }, [publicClient, loading])
 
   const buildUri = (filename) =>
-    `https://raw.githubusercontent.com/MrThygesen/TEA/main/data/${filename}`
+    `https://raw.githubusercontent.com/MrThygesen/TEA/main/data/${filename.replace(/\.json$/, '')}.json`
 
   const handlePreview = async () => {
     const uri = buildUri(title)
@@ -122,7 +103,7 @@ export default function AdminSBTManager() {
         address: CONTRACT_ADDRESS,
         abi: WebAccessSBTV3_ABI,
         functionName: 'createSBTType',
-        args: [typeId, uri, burnable, BigInt(maxSupply), false],
+        args: [typeId, uri, burnable, BigInt(maxSupply), false], // 5 args for V3
       })
       toast.success('SBT type created')
     } catch (err) {
@@ -138,8 +119,8 @@ export default function AdminSBTManager() {
       await writeContractAsync({
         address: CONTRACT_ADDRESS,
         abi: WebAccessSBTV3_ABI,
-        functionName: 'setActive',
-        args: [typeId, true],
+        functionName: 'activateSBTType',
+        args: [typeId],
       })
       toast.success('SBT type activated')
     } catch (err) {
@@ -155,8 +136,8 @@ export default function AdminSBTManager() {
       await writeContractAsync({
         address: CONTRACT_ADDRESS,
         abi: WebAccessSBTV3_ABI,
-        functionName: 'setActive',
-        args: [typeId, false],
+        functionName: 'deactivateSBTType',
+        args: [typeId],
       })
       toast.success('SBT type deactivated')
     } catch (err) {
@@ -206,19 +187,14 @@ export default function AdminSBTManager() {
           onChange={(e) => setTypeId(BigInt(e.target.value))}
           className="w-full mb-4 p-2 border rounded"
         />
-        <label className="block mb-1">Metadata Template</label>
-        <select
+        <label className="block mb-1">Title / Filename</label>
+        <input
+          type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
+          placeholder="e.g. coffee-loyalty"
           className="w-full mb-4 p-2 border rounded"
-        >
-          <option value="">Select metadata</option>
-          {availableTemplates.map((file, index) => (
-            <option key={index} value={file}>
-              {file}
-            </option>
-          ))}
-        </select>
+        />
         <label className="block mb-1">Max Supply</label>
         <input
           type="number"
@@ -290,8 +266,8 @@ export default function AdminSBTManager() {
               <div>
                 <h5 className="text-lg font-semibold mb-1">{previewData.name}</h5>
                 <p className="text-sm text-gray-700 mb-2">{previewData.description}</p>
-                {previewData.tags && (
-                  <div className="flex flex-wrap gap-2 mb-2">
+                {previewData.tags && previewData.tags.length > 0 && (
+                  <div className="flex flex-wrap mb-2" style={{ gap: '8px' }}>
                     {previewData.tags.map((tag, index) => (
                       <span
                         key={index}
@@ -302,6 +278,31 @@ export default function AdminSBTManager() {
                     ))}
                   </div>
                 )}
+                <div className="mb-2 space-y-1">
+                  {previewData.external_url && (
+                    <a
+                      href={previewData.external_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 underline text-sm block"
+                    >
+                      Official Website
+                    </a>
+                  )}
+                  {previewData.social_link && (
+                    <a
+                      href={previewData.social_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 underline text-sm block"
+                    >
+                      Social Link
+                    </a>
+                  )}
+                </div>
+                <pre className="text-xs text-gray-600 whitespace-pre-wrap break-words max-w-sm">
+                  {JSON.stringify(previewData, null, 2)}
+                </pre>
               </div>
             </div>
           </div>
