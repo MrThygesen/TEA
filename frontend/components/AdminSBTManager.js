@@ -1,4 +1,4 @@
-'use client'
+'use client' 
 
 import { useState, useEffect } from 'react'
 import { useAccount, useWriteContract, usePublicClient } from 'wagmi'
@@ -6,7 +6,7 @@ import { WebAccessSBTV3_ABI } from '../abis/WebAccessSBTV3_ABI'
 import { toast } from 'react-hot-toast'
 
 const CONTRACT_ADDRESS = '0x576c2c7544c180De7EBCa37d25c6c08Db543bBBF'
-const MAX_TYPES = 30
+const MAX_TYPES = 50
 
 const availableTemplates = [
   'nightlife-pass.json',
@@ -30,6 +30,9 @@ const availableTemplates = [
   'free-drink.json',
 ]
 
+
+
+
 export default function AdminSBTManager() {
   const { address } = useAccount()
   const publicClient = usePublicClient()
@@ -47,12 +50,13 @@ export default function AdminSBTManager() {
 
   const isAdmin = address?.toLowerCase() === process.env.NEXT_PUBLIC_ADMIN?.toLowerCase()
 
+
   useEffect(() => {
     if (!publicClient) return
 
     async function fetchTypes() {
       const types = []
-      for (let i = 1; i <= MAX_TYPES; i++) {
+      for (let i = 10; i <= MAX_TYPES; i++) {
         try {
           const sbtType = await publicClient.readContract({
             address: CONTRACT_ADDRESS,

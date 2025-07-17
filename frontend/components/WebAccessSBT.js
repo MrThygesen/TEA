@@ -21,10 +21,10 @@ export default function WebAccessSBT() {
   const fetchAvailableSBTs = useCallback(async () => {
     if (!address || !publicClient) return
 
-    const maxTypeCount = 20
+    const maxTypeCount = 50
     const found = []
 
-    for (let i = 1; i <= maxTypeCount; i++) {
+    for (let i = 10; i <= maxTypeCount; i++) {
       try {
         const [sbtType, hasClaimed] = await Promise.all([
           publicClient.readContract({
@@ -83,6 +83,7 @@ export default function WebAccessSBT() {
         abi: WebAccessSBTV3_ABI,
         functionName: 'claim',
         args: [typeId],
+        gas: BigInt(200_000), // ✅ manually set gas for Amoy
       })
       toast.success(`🎉 Claimed SBT type ${typeId}`)
       await fetchAvailableSBTs()
@@ -105,7 +106,6 @@ export default function WebAccessSBT() {
       } min-h-screen p-4 transition-colors duration-300`}
     >
       <div className="max-w-7xl mx-auto">
-        {/* Top Bar */}
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
           <input
             type="text"
@@ -197,7 +197,6 @@ export default function WebAccessSBT() {
           </div>
         )}
 
-        {/* === PREVIEW MODAL === */}
         {previewSBT && (
           <div
             className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center z-50"
