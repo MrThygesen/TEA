@@ -1,9 +1,0 @@
-{
-  "name": "Private Business Meeting Room",
-  "description": "Book a private room for business meetings or small gatherings with your SBT pass.",
-  "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/tea.png",
-  "tags": ["meeting", "business", "private", "venue"],
-  "external_url": "https://tea-network.xyz/venues/private-meeting",
-  "social_link": "https://t.me/tea_network_club"
-}
-  

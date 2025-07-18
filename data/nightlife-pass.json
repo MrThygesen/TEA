@@ -1,8 +1,0 @@
-{
-  "name": "Beer Pass",
-  "description": "Get 20% drinks all night at our selected partners",
-  "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/tea.png",
-  "tags": ["loyalty", "coffee", "reward"],
-  "external_url": "https://tea-network.xyz/loyalty",
-  "social_link": "https://t.me/tea_network"
-}

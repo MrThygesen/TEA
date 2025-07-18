@@ -1,8 +1,0 @@
-{
-  "name": "Coffee Voucher",
-  "description": "Free coffee (this is just a non-real example)",
-  "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/tea.png",
-  "tags": ["Dinner", "Restaurant-Crawl","Social" ], 
-  "extra Info": ["We are not servomg free coffee this is just a demo example of how the system works" ], 
-  }
-

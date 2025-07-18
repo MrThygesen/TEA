@@ -1,4 +1,4 @@
-'use client' 
+'use client'
 
 import { useState, useEffect } from 'react'
 import { useAccount, useWriteContract, usePublicClient } from 'wagmi'
@@ -7,31 +7,6 @@ import { toast } from 'react-hot-toast'
 
 const CONTRACT_ADDRESS = '0x576c2c7544c180De7EBCa37d25c6c08Db543bBBF'
 const MAX_TYPES = 50
-
-const availableTemplates = [
-  'nightlife-pass.json',
-  'confidential-meeting-pass.json',
-  'coffee-loyalty.json',
-  'paris-art-night.json',
-  'evening-wine-pass.json',
-  'berlin-breakfast.json',
-  'business-meeting.json',
-  'confidential-business-meeting.json',
-  'restaurant-membership-copenhagen.json',
-  'meeting-pass.json',
-  'paris-meetup.json',
-  'free_coffee.json',
-  'restaurant-membership-berlin.json',
-  'berlin.json',
-  'copenhagen.json',
-  'vip-pass.json',
-  'event-entry.json',
-  'discount-card.json',
-  'free-drink.json',
-]
-
-
-
 
 export default function AdminSBTManager() {
   const { address } = useAccount()
@@ -45,11 +20,40 @@ export default function AdminSBTManager() {
   const [loading, setLoading] = useState(false)
 
   const [sbtTypesData, setSbtTypesData] = useState([])
+  const [availableTemplates, setAvailableTemplates] = useState([])
   const [burnTokenId, setBurnTokenId] = useState('')
   const [previewData, setPreviewData] = useState(null)
 
   const isAdmin = address?.toLowerCase() === process.env.NEXT_PUBLIC_ADMIN?.toLowerCase()
 
+  const buildUri = (filename) =>
+    `https://raw.githubusercontent.com/MrThygesen/TEA/main/data/${filename}`
+
+  const formatDisplayName = (filename) => {
+    return filename
+      .replace('.json', '')
+      .replace(/[_-]/g, ' ')
+      .replace(/\b\w/g, (l) => l.toUpperCase())
+  }
+
+  useEffect(() => {
+    async function fetchTemplates() {
+      try {
+        const res = await fetch(
+          'https://api.github.com/repos/MrThygesen/TEA/contents/data'
+        )
+        const data = await res.json()
+        const jsonFiles = data
+          .filter((file) => file.name.endsWith('.json'))
+          .map((file) => file.name)
+        setAvailableTemplates(jsonFiles)
+      } catch (err) {
+        console.error('Failed to fetch templates from GitHub:', err)
+      }
+    }
+
+    fetchTemplates()
+  }, [])
 
   useEffect(() => {
     if (!publicClient) return
@@ -97,9 +101,6 @@ export default function AdminSBTManager() {
 
     fetchTypes()
   }, [publicClient, loading])
-
-  const buildUri = (filename) =>
-    `https://raw.githubusercontent.com/MrThygesen/TEA/main/data/${filename}`
 
   const handlePreview = async () => {
     const uri = buildUri(title)
@@ -219,7 +220,7 @@ export default function AdminSBTManager() {
           <option value="">Select metadata</option>
           {availableTemplates.map((file, index) => (
             <option key={index} value={file}>
-              {file}
+              {formatDisplayName(file)}
             </option>
           ))}
         </select>
