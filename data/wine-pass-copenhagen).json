@@ -1,10 +1,12 @@
   {
     "name": "Wine Group",
     "description": "Buy 2 glass of wine get 1 free - all night at our selected partners",
-    "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/tea.png",
+    "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/wine-club-clean.png",
     "tags": ["loyalty", "beer", "social"],
     "details1": "Access the beer club via selected venues. Vote on events and perks.",
     "details2": "SBT grants Telegram access and proof of the wine club membership",
     "external_url": "https://t.me/beerclub_cph_events",
-    "social_link": "https://t.me/beerclub_cph"
+    "social_link": "https://t.me/beerclub_cph",
+    "responsible": "Julie"
+
   }

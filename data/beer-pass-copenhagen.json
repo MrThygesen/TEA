@@ -1,10 +1,11 @@
   {
     "name": "Beer Pass",
     "description": "Buy 2 beers get 1 free - all night at our selected partners",
-    "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/tea.png",
+    "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/beer-club.png",
     "tags": ["loyalty", "beer", "social"],
     "details1": "Access the beer club via selected venues. Vote on events and perks.",
     "details2": "SBT grants Telegram access and proof of beer club membership",
     "external_url": "https://t.me/beerclub_cph_events",
-    "social_link": "https://t.me/beerclub_cph"
+    "social_link": "https://t.me/beerclub_cph", 
+    "responsible": "Morten" 
   }
