@@ -1,11 +1,13 @@
+
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useAccount, useWriteContract, usePublicClient } from 'wagmi'
-import { WebAccessSBTV3_ABI } from '../abis/WebAccessSBTV3_ABI'
+import WebAccessSBTV31_ABI from '../abis/WebAccessSBTV31_ABI.json'
 import { toast } from 'react-hot-toast'
 
-const CONTRACT_ADDRESS = '0x576c2c7544c180De7EBCa37d25c6c08Db543bBBF'
+
+const CONTRACT_ADDRESS = '0x67c4654C71d665DC94c507cF35Adf03031db9655'
 const MAX_TYPES = 50
 
 export default function AdminSBTManager() {
@@ -60,11 +62,11 @@ export default function AdminSBTManager() {
 
     async function fetchTypes() {
       const types = []
-      for (let i = 10; i <= MAX_TYPES; i++) {
+      for (let i = 26; i <= MAX_TYPES; i++) {
         try {
           const sbtType = await publicClient.readContract({
             address: CONTRACT_ADDRESS,
-            abi: WebAccessSBTV3_ABI,
+            abi: WebAccessSBTV31_ABI,
             functionName: 'sbtTypes',
             args: [i],
           })
@@ -125,7 +127,7 @@ export default function AdminSBTManager() {
       const uri = buildUri(title)
       await writeContractAsync({
         address: CONTRACT_ADDRESS,
-        abi: WebAccessSBTV3_ABI,
+        abi: WebAccessSBTV31_ABI,
         functionName: 'createSBTType',
         args: [typeId, uri, burnable, BigInt(maxSupply), false],
       })
@@ -141,8 +143,8 @@ export default function AdminSBTManager() {
     setLoading(true)
     try {
       await writeContractAsync({
+        abi: WebAccessSBTV31_ABI,
         address: CONTRACT_ADDRESS,
-        abi: WebAccessSBTV3_ABI,
         functionName: 'setActive',
         args: [typeId, true],
       })
@@ -159,7 +161,7 @@ export default function AdminSBTManager() {
     try {
       await writeContractAsync({
         address: CONTRACT_ADDRESS,
-        abi: WebAccessSBTV3_ABI,
+        abi: WebAccessSBTV31_ABI,
         functionName: 'setActive',
         args: [typeId, false],
       })
@@ -177,7 +179,7 @@ export default function AdminSBTManager() {
     try {
       await writeContractAsync({
         address: CONTRACT_ADDRESS,
-        abi: WebAccessSBTV3_ABI,
+        abi: WebAccessSBTV31_ABI,
         functionName: 'burn',
         args: [burnTokenId],
       })
