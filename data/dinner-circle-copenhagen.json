@@ -1,7 +1,7 @@
 {
     "name": "Dinner Circle",
     "description": "Join group dinners at restaurants with special perks for members",
-    "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/wine-club-clean.png",
+    "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/dinner.webp",
     "tags": ["food", "dinner", "social"],
     "details1": "Participate in group dinners across Copenhagen and get a glass of wine on the house, if buying dinner",
     "details2": "SBT gives access to Telegram coordination and venue perks",
