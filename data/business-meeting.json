@@ -26,8 +26,21 @@
     }, 
 
     {
-      "trait_type": "tags",
-      "value": "["business", "lunch", "networking", "coffee"]"
-    } 
+      "trait_type": "Tag",
+      "value": "Network"
+    },
+    {
+      "trait_type": "Tag",
+      "value": "Lunch"
+    },
+    {
+      "trait_type": "Tag",
+      "value": "B2B sales"
+    },
+    {
+      "trait_type": "Tag",
+      "value": "Digital Business"
+    }
+  ]
 }
 

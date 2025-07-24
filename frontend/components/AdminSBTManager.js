@@ -283,36 +283,45 @@ export default function AdminSBTManager() {
         </div>
 
         {/* === PREVIEW CARD === */}
-        {previewData && (
-          <div className="mt-4 p-4 border rounded bg-gray-50">
-            <h4 className="font-semibold mb-2">Preview Metadata</h4>
-            <div className="flex gap-4">
-              {previewData.image && (
-                <img
-                  src={previewData.image}
-                  alt={previewData.name}
-                  className="w-32 h-32 object-contain rounded"
-                />
-              )}
-              <div>
-                <h5 className="text-lg font-semibold mb-1">{previewData.name}</h5>
-                <p className="text-sm text-gray-700 mb-2">{previewData.description}</p>
-                {previewData.tags && (
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {previewData.tags.map((tag, index) => (
-                      <span
-                        key={index}
-                        className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
+ {previewData && (
+  <div className="mt-4 p-4 border rounded bg-gray-50 dark:bg-zinc-800 dark:text-white">
+    <h4 className="font-semibold mb-2">Preview Metadata</h4>
+    <div className="flex gap-4">
+      {previewData.image && (
+        <img
+          src={previewData.image}
+          alt={previewData.name}
+          className="w-32 h-32 object-contain rounded"
+        />
+      )}
+      <div>
+        <h5 className="text-lg font-semibold mb-1">{previewData.name}</h5>
+        <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">{previewData.description}</p>
+
+        {Array.isArray(previewData.attributes) && previewData.attributes.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+            {previewData.attributes.map((attr, i) => (
+              <div
+                key={i}
+                className="bg-white dark:bg-zinc-900 border rounded px-2 py-1 text-sm shadow-sm"
+              >
+                <span className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  {attr.trait_type}
+                </span>
+                <span className="font-semibold text-gray-800 dark:text-white break-words">
+                  {Array.isArray(attr.value)
+                    ? attr.value.join(', ')
+                    : attr.value?.replace(/^["']|["']$/g, '')}
+                </span>
               </div>
-            </div>
+            ))}
           </div>
         )}
+      </div>
+    </div>
+  </div>
+)}
+
       </div>
 
       {/* === DASHBOARD === */}

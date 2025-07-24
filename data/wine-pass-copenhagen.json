@@ -1,7 +1,7 @@
 {
   "name": "Wine Walk",
   "description": "Casual drinks and great company at our Parners wine bars .",
-   "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/beer-club.png",
+  "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/wine-club-clean.webp",
   "external_url": "https://yourplatform.xyz/events/social-mixer",
   "attributes": [
     {
@@ -34,7 +34,7 @@
     }, 
     {
       "trait_type": "Tags",
-      "value": "Casual Beer"
+      "value": "Casual"
     }  
   ]}
 

@@ -1,11 +1,41 @@
 {
-    "name": "Coffee Mates",
-    "description": "Morning coffee gatherings at friendly cafes",
-    "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/cafecoffee.jpg",
-    "tags": ["coffee", "morning", "remote work"],
-    "details1": "Meet others over a cup of coffee. Ideal for digital nomads and creatives.",
-    "details2": "SBT provides proof of participation and Telegram group access",
-    "external_url": "https://t.me/expat_coffee_meet",
-    "social_link": "https://t.me/teaclub_main", 
-    "responsible": "Martini"
-  }
+  "name": "Morning Coffee Mates",
+  "description": "Chill vibes and friendly chats for early birds at Morning Brew Café.",
+  "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/cafecoffee.jpg",
+  "external_url": "https://yourplatform.xyz/events/coffee-mates",
+  "attributes": [
+    {
+      "trait_type": "Venue",
+      "value": "Cafe"
+    },
+    {
+      "trait_type": "Theme",
+      "value": "Friendship"
+    },
+    {
+      "trait_type": "Formality",
+      "value": "Informal"
+    },
+    {
+      "trait_type": "Time-Limited combo-voucher",
+      "value": "No"
+    },
+    {
+      "trait_type": "Offer",
+      "value": "1 Free medium coffee per breakfast plate"
+    }, 
+
+    {
+      "trait_type": "Tag",
+      "value": "Friends"
+    },
+    {
+      "trait_type": "Tag",
+      "value": "Casual"
+    },
+    {
+      "trait_type": "Tag",
+      "value": "Coffee"
+    }
+  ]
+}

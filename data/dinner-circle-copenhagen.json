@@ -1,11 +1,45 @@
 {
-    "name": "Dinner Circle",
-    "description": "Join group dinners at restaurants with special perks for members",
-    "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/dinner.webp",
-    "tags": ["food", "dinner", "social"],
-    "details1": "Participate in group dinners across Copenhagen and get a glass of wine on the house, if buying dinner",
-    "details2": "SBT gives access to Telegram coordination and venue perks",
-    "external_url": "https://t.me/expat_dinner_club",
-    "social_link": "https://t.me/teaclub_main", 
-    "responsible": "Martini"
-  }
+  "name": "Steak Night",
+  "description": "A cozy evening designed for new connections at Amalfi Trattoria.",
+  "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/dinner.webp",
+  "external_url": "https://yourplatform.xyz/events/date-night",
+  "attributes": [
+    {
+      "trait_type": "Venue",
+      "value": "Restaurant"
+    },
+    {
+      "trait_type": "Theme",
+      "value": "Dating"
+    },
+    {
+      "trait_type": "Formality",
+      "value": "Informal"
+    },
+    {
+      "trait_type": "Time-Limited",
+      "value": "No"
+    },
+    {
+      "trait_type": "Offer",
+      "value": "Free dessert for couples"
+    },
+    {
+      "trait_type": "Tag",
+      "value": "dating"
+    },
+    {
+      "trait_type": "Tag",
+      "value": "dinner"
+    },
+    {
+      "trait_type": "Tag",
+      "value": "wine"
+    },
+    {
+      "trait_type": "Tag",
+      "value": "romance"
+    }
+  ]
+}
+

@@ -13,13 +13,12 @@ export default function WebAccessSBT() {
   const publicClient = usePublicClient()
 
   const [availableSBTs, setAvailableSBTs] = useState([])
-  const [ownedSBTs, setOwnedSBTs] = useState([])       // owned tokens metadata array
+  const [ownedSBTs, setOwnedSBTs] = useState([])
   const [loadingTypeId, setLoadingTypeId] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [darkMode, setDarkMode] = useState(false)
   const [previewSBT, setPreviewSBT] = useState(null)
 
-  // Fetch SBTs available to claim (existing)
   const fetchAvailableSBTs = useCallback(async () => {
     if (!address || !publicClient) return
 
@@ -73,12 +72,10 @@ export default function WebAccessSBT() {
     setAvailableSBTs(found)
   }, [address, publicClient])
 
-  // Fetch tokens owned by user and their metadata
   const fetchOwnedSBTs = useCallback(async () => {
     if (!address || !publicClient) return
 
     try {
-      // 1. Get token IDs owned by user
       const tokenIds = await publicClient.readContract({
         address: CONTRACT_ADDRESS,
         abi: WebAccessSBTV31_ABI,
@@ -88,15 +85,13 @@ export default function WebAccessSBT() {
 
       const owned = []
       for (const tokenId of tokenIds) {
-        // 2. Fetch token typeId via public mapping getter "typeOf"
         const typeId = await publicClient.readContract({
           address: CONTRACT_ADDRESS,
           abi: WebAccessSBTV31_ABI,
-          functionName: 'typeOf',  // <-- fixed from 'tokenType'
+          functionName: 'typeOf',
           args: [tokenId],
         })
 
-        // 3. Fetch sbtType info for metadata URI
         const sbtType = await publicClient.readContract({
           address: CONTRACT_ADDRESS,
           abi: WebAccessSBTV31_ABI,
@@ -106,7 +101,6 @@ export default function WebAccessSBT() {
 
         const [uri] = sbtType
 
-        // 4. Fetch metadata JSON from URI
         try {
           const res = await fetch(uri)
           const metadata = await res.json()
@@ -132,7 +126,6 @@ export default function WebAccessSBT() {
     }
   }, [address, publicClient])
 
-  // Fetch both available and owned SBTs when address or client changes
   useEffect(() => {
     fetchAvailableSBTs()
     fetchOwnedSBTs()
@@ -148,7 +141,6 @@ export default function WebAccessSBT() {
         args: [typeId],
       })
       toast.success(`🎉 Claimed SBT type ${typeId}`)
-      // Refresh lists
       await fetchAvailableSBTs()
       await fetchOwnedSBTs()
     } catch (err) {
@@ -159,23 +151,9 @@ export default function WebAccessSBT() {
     }
   }
 
-  // Filter available SBTs by search term
   const filteredSBTs = availableSBTs.filter((sbt) =>
     sbt.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
-
-  // Helper to render any extra metadata key-values (except handled ones)
-  const renderExtraMetadata = (metadata) => {
-    const skipKeys = new Set(['name', 'description', 'image', 'tags', 'external_url'])
-    return Object.entries(metadata)
-      .filter(([key]) => !skipKeys.has(key))
-      .map(([key, value]) => (
-        <div key={key} className="mb-2 text-xs text-gray-700 dark:text-gray-300">
-          <span className="font-semibold">{key}:</span>{' '}
-          {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-        </div>
-      ))
-  }
 
   const handleShare = () => {
     if (previewSBT?.uri) {
@@ -207,7 +185,11 @@ export default function WebAccessSBT() {
           </button>
         </div>
 
-        {/* Available to claim section */}
+<h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white mt-6 mb-4">
+  Available SBTs
+</h2>
+
+        {/* Available SBTs section */}
         {filteredSBTs.length === 0 ? (
           <div className="text-center text-gray-400 py-8">
             No available SBTs to claim.
@@ -323,70 +305,92 @@ export default function WebAccessSBT() {
         )}
 
         {/* Preview modal */}
-        {previewSBT && (
-          <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 transition-opacity duration-300"
-            role="dialog"
-            aria-modal="true"
-          >
-            <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl shadow-2xl max-w-xl w-full max-h-[80vh] overflow-y-auto relative animate-fade-in-up">
-              <button
-                onClick={() => setPreviewSBT(null)}
-                aria-label="Close preview"
-                className="absolute top-3 right-3 text-white bg-red-500 hover:bg-red-600 rounded-full w-10 h-10 text-center font-bold shadow-lg transition duration-200"
+      {previewSBT && (
+  <div
+    className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 transition-opacity duration-300"
+    role="dialog"
+    aria-modal="true"
+  >
+    <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto relative animate-fade-in-up">
+      <button
+        onClick={() => setPreviewSBT(null)}
+        aria-label="Close preview"
+        className="absolute top-3 right-3 text-white bg-red-500 hover:bg-red-600 rounded-full w-10 h-10 text-center font-bold shadow-lg transition duration-200"
+      >
+        &times;
+      </button>
+
+      {/* Image */}
+      {previewSBT.image && (
+        <img
+          src={previewSBT.image}
+          alt={previewSBT.name}
+          className="rounded-xl w-full h-auto object-cover mb-6 shadow"
+        />
+      )}
+
+      {/* Name */}
+      <h3 className="text-2xl sm:text-3xl font-extrabold mb-4 text-center dark:text-white">
+        {previewSBT.name}
+      </h3>
+
+      {/* Description */}
+      {previewSBT.description && (
+        <p className="text-base text-gray-700 dark:text-gray-300 mb-6 leading-relaxed text-center">
+          {previewSBT.description}
+        </p>
+      )}
+
+      {/* Attributes */}
+      {Array.isArray(previewSBT.attributes) && previewSBT.attributes.length > 0 && (
+        <div className="mb-6">
+          <h4 className="text-lg font-bold mb-2 text-center dark:text-white">Details</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {previewSBT.attributes.map((attr, i) => (
+              <div
+                key={i}
+                className="flex flex-col bg-gray-100 dark:bg-zinc-800 rounded-lg p-3 shadow"
               >
-                &times;
-              </button>
-              <h3 className="text-2xl font-bold mb-4">{previewSBT.name}</h3>
-
-              {previewSBT.image && (
-                <img
-                  src={previewSBT.image}
-                  alt={previewSBT.name}
-                  className="w-full max-h-60 object-contain rounded-lg shadow mb-4"
-                />
-              )}
-
-              <p className="mb-4 text-sm">{previewSBT.description}</p>
-
-              {previewSBT.tags?.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {previewSBT.tags.map((tag, i) => (
-                    <span
-                      key={i}
-                      className="bg-blue-100 text-blue-800 px-2 py-0.5 text-xs rounded dark:bg-blue-800 dark:text-white"
-                    >
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {/* Render all other metadata keys */}
-              {renderExtraMetadata(previewSBT)}
-
-              {previewSBT.external_url && (
-                <a
-                  href={previewSBT.external_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 underline text-sm block mb-4"
-                >
-                  🌐 External Link
-                </a>
-              )}
-
-              <button
-                onClick={handleShare}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
-              >
-                📋 Copy Metadata URI
-              </button>
-            </div>
+                <span className="text-xs text-gray-500 uppercase font-medium">
+                  {attr.trait_type}
+                </span>
+                <span className="text-sm font-semibold text-gray-800 dark:text-white break-words">
+                  {Array.isArray(attr.value)
+                    ? attr.value.join(', ')
+                    : attr.value?.replace(/^["']|["']$/g, '')}
+                </span>
+              </div>
+            ))}
           </div>
+        </div>
+      )}
+
+      {/* Buttons */}
+      <div className="flex flex-col sm:flex-row justify-center gap-4 mt-4">
+        <button
+          onClick={handleShare}
+          className="flex-1 px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg font-semibold shadow-md transition"
+        >
+          📋 Copy Link
+        </button>
+
+        {previewSBT.external_url && (
+          <a
+            href={previewSBT.external_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 text-center px-4 py-2 border border-blue-700 text-blue-700 hover:bg-blue-50 dark:hover:bg-zinc-800 rounded-lg font-semibold transition"
+          >
+            🌐 External Link
+          </a>
         )}
+      </div>
+    </div>
+  </div>
+)}
+
       </div>
     </div>
   )
 }
- 
+
