@@ -1,45 +1,20 @@
 {
   "name": "Steak Night",
-  "description": "A cozy evening designed for new connections at Amalfi Trattoria.",
+  "description": "A cozy singles night out designed for new connections. Perk announcements and confirmation happen in the Telegram group (link).",
   "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/dinner.webp",
   "external_url": "https://yourplatform.xyz/events/date-night",
   "attributes": [
-    {
-      "trait_type": "Venue",
-      "value": "Restaurant"
-    },
-    {
-      "trait_type": "Theme",
-      "value": "Dating"
-    },
-    {
-      "trait_type": "Formality",
-      "value": "Informal"
-    },
-    {
-      "trait_type": "Time-Limited",
-      "value": "No"
-    },
-    {
-      "trait_type": "Offer",
-      "value": "Free dessert for couples"
-    },
-    {
-      "trait_type": "Tag",
-      "value": "dating"
-    },
-    {
-      "trait_type": "Tag",
-      "value": "dinner"
-    },
-    {
-      "trait_type": "Tag",
-      "value": "wine"
-    },
-    {
-      "trait_type": "Tag",
-      "value": "romance"
-    }
+    { "trait_type": "Venue", "value": "Restaurant" },
+    { "trait_type": "Theme", "value": "Conversational flirt" },
+    { "trait_type": "Formality", "value": "Informal" },
+    { "trait_type": "Time-Limited", "value": "Weekly update of perks during Alpha Test" },
+    { "trait_type": "Offer", "value": "Free glass of wine on dinner" },
+    { "trait_type": "Telegram Announced", "value": "Yes" },
+    { "trait_type": "Reservation", "value": "Telegram" },
+    { "trait_type": "Proof", "value": "SBT shown at the venue" },
+    { "trait_type": "Tags", "value": "Dinner, Wine, Romance, Singles" }
   ]
 }
+ 
+
 

@@ -19,13 +19,14 @@ export default function WebAccessSBT() {
   const [darkMode, setDarkMode] = useState(false)
   const [previewSBT, setPreviewSBT] = useState(null)
 
+  // Fetch available SBTs with exclusion of typeId 1-50
   const fetchAvailableSBTs = useCallback(async () => {
     if (!address || !publicClient) return
 
-    const maxTypeCount = 50
+    const maxTypeCount = 100
     const found = []
 
-    for (let i = 30; i <= maxTypeCount; i++) {
+    for (let i = 51; i <= maxTypeCount; i++) {  // START from 51, exclude 1-50
       try {
         const [sbtType, hasClaimed] = await Promise.all([
           publicClient.readContract({
@@ -72,6 +73,7 @@ export default function WebAccessSBT() {
     setAvailableSBTs(found)
   }, [address, publicClient])
 
+  // Fetch owned SBTs with exclusion of typeId 1-50
   const fetchOwnedSBTs = useCallback(async () => {
     if (!address || !publicClient) return
 
@@ -91,6 +93,9 @@ export default function WebAccessSBT() {
           functionName: 'typeOf',
           args: [tokenId],
         })
+
+        // Exclude typeId 1-50
+        if (typeId >= 1 && typeId <= 50) continue
 
         const sbtType = await publicClient.readContract({
           address: CONTRACT_ADDRESS,
@@ -112,7 +117,7 @@ export default function WebAccessSBT() {
             name: metadata.name || `SBT Type ${typeId}`,
             image: metadata.image || '',
             description: metadata.description || '',
-            tags: metadata.tags || [],
+            attributes: metadata.attributes || [],
             metadata,
           })
         } catch (e) {
@@ -122,7 +127,7 @@ export default function WebAccessSBT() {
 
       setOwnedSBTs(owned)
     } catch (err) {
-      console.error('Failed to fetch owned SBTs:', err)
+      console.error('Error fetching owned SBTs:', err)
     }
   }, [address, publicClient])
 
@@ -185,27 +190,16 @@ export default function WebAccessSBT() {
           </button>
         </div>
 
-<h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white mt-6 mb-4">
-  Available SBTs
-</h2>
-
-        {/* Available SBTs section */}
+        {/* Available SBTs */}
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white mt-6 mb-4">
+          Available SBTs
+        </h2>
         {filteredSBTs.length === 0 ? (
-          <div className="text-center text-gray-400 py-8">
-            No available SBTs to claim.
-          </div>
+          <div className="text-center text-gray-400 py-8">No available SBTs to claim.</div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
             {filteredSBTs.map(
-              ({
-                typeId,
-                name,
-                image,
-                description,
-                tags,
-                tokensLeft,
-                metadata,
-              }) => (
+              ({ typeId, name, image, description, tags, tokensLeft, metadata }) => (
                 <div
                   key={typeId}
                   className={`border rounded-xl p-4 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl ${
@@ -265,15 +259,15 @@ export default function WebAccessSBT() {
           </div>
         )}
 
-        {/* Owned SBTs section */}
+        {/* Owned SBTs */}
         <h2 className="text-xl font-bold mt-10 mb-4">Your Owned SBTs</h2>
         {ownedSBTs.length === 0 ? (
           <p className="text-gray-500">You do not own any SBTs yet.</p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
-            {ownedSBTs.map(({ tokenId, typeId, name, image, description, tags }) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            {ownedSBTs.map(({ tokenId, typeId, name, image, description, tags, metadata }) => (
               <div
-                key={tokenId}
+                key={tokenId.toString()}
                 className={`border rounded-xl p-4 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl ${
                   darkMode ? 'bg-zinc-900 text-white border-zinc-700' : 'bg-white text-black'
                 }`}
@@ -299,96 +293,123 @@ export default function WebAccessSBT() {
                 )}
                 <p className="text-xs text-gray-400">Token ID: {tokenId.toString()}</p>
                 <p className="text-xs text-gray-400">Type ID: {typeId.toString()}</p>
+
+                <button
+                  onClick={() => setPreviewSBT(metadata)}
+                  className="mt-2 w-full py-2 rounded-lg bg-gray-600 hover:bg-gray-700 text-white font-semibold transition"
+                >
+                  Preview
+                </button>
               </div>
             ))}
           </div>
         )}
 
         {/* Preview modal */}
-      {previewSBT && (
-  <div
-    className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 transition-opacity duration-300"
-    role="dialog"
-    aria-modal="true"
-  >
-    <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto relative animate-fade-in-up">
-      <button
-        onClick={() => setPreviewSBT(null)}
-        aria-label="Close preview"
-        className="absolute top-3 right-3 text-white bg-red-500 hover:bg-red-600 rounded-full w-10 h-10 text-center font-bold shadow-lg transition duration-200"
-      >
-        &times;
-      </button>
-
-      {/* Image */}
-      {previewSBT.image && (
-        <img
-          src={previewSBT.image}
-          alt={previewSBT.name}
-          className="rounded-xl w-full h-auto object-cover mb-6 shadow"
-        />
-      )}
-
-      {/* Name */}
-      <h3 className="text-2xl sm:text-3xl font-extrabold mb-4 text-center dark:text-white">
-        {previewSBT.name}
-      </h3>
-
-      {/* Description */}
-      {previewSBT.description && (
-        <p className="text-base text-gray-700 dark:text-gray-300 mb-6 leading-relaxed text-center">
-          {previewSBT.description}
-        </p>
-      )}
-
-      {/* Attributes */}
-      {Array.isArray(previewSBT.attributes) && previewSBT.attributes.length > 0 && (
-        <div className="mb-6">
-          <h4 className="text-lg font-bold mb-2 text-center dark:text-white">Details</h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {previewSBT.attributes.map((attr, i) => (
-              <div
-                key={i}
-                className="flex flex-col bg-gray-100 dark:bg-zinc-800 rounded-lg p-3 shadow"
-              >
-                <span className="text-xs text-gray-500 uppercase font-medium">
-                  {attr.trait_type}
-                </span>
-                <span className="text-sm font-semibold text-gray-800 dark:text-white break-words">
-                  {Array.isArray(attr.value)
-                    ? attr.value.join(', ')
-                    : attr.value?.replace(/^["']|["']$/g, '')}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Buttons */}
-      <div className="flex flex-col sm:flex-row justify-center gap-4 mt-4">
-        <button
-          onClick={handleShare}
-          className="flex-1 px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg font-semibold shadow-md transition"
-        >
-          📋 Copy Link
-        </button>
-
-        {previewSBT.external_url && (
-          <a
-            href={previewSBT.external_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 text-center px-4 py-2 border border-blue-700 text-blue-700 hover:bg-blue-50 dark:hover:bg-zinc-800 rounded-lg font-semibold transition"
+        {previewSBT && (
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 transition-opacity duration-300"
+            role="dialog"
+            aria-modal="true"
           >
-            🌐 External Link
-          </a>
-        )}
-      </div>
-    </div>
-  </div>
-)}
+            <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl shadow-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto relative animate-fade-in-up">
+              <button
+                onClick={() => setPreviewSBT(null)}
+                aria-label="Close preview"
+                className="absolute top-3 right-3 text-white bg-red-500 hover:bg-red-600 rounded-full w-10 h-10 text-center font-bold shadow-lg transition duration-200"
+              >
+                &times;
+              </button>
 
+              {/* Title */}
+              <h3 className="text-2xl font-bold mb-4 text-center dark:text-white">
+                {previewSBT.name}
+              </h3>
+
+              {/* Image */}
+              {previewSBT.image && (
+                <img
+                  src={previewSBT.image}
+                  alt={previewSBT.name}
+                  className="w-full max-w-xs mx-auto h-48 object-cover rounded mb-4 shadow"
+                />
+              )}
+
+              {/* Description */}
+              {previewSBT.description && (
+                <p className="text-gray-700 dark:text-gray-300 text-center mb-4">
+                  {previewSBT.description}
+                </p>
+              )}
+
+              {/* External URL */}
+              {previewSBT.external_url && (
+                <a
+                  href={previewSBT.external_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-center text-blue-600 dark:text-blue-400 hover:underline mb-6"
+                >
+                  Visit Event Page ↗
+                </a>
+              )}
+
+              {/* Attributes */}
+              {Array.isArray(previewSBT.attributes) && previewSBT.attributes.length > 0 && (
+                <div className="mb-6 space-y-2">
+                  {previewSBT.attributes
+                    .filter((attr) => attr.trait_type !== 'Tag')
+                    .map((attr, index) => (
+                      <div key={index} className="flex gap-2">
+                        <span className="font-semibold text-gray-600 dark:text-gray-400 w-40">
+                          {attr.trait_type}:
+                        </span>
+                        <span className="text-gray-900 dark:text-gray-200">
+                          {Array.isArray(attr.value)
+                            ? attr.value.join(', ')
+                            : attr.value?.replace(/^["']|["']$/g, '')}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              )}
+
+              {/* Tags */}
+              <div className="flex flex-wrap gap-2 mb-6 justify-center">
+                {previewSBT.attributes
+                  ?.filter((attr) => attr.trait_type === 'Tag')
+                  .map((tag, index) => (
+                    <span
+                      key={index}
+                      className="bg-indigo-100 text-indigo-800 dark:bg-indigo-700 dark:text-indigo-100 px-3 py-1 rounded-full text-sm font-semibold"
+                    >
+                      {tag.value}
+                    </span>
+                  ))}
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-col sm:flex-row justify-center gap-4 mt-4">
+                <button
+                  onClick={handleShare}
+                  className="flex-1 px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg font-semibold shadow-md transition"
+                >
+                  📋 Copy Link
+                </button>
+                {previewSBT.external_url && (
+                  <a
+                    href={previewSBT.external_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 px-4 py-2 bg-green-700 hover:bg-green-800 text-white rounded-lg font-semibold text-center shadow-md transition"
+                  >
+                    🌐 Visit
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

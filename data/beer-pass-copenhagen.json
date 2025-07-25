@@ -1,40 +1,17 @@
-{
-  "name": "Wine Walk",
-  "description": "Casual drinks and great company at our Parners wine bars .",
-   "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/beer-club.png",
+ {
+  "name": "Beer Walk",
+  "description": "Casual drinks and great company at partner beer pubs in Copenhagen. Perks announced weekly in Telegram.",
+  "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/beer-club.png",
   "external_url": "https://yourplatform.xyz/events/social-mixer",
   "attributes": [
-    {
-      "trait_type": "Venue",
-      "value": "Bar"
-    },
-    {
-      "trait_type": "Theme",
-      "value": "Social"
-    },
-    {
-      "trait_type": "Formality",
-      "value": "Informal"
-    },
-    {
-      "trait_type": "Time-Limited",
-      "value": "Yes"
-    },
-    {
-      "trait_type": "Offer",
-      "value": "Buy 2 get 1 free wine on the house"
-    }, 
-    {
-      "trait_type": "Tags",
-      "value": "Social"
-    }, 
-    {
-      "trait_type": "Tags",
-      "value": "Evening"
-    }, 
-    {
-      "trait_type": "Tags",
-      "value": "Casual Beer"
-    }  
-  ]}
-
+    { "trait_type": "Venue", "value": "Bar" },
+    { "trait_type": "Theme", "value": "Social" },
+    { "trait_type": "Formality", "value": "Informal" },
+    { "trait_type": "Time-Limited", "value": "Weekly update of perks during Alpha Test" },
+    { "trait_type": "Offer", "value": "Weekly update of perks" },
+    { "trait_type": "Telegram Announced", "value": "Yes" },
+    { "trait_type": "Reservation", "value": "No" },
+    { "trait_type": "Proof", "value": "SBT shown at the venue" },
+    { "trait_type": "Tags", "value": "Evening, Beer, Social" }
+  ]
+}

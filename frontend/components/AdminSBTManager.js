@@ -8,7 +8,7 @@ import { toast } from 'react-hot-toast'
 
 
 const CONTRACT_ADDRESS = '0x67c4654C71d665DC94c507cF35Adf03031db9655'
-const MAX_TYPES = 50
+const MAX_TYPES = 100
 
 export default function AdminSBTManager() {
   const { address } = useAccount()
@@ -62,7 +62,7 @@ export default function AdminSBTManager() {
 
     async function fetchTypes() {
       const types = []
-      for (let i = 26; i <= MAX_TYPES; i++) {
+      for (let i = 56; i <= MAX_TYPES; i++) {
         try {
           const sbtType = await publicClient.readContract({
             address: CONTRACT_ADDRESS,
@@ -283,41 +283,67 @@ export default function AdminSBTManager() {
         </div>
 
         {/* === PREVIEW CARD === */}
- {previewData && (
-  <div className="mt-4 p-4 border rounded bg-gray-50 dark:bg-zinc-800 dark:text-white">
-    <h4 className="font-semibold mb-2">Preview Metadata</h4>
-    <div className="flex gap-4">
-      {previewData.image && (
-        <img
-          src={previewData.image}
-          alt={previewData.name}
-          className="w-32 h-32 object-contain rounded"
-        />
-      )}
-      <div>
-        <h5 className="text-lg font-semibold mb-1">{previewData.name}</h5>
-        <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">{previewData.description}</p>
+{previewData && (
+  <div className="mt-6 p-6 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-md bg-white dark:bg-zinc-900 max-w-xl">
+    {/* Title */}
+    <h4 className="font-semibold text-xl mb-4 text-gray-900 dark:text-white">
+      {previewData.name}
+    </h4>
 
-        {Array.isArray(previewData.attributes) && previewData.attributes.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-            {previewData.attributes.map((attr, i) => (
-              <div
-                key={i}
-                className="bg-white dark:bg-zinc-900 border rounded px-2 py-1 text-sm shadow-sm"
-              >
-                <span className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                  {attr.trait_type}
-                </span>
-                <span className="font-semibold text-gray-800 dark:text-white break-words">
-                  {Array.isArray(attr.value)
-                    ? attr.value.join(', ')
-                    : attr.value?.replace(/^["']|["']$/g, '')}
-                </span>
-              </div>
-            ))}
+    {/* Image */}
+    {previewData.image && (
+      <img
+        src={previewData.image}
+        alt={previewData.name}
+        className="w-full max-w-xs h-48 object-cover rounded mb-4"
+      />
+    )}
+
+    {/* Description */}
+    <p className="text-gray-700 dark:text-gray-300 mb-4">
+      {previewData.description}
+    </p>
+
+    {/* External Link */}
+    {previewData.external_url && (
+      <a
+        href={previewData.external_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-600 dark:text-blue-400 hover:underline block mb-6"
+      >
+        Visit Event Page ↗
+      </a>
+    )}
+
+    {/* Attributes */}
+    <div className="mb-6 space-y-2">
+      {previewData.attributes
+        ?.filter(attr => attr.trait_type !== "Tag")
+        .map((attr, index) => (
+          <div key={index} className="flex gap-2">
+            <span className="font-semibold text-gray-600 dark:text-gray-400 w-40">
+              {attr.trait_type}:
+            </span>
+            <span className="text-gray-900 dark:text-gray-200">
+              {attr.value}
+            </span>
           </div>
-        )}
-      </div>
+        ))}
+    </div>
+
+    {/* Tags */}
+    <div className="flex flex-wrap gap-2">
+      {previewData.attributes
+        ?.filter(attr => attr.trait_type === "Tag")
+        .map((tag, index) => (
+          <span
+            key={index}
+            className="bg-indigo-100 text-indigo-800 dark:bg-indigo-700 dark:text-indigo-100 px-3 py-1 rounded-full text-sm font-semibold"
+          >
+            {tag.value}
+          </span>
+        ))}
     </div>
   </div>
 )}

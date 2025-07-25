@@ -1,46 +1,18 @@
 {
   "name": "Business Lunch",
-  "description": "Connect with local professionals over lunch at JavaSpot Café.",
-    "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/tea.png",
- "external_url": "https://yourplatform.xyz/events/business-lunch",
+  "description": "Connect with local professionals at select lunch spots. Booking link in Telegram.",
+  "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/tea.png",
+  "external_url": "https://yourplatform.xyz/events/business-lunch",
   "attributes": [
-    {
-      "trait_type": "Venue",
-      "value": "Cafe"
-    },
-    {
-      "trait_type": "Theme",
-      "value": "Business"
-    },
-    {
-      "trait_type": "Formality",
-      "value": "Formal"
-    },
-    {
-      "trait_type": "Time-Limited",
-      "value": "Yes"
-    },
-    {
-      "trait_type": "Offer",
-      "value": "20% discount on lunch sets in August, 2025"
-    }, 
-
-    {
-      "trait_type": "Tag",
-      "value": "Network"
-    },
-    {
-      "trait_type": "Tag",
-      "value": "Lunch"
-    },
-    {
-      "trait_type": "Tag",
-      "value": "B2B sales"
-    },
-    {
-      "trait_type": "Tag",
-      "value": "Digital Business"
-    }
+    { "trait_type": "Venue", "value": "Restaurant/Cafe" },
+    { "trait_type": "Theme", "value": "Business" },
+    { "trait_type": "Formality", "value": "Formal" },
+    { "trait_type": "Time-Limited", "value": "August 2025" },
+    { "trait_type": "Time-Limited", "value": "Weekly update of perks during Alpha Test" },
+    { "trait_type": "Telegram Announced", "value": "Yes" },
+    { "trait_type": "Reservation", "value": "Preferred" },
+    { "trait_type": "Proof", "value": "SBT shown at the venue" },
+    { "trait_type": "Tags", "value": "Lunch, Digital Business, Networking" }
   ]
 }
-
+ 

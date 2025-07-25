@@ -8,7 +8,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/CountersUpgradeable.sol";
 
 contract WebAccessSBTV3 is
-    ERC721Upgradeable,
+    ERC721Upgradeable, 
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
     UUPSUpgradeable
@@ -141,9 +141,45 @@ contract WebAccessSBTV3 is
         _safeMint(to, tokenId);
     }
 
-    /* --------------------------------------------------------------------- */
-    /*                                Views                                  */
-    /* --------------------------------------------------------------------- */
+    /* -------------------------------Burn-------------------------------------- */
+    
+
+function burn(uint256 tokenId) external nonReentrant {
+    require(_exists(tokenId), "Nonexistent token");
+    require(ownerOf(tokenId) == msg.sender, "Not token owner");
+
+    uint256 typeId = typeOf[tokenId];
+    SBTType storage t = sbtTypes[typeId];
+    require(t.burnable, "Not burnable");
+
+    // Burn token
+    _burn(tokenId);
+
+    // Remove from _ownedTokens list
+    uint256[] storage tokens = _ownedTokens[msg.sender];
+    for (uint256 i = 0; i < tokens.length; i++) {
+        if (tokens[i] == tokenId) {
+            tokens[i] = tokens[tokens.length - 1]; // Replace with last
+            tokens.pop();
+            break;
+        }
+    }
+
+    // Adjust state
+    hasClaimed[typeId][msg.sender] = false;
+    t.minted -= 1;
+}
+
+    /* ----------------------------------URI Update----------------------------------- */
+
+function updateURI(uint256 typeId, string calldata newUri) external onlyOwner {
+    require(bytes(newUri).length > 0, "Empty URI");
+    require(sbtTypes[typeId].maxSupply > 0, "Type not found");
+    sbtTypes[typeId].uri = newUri;
+}
+
+    
+    /* ----------------------------------Views----------------------------------- */
 
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         require(_exists(tokenId), "Nonexistent token");
