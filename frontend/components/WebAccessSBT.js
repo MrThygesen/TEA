@@ -19,6 +19,14 @@ export default function WebAccessSBT() {
   const [darkMode, setDarkMode] = useState(false)
   const [previewSBT, setPreviewSBT] = useState(null)
 
+  // Helper to extract tags array from attributes
+  const extractTags = (attributes) => {
+    if (!Array.isArray(attributes)) return []
+    const tagsAttr = attributes.find(attr => attr.trait_type === 'Tags')
+    if (!tagsAttr || !tagsAttr.value) return []
+    return tagsAttr.value.split(',').map(tag => tag.trim())
+  }
+
   // Fetch available SBTs with exclusion of typeId 1-50
   const fetchAvailableSBTs = useCallback(async () => {
     if (!address || !publicClient) return
@@ -26,7 +34,7 @@ export default function WebAccessSBT() {
     const maxTypeCount = 100
     const found = []
 
-    for (let i = 51; i <= maxTypeCount; i++) {  // START from 51, exclude 1-50
+    for (let i = 51; i <= maxTypeCount; i++) {
       try {
         const [sbtType, hasClaimed] = await Promise.all([
           publicClient.readContract({
@@ -49,6 +57,7 @@ export default function WebAccessSBT() {
           try {
             const res = await fetch(uri)
             const metadata = await res.json()
+            const tags = extractTags(metadata.attributes)
 
             found.push({
               typeId: i,
@@ -56,7 +65,7 @@ export default function WebAccessSBT() {
               name: metadata.name || `SBT Type ${i}`,
               image: metadata.image || '',
               description: metadata.description || '',
-              tags: metadata.tags || [],
+              tags,
               tokensLeft: Number(maxSupply) - Number(minted),
               metadata,
             })
@@ -109,6 +118,7 @@ export default function WebAccessSBT() {
         try {
           const res = await fetch(uri)
           const metadata = await res.json()
+          const tags = extractTags(metadata.attributes)
 
           owned.push({
             tokenId,
@@ -117,6 +127,7 @@ export default function WebAccessSBT() {
             name: metadata.name || `SBT Type ${typeId}`,
             image: metadata.image || '',
             description: metadata.description || '',
+            tags,
             attributes: metadata.attributes || [],
             metadata,
           })
@@ -221,7 +232,7 @@ export default function WebAccessSBT() {
                     🧮 Tokens left: {tokensLeft}
                   </p>
 
-                  {tags.length > 0 && (
+                  {Array.isArray(tags) && tags.length > 0 && (
                     <div className="flex flex-wrap gap-2 mb-4">
                       {tags.map((tag, idx) => (
                         <span
@@ -279,7 +290,7 @@ export default function WebAccessSBT() {
                 />
                 <h3 className="text-lg font-semibold mb-1">{name}</h3>
                 <p className="text-sm mb-2 line-clamp-3">{description}</p>
-                {tags.length > 0 && (
+                {Array.isArray(tags) && tags.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-4">
                     {tags.map((tag, idx) => (
                       <span
@@ -358,7 +369,7 @@ export default function WebAccessSBT() {
               {Array.isArray(previewSBT.attributes) && previewSBT.attributes.length > 0 && (
                 <div className="mb-6 space-y-2">
                   {previewSBT.attributes
-                    .filter((attr) => attr.trait_type !== 'Tag')
+                    .filter((attr) => attr.trait_type !== 'Tag' && attr.trait_type !== 'Tags')
                     .map((attr, index) => (
                       <div key={index} className="flex gap-2">
                         <span className="font-semibold text-gray-600 dark:text-gray-400 w-40">
@@ -377,13 +388,21 @@ export default function WebAccessSBT() {
               {/* Tags */}
               <div className="flex flex-wrap gap-2 mb-6 justify-center">
                 {previewSBT.attributes
-                  ?.filter((attr) => attr.trait_type === 'Tag')
+                  ?.filter((attr) => attr.trait_type === 'Tag' || attr.trait_type === 'Tags')
+                  .flatMap(attr => {
+                    const vals = Array.isArray(attr.value)
+                      ? attr.value
+                      : attr.value.split?.(',')
+                      ? attr.value.split(',').map(t => t.trim())
+                      : [attr.value]
+                    return vals
+                  })
                   .map((tag, index) => (
                     <span
                       key={index}
                       className="bg-indigo-100 text-indigo-800 dark:bg-indigo-700 dark:text-indigo-100 px-3 py-1 rounded-full text-sm font-semibold"
                     >
-                      {tag.value}
+                      {tag}
                     </span>
                   ))}
               </div>
