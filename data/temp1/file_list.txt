@@ -1,0 +1,25 @@
+List of files in folder:
+
+Coffee-Mates.json
+FUTURE VERSION -confidential-business-meeting.json
+FUTURE VERSION business-meeting-nda.json
+Night-Owls.json
+beer-club.png
+beer-pass-copenhagen.json
+business-meeting.json
+busness-meeting.jpg
+cafecoffee.jpg
+coffee-mates-copenhagen.json
+coffee-mates.json
+dinner-circle-copenhagen.json
+dinner.webp
+file_list.txt
+files.js
+night-owls-copenhagen.json
+night-owls.json
+owl.webp
+social-breakfast.jpg
+tea.png
+wine-club-clean.png
+wine-club-clean.webp
+wine-pass-copenhagen.json
