@@ -2,7 +2,7 @@
   "name": "Wine Walk",
   "description": "Casual drinks and great company at partner wine clubs in Copenhagen. Perks announced weekly in Telegram.",
   "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/wine-club-clean.webp",
-  "external_url": "https://yourplatform.xyz/events/social-mixer",
+"external_url": "t.me/TeaNetworkCphBar",
   "attributes": [
     { "trait_type": "Venue", "value": "Bar" },
     { "trait_type": "Theme", "value": "Social" },

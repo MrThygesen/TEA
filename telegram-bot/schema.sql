@@ -4,3 +4,10 @@ CREATE TABLE groups (
   type_id INTEGER NOT NULL,
   is_active BOOLEAN DEFAULT 1
 );
+
+CREATE TABLE IF NOT EXISTS sbt_groups (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  type_id INTEGER UNIQUE NOT NULL,
+  metadata_uri TEXT NOT NULL
+);
+
