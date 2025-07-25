@@ -62,7 +62,7 @@ export default function AdminSBTManager() {
 
     async function fetchTypes() {
       const types = []
-      for (let i = 56; i <= MAX_TYPES; i++) {
+      for (let i = 50; i <= MAX_TYPES; i++) {
         try {
           const sbtType = await publicClient.readContract({
             address: CONTRACT_ADDRESS,
