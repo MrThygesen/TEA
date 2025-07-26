@@ -3,8 +3,11 @@
 
 import { useState, useEffect } from 'react'
 import { useAccount, useWriteContract, usePublicClient } from 'wagmi'
-import WebAccessSBTV31_ABI from '../abis/WebAccessSBTV32_ABI.json'
+import WebAccessSBTV32_ABI from '../abis/WebAccessSBTV32_ABI.json'
+const WebAccessSBTV32_ABI = contract.abi;
 import { toast } from 'react-hot-toast'
+
+
 
 
 const CONTRACT_ADDRESS = '0x4f22580C5FdfcEAF80189877d6E961D6B11994c3'
