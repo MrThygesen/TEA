@@ -2,7 +2,7 @@
   "name": "Beer Walk",
   "description": "Casual drinks and great company at partner beer pubs in Copenhagen. Perks announced weekly in Telegram.",
   "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/beer-club.png",
-  "external_url": "t.me/TeaNetworkCphBar", 
+  "external_url": "https://t.me/TeaNetworkCphBar", 
   "attributes": [
     { "trait_type": "Venue", "value": "Bar" },
     { "trait_type": "Theme", "value": "Social" },

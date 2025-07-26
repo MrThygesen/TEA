@@ -2,7 +2,7 @@
   "name": "Morning Coffee Mates",
   "description": "Start your day with a calm coffee chat rotating among partners. Weekly drop-in perks shared on Telegram.",
   "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/cafecoffee.jpg",
-"external_url": "t.me/TeaNetworkCphCafe",
+"external_url": "https://t.me/TeaNetworkCphCafe",
   "attributes": [
     { "trait_type": "Venue", "value": "Cafe" },
     { "trait_type": "Theme", "value": "Friendship" },

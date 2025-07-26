@@ -1,7 +1,7 @@
 {
   "name": "Business Lunch",
   "description": "Connect with local professionals at select lunch spots. Booking link in Telegram.",
-  "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/tea.png",
+  "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/business-launch.jpg",
   "external_url": "t.me/TeaNetworkCphBuz",
   "attributes": [
     { "trait_type": "Venue", "value": "Restaurant/Cafe" },
