@@ -3,11 +3,11 @@
 
 import { useState, useEffect } from 'react'
 import { useAccount, useWriteContract, usePublicClient } from 'wagmi'
-import WebAccessSBTV31_ABI from '../abis/WebAccessSBTV31_ABI.json'
+import WebAccessSBTV31_ABI from '../abis/WebAccessSBTV32_ABI.json'
 import { toast } from 'react-hot-toast'
 
 
-const CONTRACT_ADDRESS = '0x67c4654C71d665DC94c507cF35Adf03031db9655'
+const CONTRACT_ADDRESS = '0x4f22580C5FdfcEAF80189877d6E961D6B11994c3'
 const MAX_TYPES = 100
 
 export default function AdminSBTManager() {
@@ -66,7 +66,7 @@ export default function AdminSBTManager() {
         try {
           const sbtType = await publicClient.readContract({
             address: CONTRACT_ADDRESS,
-            abi: WebAccessSBTV31_ABI,
+            abi: WebAccessSBTV32_ABI,
             functionName: 'sbtTypes',
             args: [i],
           })
@@ -127,7 +127,7 @@ export default function AdminSBTManager() {
       const uri = buildUri(title)
       await writeContractAsync({
         address: CONTRACT_ADDRESS,
-        abi: WebAccessSBTV31_ABI,
+        abi: WebAccessSBTV32_ABI,
         functionName: 'createSBTType',
         args: [typeId, uri, burnable, BigInt(maxSupply), false],
       })
@@ -143,7 +143,7 @@ export default function AdminSBTManager() {
     setLoading(true)
     try {
       await writeContractAsync({
-        abi: WebAccessSBTV31_ABI,
+        abi: WebAccessSBTV32_ABI,
         address: CONTRACT_ADDRESS,
         functionName: 'setActive',
         args: [typeId, true],
@@ -161,7 +161,7 @@ export default function AdminSBTManager() {
     try {
       await writeContractAsync({
         address: CONTRACT_ADDRESS,
-        abi: WebAccessSBTV31_ABI,
+        abi: WebAccessSBTV32_ABI,
         functionName: 'setActive',
         args: [typeId, false],
       })
@@ -179,7 +179,7 @@ export default function AdminSBTManager() {
     try {
       await writeContractAsync({
         address: CONTRACT_ADDRESS,
-        abi: WebAccessSBTV31_ABI,
+        abi: WebAccessSBTV32_ABI,
         functionName: 'burn',
         args: [burnTokenId],
       })

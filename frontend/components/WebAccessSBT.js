@@ -3,9 +3,9 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useAccount, useWriteContract, usePublicClient } from 'wagmi'
 import { toast } from 'react-hot-toast'
-import WebAccessSBTV31_ABI from '../abis/WebAccessSBTV31_ABI.json'
+import WebAccessSBTV31_ABI from '../abis/WebAccessSBTV32_ABI.json'
 
-const CONTRACT_ADDRESS = '0x67c4654C71d665DC94c507cF35Adf03031db9655'
+const CONTRACT_ADDRESS = '0x4f22580C5FdfcEAF80189877d6E961D6B11994c3'
 
 export default function WebAccessSBT({ darkMode }) {
   const { address } = useAccount()
@@ -38,13 +38,13 @@ export default function WebAccessSBT({ darkMode }) {
         const [sbtType, hasClaimed] = await Promise.all([
           publicClient.readContract({
             address: CONTRACT_ADDRESS,
-            abi: WebAccessSBTV31_ABI,
+            abi: WebAccessSBTV32_ABI,
             functionName: 'sbtTypes',
             args: [i],
           }),
           publicClient.readContract({
             address: CONTRACT_ADDRESS,
-            abi: WebAccessSBTV31_ABI,
+            abi: WebAccessSBTV32_ABI,
             functionName: 'hasClaimed',
             args: [i, address],
           }),
@@ -88,7 +88,7 @@ export default function WebAccessSBT({ darkMode }) {
     try {
       const tokenIds = await publicClient.readContract({
         address: CONTRACT_ADDRESS,
-        abi: WebAccessSBTV31_ABI,
+        abi: WebAccessSBTV32_ABI,
         functionName: 'tokensOfOwner',
         args: [address],
       })
@@ -97,7 +97,7 @@ export default function WebAccessSBT({ darkMode }) {
       for (const tokenId of tokenIds) {
         const typeId = await publicClient.readContract({
           address: CONTRACT_ADDRESS,
-          abi: WebAccessSBTV31_ABI,
+          abi: WebAccessSBTV32_ABI,
           functionName: 'typeOf',
           args: [tokenId],
         })
@@ -107,7 +107,7 @@ export default function WebAccessSBT({ darkMode }) {
 
         const sbtType = await publicClient.readContract({
           address: CONTRACT_ADDRESS,
-          abi: WebAccessSBTV31_ABI,
+          abi: WebAccessSBTV32_ABI,
           functionName: 'sbtTypes',
           args: [typeId],
         })
@@ -151,7 +151,7 @@ export default function WebAccessSBT({ darkMode }) {
       setLoadingTypeId(typeId)
       await writeContractAsync({
         address: CONTRACT_ADDRESS,
-        abi: WebAccessSBTV31_ABI,
+        abi: WebAccessSBTV32_ABI,
         functionName: 'claim',
         args: [typeId],
       })
