@@ -1,0 +1,20 @@
+{
+  "name": "Steak Night",
+  "description": "A cozy singles night out designed for new connections. Perk announcements and confirmation happen in the Telegram group (link).",
+  "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/dinner.webp",
+  "external_url": "https://t.me/TeaNetworkCphSolo",
+  "attributes": [
+    { "trait_type": "Venue", "value": "Restaurant" },
+    { "trait_type": "Theme", "value": "Conversational flirt" },
+    { "trait_type": "Formality", "value": "Informal" },
+    { "trait_type": "Time-Limited", "value": "Weekly update of perks during Alpha Test" },
+    { "trait_type": "Offer", "value": "Free glass of wine on dinner" },
+    { "trait_type": "Telegram Announced", "value": "Yes" },
+    { "trait_type": "Reservation", "value": "Telegram" },
+    { "trait_type": "Proof", "value": "SBT shown at the venue" },
+    { "trait_type": "Tags", "value": "Dinner, Wine, Romance, Singles" }
+  ]
+}
+ 
+
+
