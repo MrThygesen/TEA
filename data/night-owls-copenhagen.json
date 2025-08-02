@@ -1,11 +1,18 @@
 {
-    "name": "Night Owls",
-    "description": "Join late-night events at bars with themed fun and drinks",
-    "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/owl.webp",
-    "tags": ["nightlife", "games", "cocktails"],
-    "details1": "Exclusive entry to social nightlife events around Copenhagen",
-    "details2": "SBT gives you entry rights and Telegram coordination access",
-    "external_url": "https://t.me/nightowls_cph",
-    "social_link": "https://t.me/teaclub_main", 
-    "responsible": "Martini"
-  }
+  "name": "Night Owls",
+  "description": "Join late-night events at bars with themed fun and drinks",
+  "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/owl.webp",
+  "external_url": "https://t.me/TeaNetworkCphBar",
+  "attributes": [
+    { "trait_type": "Venue", "value": "Restaurant/Cafe" },
+    { "trait_type": "Theme", "value": "Social" },
+    { "trait_type": "Formality", "value": "Informal" },
+    { "trait_type": "Time-Limited", "value": "Weekly update of perks during Alpha Test" },
+    { "trait_type": "Telegram Announced", "value": "Yes" },
+    { "trait_type": "Reservation", "value": "no, meet on vote" },
+    { "trait_type": "Proof", "value": "SBT shown at the venue" },
+    { "trait_type": "Tags", "value": "Networking, fun" }, 
+    { "trait_type": "Responsible", "value": "Martine" }
+  ]
+}
+ 
