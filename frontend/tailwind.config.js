@@ -32,10 +32,6 @@ module.exports = {
       },
     },
   },
-  plugins: [
-    require('@tailwindcss/forms'),
-    require('@tailwindcss/aspect-ratio'),
-    require('tailwind-clip-path'), // optional, required for `clip-path-*` classes
-  ],
+  plugins: [],
 }
 
