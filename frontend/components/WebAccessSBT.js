@@ -255,7 +255,7 @@ export default function WebAccessSBT() {
 
         {showOwned && !isLoading && (
           <section className="border-zinc-700 text-white rounded-3xl p-8 border shadow-lg space-y-4 transition-colors duration-300 text-left">
-            <h2 className="text-lg font-semibold mb-2">Your Network Deals</h2>
+            <h2 className="text-lg font-semibold mb-2">Your Deals</h2>
             {filteredOwned.length === 0 ? (
               <p className="text-gray-400">You did not join any social perk network yet.</p>
             ) : (
