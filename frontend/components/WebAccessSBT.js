@@ -18,7 +18,7 @@ const styles = {
   tagBadgeInactive: 'border border-blue-400 text-blue-400 text-xs px-3 py-1 rounded-full',
   tagBadge: 'border border-blue-400 text-blue-200 text-xs px-2 py-1 rounded-full',
   emailButton: 'px-3 py-1 text-sm border rounded bg-blue-600 text-white hover:bg-blue-700',
-  sbtCard: 'border rounded p-4 text-left', // left align here
+  sbtCard: 'border rounded p-4 text-left',
   sbtImage: 'w-full h-40 object-cover rounded mb-2',
   previewModalBg: 'fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50',
   previewModalContentDark: 'relative p-6 rounded-lg max-w-md w-full bg-gray-900 text-white text-left',
@@ -34,12 +34,7 @@ const styles = {
 function LoadingSpinner() {
   return (
     <div className="flex justify-center items-center py-12">
-      <svg
-        className="animate-spin h-10 w-10 text-blue-600"
-        xmlns="http://www.w3.org/2000/svg"
-        fill="none"
-        viewBox="0 0 24 24"
-      >
+      <svg className="animate-spin h-10 w-10 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
       </svg>
@@ -223,33 +218,37 @@ export default function WebAccessSBT() {
       </div>
 
       <div className={`${styles.container} relative overflow-hidden rounded-lg p-6`}>
-        <section className="border border-zinc-700 rounded-lg p-4 mb-4 flex items-center justify-between">
-          <div className="flex flex-wrap gap-2">
-            {allTags.map((tag) => (
-              <button
-                key={tag}
-                onClick={() =>
-                  setSelectedTags((prev) =>
-                    prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-                  )
-                }
-                className={
-                  selectedTags.includes(tag) ? styles.tagBadgeActive : styles.tagBadgeInactive
-                }
-              >
-                {tag}
-              </button>
-            ))}
+        {/* TAG FILTER SECTION WITH HEADLINE */}
+        <section className="border border-zinc-700 rounded-lg p-4 mb-4">
+          <h2 className="text-xl font-semibold mb-3">Filter Deals</h2>
+          <div className="flex flex-wrap justify-between items-center gap-2">
+            <div className="flex flex-wrap gap-2">
+              {allTags.map((tag) => (
+                <button
+                  key={tag}
+                  onClick={() =>
+                    setSelectedTags((prev) =>
+                      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+                    )
+                  }
+                  className={
+                    selectedTags.includes(tag) ? styles.tagBadgeActive : styles.tagBadgeInactive
+                  }
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+            <label className="text-sm">
+              <input
+                type="checkbox"
+                className="mr-2"
+                checked={showOwned}
+                onChange={() => setShowOwned(!showOwned)}
+              />
+              Show My Deals
+            </label>
           </div>
-          <label className="text-sm">
-            <input
-              type="checkbox"
-              className="mr-2"
-              checked={showOwned}
-              onChange={() => setShowOwned(!showOwned)}
-            />
-            Show My Deals
-          </label>
         </section>
 
         {isLoading && <LoadingSpinner />}
@@ -344,11 +343,7 @@ export default function WebAccessSBT() {
                     ×
                   </button>
                   <h3 className="text-xl font-semibold mb-2">{previewSBT.name}</h3>
-                  <img
-                    src={previewSBT.image}
-                    alt={previewSBT.name}
-                    className="w-full h-48 object-cover rounded mb-2"
-                  />
+                  <img src={previewSBT.image} alt={previewSBT.name} className="w-full h-48 object-cover rounded mb-2" />
                   <p className="mb-2">{previewSBT.description}</p>
                   <div className={styles.flexWrapGap2}>
                     {previewSBT.tags.map((tag, idx) => (
@@ -367,15 +362,15 @@ export default function WebAccessSBT() {
                       ))}
                     </div>
                   )}
-                  {previewSBT.uri && (
+                  {previewSBT.metadata?.external_url && (
                     <p className="mt-3 text-sm">
                       <a
-                        href={previewSBT.uri}
+                        href={previewSBT.metadata.external_url}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="underline text-blue-400"
                       >
-                        Telegram Group
+                        View External Page
                       </a>
                     </p>
                   )}
