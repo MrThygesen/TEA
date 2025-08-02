@@ -2,437 +2,393 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useAccount, useWriteContract, usePublicClient } from 'wagmi'
+import { parseAbi } from 'viem'
 import { toast } from 'react-hot-toast'
-import WebAccessSBTV32_ABI from '../abis/WebAccessSBTV32_ABI.json'
-const WebAccessSBTV32_ABI = contract.abi;
 
-const CONTRACT_ADDRESS = '0x4f22580C5FdfcEAF80189877d6E961D6B11994c3'
+const CONTRACT_ADDRESS = '0xA508A0f5733bcfcf6eA0b41ca9344c27855FeEF0'
 
-export default function WebAccessSBT({ darkMode }) {
+const styles = {
+  container: 'min-h-screen p-4 max-w-5xl mx-auto',
+  header: 'flex justify-between items-center mb-4',
+  btnPrimary:
+    'px-3 py-1 rounded text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed',
+  btnSecondary:
+    'px-3 py-1 border rounded text-blue-600 border-blue-600 hover:bg-blue-50',
+  tagBadgeActive: 'bg-blue-600 text-white text-xs px-3 py-1 rounded-full',
+  tagBadgeInactive: 'border border-blue-400 text-blue-400 text-xs px-3 py-1 rounded-full',
+  tagBadge: 'border border-blue-400 text-blue-200 text-xs px-2 py-1 rounded-full',
+  emailButton: 'px-3 py-1 text-sm border rounded bg-blue-600 text-white hover:bg-blue-700',
+  sbtCard: 'border rounded p-4 text-left', // left align here
+  sbtImage: 'w-full h-40 object-cover rounded mb-2',
+  previewModalBg: 'fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50',
+  previewModalContentDark: 'relative p-6 rounded-lg max-w-md w-full bg-gray-900 text-white text-left',
+  previewCloseButton: 'absolute top-2 right-3 text-2xl font-bold cursor-pointer',
+  flexWrapGap2: 'flex flex-wrap gap-2 mt-2',
+  textGray400: 'text-xs mt-2 text-gray-400',
+  flexGap2: 'flex gap-2',
+  flexItemsStartGap2: 'flex items-start gap-2 text-sm mt-3 mb-2',
+  checkboxMarginTop: 'mt-1',
+  gridMd3Gap4: 'grid md:grid-cols-3 gap-4 mb-6',
+}
+
+function LoadingSpinner() {
+  return (
+    <div className="flex justify-center items-center py-12">
+      <svg
+        className="animate-spin h-10 w-10 text-blue-600"
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+      >
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+      </svg>
+    </div>
+  )
+}
+
+function shortenText(text, maxLen = 120) {
+  if (!text) return ''
+  return text.length > maxLen ? text.slice(0, maxLen) + '...' : text
+}
+
+export default function WebAccessSBT() {
   const { address } = useAccount()
-  const { writeContractAsync } = useWriteContract()
   const publicClient = usePublicClient()
+  const { writeContractAsync } = useWriteContract()
 
   const [availableSBTs, setAvailableSBTs] = useState([])
   const [ownedSBTs, setOwnedSBTs] = useState([])
-  const [loadingTypeId, setLoadingTypeId] = useState(null)
-  const [searchTerm, setSearchTerm] = useState('')
   const [previewSBT, setPreviewSBT] = useState(null)
+  const [loadingTypeId, setLoadingTypeId] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [selectedTags, setSelectedTags] = useState([])
+  const [showOwned, setShowOwned] = useState(true)
+  const [policyAccepted, setPolicyAccepted] = useState({})
 
-  // Helper to extract tags array from attributes
-  const extractTags = (attributes) => {
-    if (!Array.isArray(attributes)) return []
-    const tagsAttr = attributes.find(attr => attr.trait_type === 'Tags')
-    if (!tagsAttr || !tagsAttr.value) return []
-    return tagsAttr.value.split(',').map(tag => tag.trim())
-  }
-
-  // Fetch available SBTs with exclusion of typeId 1-50
-  const fetchAvailableSBTs = useCallback(async () => {
+  const fetchSBTs = useCallback(async () => {
     if (!address || !publicClient) return
 
+    setIsLoading(true)
     const maxTypeCount = 100
-    const found = []
+    const owned = []
+    const available = []
 
-    for (let i = 51; i <= maxTypeCount; i++) {
-      try {
-        const [sbtType, hasClaimed] = await Promise.all([
-          publicClient.readContract({
-            address: CONTRACT_ADDRESS,
-            abi: WebAccessSBTV32_ABI,
-            functionName: 'sbtTypes',
-            args: [i],
-          }),
-          publicClient.readContract({
-            address: CONTRACT_ADDRESS,
-            abi: WebAccessSBTV32_ABI,
-            functionName: 'hasClaimed',
-            args: [i, address],
-          }),
-        ])
-
-        const [uri, active, , maxSupply, minted] = sbtType
-
-        if (active && !hasClaimed && minted < maxSupply) {
-          try {
-            const res = await fetch(uri)
-            const metadata = await res.json()
-            const tags = extractTags(metadata.attributes)
-
-            found.push({
-              typeId: i,
-              uri,
-              name: metadata.name || `SBT Type ${i}`,
-              image: metadata.image || '',
-              description: metadata.description || '',
-              tags,
-              tokensLeft: Number(maxSupply) - Number(minted),
-              metadata,
-            })
-          } catch (e) {
-            console.warn(`Error loading SBT ${i}:`, e.message)
-          }
-        }
-      } catch (err) {
-        console.warn(`Failed to fetch SBT type ${i}:`, err)
-        continue
-      }
-    }
-
-    setAvailableSBTs(found)
-  }, [address, publicClient])
-
-  // Fetch owned SBTs with exclusion of typeId 1-50
-  const fetchOwnedSBTs = useCallback(async () => {
-    if (!address || !publicClient) return
-
+    let tokenIds = []
     try {
-      const tokenIds = await publicClient.readContract({
+      tokenIds = await publicClient.readContract({
         address: CONTRACT_ADDRESS,
-        abi: WebAccessSBTV32_ABI,
+        abi: parseAbi(['function tokensOfOwner(address) view returns (uint256[])']),
         functionName: 'tokensOfOwner',
         args: [address],
       })
+    } catch (err) {
+      console.error('Error fetching owned tokens:', err)
+    }
 
-      const owned = []
-      for (const tokenId of tokenIds) {
-        const typeId = await publicClient.readContract({
-          address: CONTRACT_ADDRESS,
-          abi: WebAccessSBTV32_ABI,
-          functionName: 'typeOf',
-          args: [tokenId],
+    const ownedTypeIds = new Set()
+
+    for (const tokenId of tokenIds) {
+      try {
+        const [typeId, uri] = await Promise.all([
+          publicClient.readContract({
+            address: CONTRACT_ADDRESS,
+            abi: parseAbi(['function typeOf(uint256) view returns (uint256)']),
+            functionName: 'typeOf',
+            args: [tokenId],
+          }),
+          publicClient.readContract({
+            address: CONTRACT_ADDRESS,
+            abi: parseAbi(['function tokenURI(uint256) view returns (string)']),
+            functionName: 'tokenURI',
+            args: [tokenId],
+          }),
+        ])
+
+        const res = await fetch(uri)
+        const metadata = await res.json()
+
+        ownedTypeIds.add(Number(typeId))
+
+        owned.push({
+          tokenId: Number(tokenId),
+          typeId: Number(typeId),
+          uri,
+          name: metadata.name || `Token ${tokenId}`,
+          image: metadata.image || '',
+          description: metadata.description || '',
+          tags: extractTags(metadata.attributes),
+          metadata,
         })
+      } catch (err) {
+        console.warn('Error loading owned SBT metadata:', err)
+      }
+    }
 
-        // Exclude typeId 1-50
-        if (typeId >= 1 && typeId <= 50) continue
-
+    for (let i = 1; i <= maxTypeCount; i++) {
+      if (ownedTypeIds.has(i)) continue
+      try {
         const sbtType = await publicClient.readContract({
           address: CONTRACT_ADDRESS,
-          abi: WebAccessSBTV32_ABI,
+          abi: parseAbi([
+            'function sbtTypes(uint256) view returns (string uri, bool active, uint256 maxSupply, uint256 supply, bool created, bool burnable)',
+          ]),
           functionName: 'sbtTypes',
-          args: [typeId],
+          args: [i],
         })
 
-        const [uri] = sbtType
+        const [uri, active, maxSupply, supply, created] = sbtType
 
-        try {
+        if (created && active && uri && supply < maxSupply) {
           const res = await fetch(uri)
           const metadata = await res.json()
-          const tags = extractTags(metadata.attributes)
 
-          owned.push({
-            tokenId,
-            typeId,
+          available.push({
+            typeId: i,
             uri,
-            name: metadata.name || `SBT Type ${typeId}`,
+            name: metadata.name || `SBT Type ${i}`,
             image: metadata.image || '',
             description: metadata.description || '',
-            tags,
-            attributes: metadata.attributes || [],
+            tags: extractTags(metadata.attributes),
+            tokensLeft: Number(maxSupply) - Number(supply),
             metadata,
           })
-        } catch (e) {
-          console.warn(`Error loading owned token ${tokenId}:`, e.message)
         }
+      } catch (e) {
+        console.warn(`Failed to fetch sbtTypes[${i}]:`, e)
       }
-
-      setOwnedSBTs(owned)
-    } catch (err) {
-      console.error('Error fetching owned SBTs:', err)
     }
+
+    setOwnedSBTs(owned)
+    setAvailableSBTs(available)
+    setIsLoading(false)
   }, [address, publicClient])
 
+  const extractTags = (attributes) => {
+    if (!attributes || !Array.isArray(attributes)) return []
+    const tagsAttr = attributes.find(
+      (attr) =>
+        attr.trait_type?.toLowerCase() === 'tags' ||
+        attr.trait_type?.toLowerCase() === 'tag'
+    )
+    if (!tagsAttr?.value) return []
+    return tagsAttr.value.split(',').map((t) => t.trim()).filter(Boolean)
+  }
+
   useEffect(() => {
-    fetchAvailableSBTs()
-    fetchOwnedSBTs()
-  }, [fetchAvailableSBTs, fetchOwnedSBTs])
+    fetchSBTs()
+  }, [fetchSBTs])
 
   const handleClaim = async (typeId) => {
+    if (ownedSBTs.some((sbt) => sbt.typeId === typeId)) {
+      toast.error(`❌ Already claimed SBT of type ${typeId}`)
+      return
+    }
+
     try {
       setLoadingTypeId(typeId)
       await writeContractAsync({
         address: CONTRACT_ADDRESS,
-        abi: WebAccessSBTV32_ABI,
+        abi: parseAbi(['function claim(uint256)']),
         functionName: 'claim',
         args: [typeId],
       })
       toast.success(`🎉 Claimed SBT type ${typeId}`)
-      await fetchAvailableSBTs()
-      await fetchOwnedSBTs()
+      await fetchSBTs()
     } catch (err) {
-      console.error('Claim failed:', err)
       toast.error(err.message || 'Claim failed')
     } finally {
       setLoadingTypeId(null)
     }
   }
 
-  const filteredSBTs = availableSBTs.filter((sbt) =>
-    sbt.name.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const allTags = Array.from(
+    new Set([...availableSBTs.flatMap((sbt) => sbt.tags), ...ownedSBTs.flatMap((sbt) => sbt.tags)])
+  ).sort()
 
-  const handleShare = () => {
-    if (previewSBT?.uri) {
-      navigator.clipboard.writeText(previewSBT.uri)
-      toast.success('Metadata URI copied to clipboard!')
-    }
-  }
+  const filteredAvailable =
+    selectedTags.length === 0
+      ? availableSBTs
+      : availableSBTs.filter((sbt) => selectedTags.every((tag) => sbt.tags.includes(tag)))
+
+  const filteredOwned =
+    selectedTags.length === 0
+      ? ownedSBTs
+      : ownedSBTs.filter((sbt) => selectedTags.every((tag) => sbt.tags.includes(tag)))
 
   return (
-    <div
-      className={`${
-        darkMode ? 'bg-black text-white' : 'bg-white text-black'
-      } p-4 rounded-xl border ${
-        darkMode ? 'border-gray-700' : 'border-gray-300'
-      } transition-colors duration-300`}
-    >
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-        <input
-          type="text"
-          placeholder="Search SBT by name..."
-          className={`w-full sm:w-2/3 p-2 rounded border ${
-            darkMode ? 'bg-zinc-900 text-white border-gray-600' : 'bg-white text-black border-gray-300'
-          }`}
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+    <div className="bg-black text-white min-h-screen">
+      <div className="bg-zinc-900 border-zinc-700 shadow-lg rounded-3xl p-8 flex flex-col items-center space-y-4 border transition-colors duration-300">
+        <h1 className="text-3xl font-bold mb-2 text-left w-full max-w-5xl">Grab the available network and membership deal</h1>
       </div>
 
-      {/* Available SBTs */}
-      <h2
-        className={`text-xl sm:text-2xl font-bold mb-4 ${
-          darkMode ? 'text-white' : 'text-gray-800'
-        }`}
-      >
-        Available SBTs
-      </h2>
-      {filteredSBTs.length === 0 ? (
-        <div className={`text-center py-8 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-          No available SBTs to claim.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-          {filteredSBTs.map(
-            ({ typeId, name, image, description, tags, tokensLeft, metadata }) => (
-              <div
-                key={typeId}
-                className={`border rounded-xl p-4 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl ${
-                  darkMode ? 'bg-zinc-900 text-white border-zinc-700' : 'bg-white text-black border-gray-300'
-                }`}
+      <div className={`${styles.container} relative overflow-hidden rounded-lg p-6`}>
+        <section className="border border-zinc-700 rounded-lg p-4 mb-4 flex items-center justify-between">
+          <div className="flex flex-wrap gap-2">
+            {allTags.map((tag) => (
+              <button
+                key={tag}
+                onClick={() =>
+                  setSelectedTags((prev) =>
+                    prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+                  )
+                }
+                className={
+                  selectedTags.includes(tag) ? styles.tagBadgeActive : styles.tagBadgeInactive
+                }
               >
-                <img
-                  src={image}
-                  alt={name}
-                  className="w-full aspect-[4/3] object-cover rounded mb-3 shadow"
-                />
-                <h3 className="text-lg font-semibold mb-1">{name}</h3>
-                <p className="text-sm mb-2 line-clamp-3">
-                  {description.split(' ').slice(0, 12).join(' ')}...
-                </p>
-                <p className={`text-xs mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  🧮 Tokens left: {tokensLeft}
-                </p>
+                {tag}
+              </button>
+            ))}
+          </div>
+          <label className="text-sm">
+            <input
+              type="checkbox"
+              className="mr-2"
+              checked={showOwned}
+              onChange={() => setShowOwned(!showOwned)}
+            />
+            Show My Deals
+          </label>
+        </section>
 
-                {Array.isArray(tags) && tags.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {tags.map((tag, idx) => (
-                      <span
-                        key={idx}
-                        className="bg-blue-100 text-blue-800 px-2 py-0.5 text-xs rounded dark:bg-blue-800 dark:text-white"
-                      >
-                        #{tag}
+        {isLoading && <LoadingSpinner />}
+
+        {showOwned && !isLoading && (
+          <section className="border-zinc-700 text-white rounded-3xl p-8 border shadow-lg space-y-4 transition-colors duration-300 text-left">
+            <h2 className="text-lg font-semibold mb-2">Your Network Deals</h2>
+            {filteredOwned.length === 0 ? (
+              <p className="text-gray-400">You did not join any social perk network yet.</p>
+            ) : (
+              <div className={styles.gridMd3Gap4}>
+                {filteredOwned.map((sbt) => (
+                  <div key={sbt.tokenId} className={styles.sbtCard}>
+                    <img src={sbt.image} alt={sbt.name} className={styles.sbtImage} />
+                    <h3 className="text-lg font-semibold">{sbt.name}</h3>
+                    <p className="text-sm">{shortenText(sbt.description)}</p>
+                    <div className={styles.flexWrapGap2}>
+                      {sbt.tags.map((tag, idx) => (
+                        <span key={idx} className={styles.tagBadge}>
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                    <p className={styles.textGray400}>
+                      Type ID: {sbt.typeId} · Token ID: {sbt.tokenId}
+                    </p>
+                    <button
+                      onClick={() => setPreviewSBT(sbt)}
+                      className={`${styles.btnSecondary} mt-3`}
+                    >
+                      Preview
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {!isLoading && (
+          <section className="border-zinc-700 text-white rounded-3xl p-8 border shadow-lg space-y-4 transition-colors duration-300 text-left">
+            <h2 className="text-lg font-semibold mb-2">Available Deals</h2>
+            <div className={styles.gridMd3Gap4}>
+              {filteredAvailable.map((sbt) => (
+                <div key={sbt.typeId} className={styles.sbtCard}>
+                  <img src={sbt.image} alt={sbt.name} className={styles.sbtImage} />
+                  <h3 className="text-lg font-semibold">{sbt.name}</h3>
+                  <p className="text-sm">{shortenText(sbt.description)}</p>
+                  <div className={styles.flexWrapGap2}>
+                    {sbt.tags.map((tag, idx) => (
+                      <span key={idx} className={styles.tagBadge}>
+                        {tag}
                       </span>
                     ))}
                   </div>
-                )}
-
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <button
-                    onClick={() => handleClaim(typeId)}
-                    disabled={loadingTypeId === typeId}
-                    className={`flex-1 py-2 rounded-lg text-white font-bold shadow-sm transform transition-all active:scale-95 ${
-                      loadingTypeId === typeId
-                        ? 'bg-blue-300'
-                        : 'bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800'
-                    }`}
-                  >
-                    {loadingTypeId === typeId ? 'Claiming...' : 'Claim'}
-                  </button>
-                  <button
-                    onClick={() => setPreviewSBT(metadata)}
-                    className="flex-1 py-2 rounded-lg bg-gray-600 hover:bg-gray-700 text-white font-semibold transition"
-                  >
-                    Preview
-                  </button>
-                </div>
-              </div>
-            )
-          )}
-        </div>
-      )}
-
-      {/* Owned SBTs */}
-      <h2 className={`text-xl font-bold mt-10 mb-4 ${darkMode ? 'text-white' : 'text-gray-800'}`}>
-        Your Owned SBTs
-      </h2>
-      {ownedSBTs.length === 0 ? (
-        <p className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
-          You do not own any SBTs yet.
-        </p>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-          {ownedSBTs.map(({ tokenId, typeId, name, image, description, tags, metadata }) => (
-            <div
-              key={tokenId.toString()}
-              className={`border rounded-xl p-4 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl ${
-                darkMode ? 'bg-zinc-900 text-white border-zinc-700' : 'bg-white text-black border-gray-300'
-              }`}
-            >
-              <img
-                src={image}
-                alt={name}
-                className="w-full aspect-[4/3] object-cover rounded mb-3 shadow"
-              />
-              <h3 className="text-lg font-semibold mb-1">{name}</h3>
-              <p className="text-sm mb-2 line-clamp-3">{description}</p>
-              {Array.isArray(tags) && tags.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {tags.map((tag, idx) => (
-                    <span
-                      key={idx}
-                      className="bg-blue-100 text-blue-800 px-2 py-0.5 text-xs rounded dark:bg-blue-800 dark:text-white"
+                  <p className="text-xs mt-2 text-gray-400">Tokens left: {sbt.tokensLeft}</p>
+                  <div className={styles.flexItemsStartGap2}>
+                    <input
+                      type="checkbox"
+                      id={`policy-${sbt.typeId}`}
+                      onChange={(e) =>
+                        setPolicyAccepted((prev) => ({
+                          ...prev,
+                          [sbt.typeId]: e.target.checked,
+                        }))
+                      }
+                      checked={!!policyAccepted[sbt.typeId]}
+                      className={styles.checkboxMarginTop}
+                    />
+                    <label htmlFor={`policy-${sbt.typeId}`}>I accept the policy</label>
+                  </div>
+                  <div className={styles.flexGap2}>
+                    <button
+                      disabled={loadingTypeId === sbt.typeId || !policyAccepted[sbt.typeId]}
+                      onClick={() => handleClaim(sbt.typeId)}
+                      className={styles.btnPrimary}
                     >
-                      #{tag}
-                    </span>
-                  ))}
+                      {loadingTypeId === sbt.typeId ? 'Minting...' : 'Mint'}
+                    </button>
+                    <button onClick={() => setPreviewSBT(sbt)} className={styles.btnSecondary}>
+                      Preview
+                    </button>
+                  </div>
                 </div>
-              )}
-              <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                Token ID: {tokenId.toString()}
-              </p>
-              <p className={`text-xs mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                Type ID: {typeId.toString()}
-              </p>
-
-              <button
-                onClick={() => setPreviewSBT(metadata)}
-                className="mt-2 w-full py-2 rounded-lg bg-gray-600 hover:bg-gray-700 text-white font-semibold transition"
-              >
-                Preview
-              </button>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
 
-      {/* Preview modal */}
-      {previewSBT && (
-        <div
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 transition-opacity duration-300"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className={`p-6 rounded-2xl shadow-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto relative animate-fade-in-up
-            ${darkMode ? 'bg-zinc-900 text-white' : 'bg-white text-black'}`}>
-            <button
-              onClick={() => setPreviewSBT(null)}
-              aria-label="Close preview"
-              className="absolute top-3 right-3 text-white bg-red-500 hover:bg-red-600 rounded-full w-10 h-10 text-center font-bold shadow-lg transition duration-200"
-            >
-              &times;
-            </button>
-
-            {/* Title */}
-            <h3 className="text-2xl font-bold mb-4 text-center">{previewSBT.name}</h3>
-
-            {/* Image */}
-            {previewSBT.image && (
-              <img
-                src={previewSBT.image}
-                alt={previewSBT.name}
-                className="w-full max-w-xs mx-auto h-48 object-cover rounded mb-4 shadow"
-              />
-            )}
-
-            {/* Description */}
-            {previewSBT.description && (
-              <p className={`text-center mb-4 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                {previewSBT.description}
-              </p>
-            )}
-
-            {/* External URL */}
-            {previewSBT.external_url && (
-              <a
-                href={previewSBT.external_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block text-center text-blue-600 dark:text-blue-400 hover:underline mb-6"
-              >
-                Visit Event Page ↗
-              </a>
-            )}
-
-            {/* Attributes */}
-            {Array.isArray(previewSBT.attributes) && previewSBT.attributes.length > 0 && (
-              <div className="mb-6 space-y-2">
-                {previewSBT.attributes
-                  .filter((attr) => attr.trait_type !== 'Tag' && attr.trait_type !== 'Tags')
-                  .map((attr, index) => (
-                    <div key={index} className="flex gap-2">
-                      <span className={`font-semibold w-40 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        {attr.trait_type}:
+            {previewSBT && (
+              <div className={styles.previewModalBg}>
+                <div className={styles.previewModalContentDark}>
+                  <button onClick={() => setPreviewSBT(null)} className={styles.previewCloseButton}>
+                    ×
+                  </button>
+                  <h3 className="text-xl font-semibold mb-2">{previewSBT.name}</h3>
+                  <img
+                    src={previewSBT.image}
+                    alt={previewSBT.name}
+                    className="w-full h-48 object-cover rounded mb-2"
+                  />
+                  <p className="mb-2">{previewSBT.description}</p>
+                  <div className={styles.flexWrapGap2}>
+                    {previewSBT.tags.map((tag, idx) => (
+                      <span key={idx} className={styles.tagBadge}>
+                        {tag}
                       </span>
-                      <span className={`${darkMode ? 'text-gray-200' : 'text-gray-900'}`}>
-                        {Array.isArray(attr.value)
-                          ? attr.value.join(', ')
-                          : attr.value?.replace(/^["']|["']$/g, '')}
-                      </span>
+                    ))}
+                  </div>
+                  {previewSBT.metadata?.attributes?.length > 0 && (
+                    <div className="mt-4 text-sm space-y-1">
+                      <h4 className="font-semibold">Metadata Attributes</h4>
+                      {previewSBT.metadata.attributes.map((attr, idx) => (
+                        <p key={idx}>
+                          <span className="text-gray-400">{attr.trait_type}:</span> {attr.value}
+                        </p>
+                      ))}
                     </div>
-                  ))}
+                  )}
+                  {previewSBT.uri && (
+                    <p className="mt-3 text-sm">
+                      <a
+                        href={previewSBT.uri}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline text-blue-400"
+                      >
+                        Telegram Group
+                      </a>
+                    </p>
+                  )}
+                  <p className={styles.textGray400}>
+                    Type ID: {previewSBT.typeId}
+                    {previewSBT.tokenId !== undefined && ` · Token ID: ${previewSBT.tokenId}`}
+                  </p>
+                </div>
               </div>
             )}
-
-            {/* Tags */}
-            <div className="flex flex-wrap gap-2 mb-6 justify-center">
-              {previewSBT.attributes
-                ?.filter((attr) => attr.trait_type === 'Tag' || attr.trait_type === 'Tags')
-                .flatMap(attr => {
-                  const vals = Array.isArray(attr.value)
-                    ? attr.value
-                    : attr.value.split?.(',')
-                    ? attr.value.split(',').map(t => t.trim())
-                    : [attr.value]
-                  return vals
-                })
-                .map((tag, index) => (
-                  <span
-                    key={index}
-                    className="bg-indigo-100 text-indigo-800 dark:bg-indigo-700 dark:text-indigo-100 px-3 py-1 rounded-full text-sm font-semibold"
-                  >
-                    {tag}
-                  </span>
-                ))}
-            </div>
-
-            {/* Actions */}
-            <div className="flex flex-col sm:flex-row justify-center gap-4 mt-4">
-              <button
-                onClick={handleShare}
-                className="flex-1 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition"
-              >
-                Copy Metadata URI
-              </button>
-              <button
-                onClick={() => setPreviewSBT(null)}
-                className="flex-1 py-2 rounded-lg border border-gray-400 text-gray-700 dark:text-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-zinc-800 transition"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </section>
+        )}
+      </div>
     </div>
   )
 }
