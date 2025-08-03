@@ -167,7 +167,7 @@ export default function Home() {
 
                 {showAmoyInfo && (
                   <div className="mt-4 text-sm text-left bg-zinc-800 border border-zinc-600 rounded-lg p-4 max-w-md mx-auto">
-                    <p className="mb-2">To add the Amoy network to your wallet, use the following:</p>
+                    <p className="mb-2">To add the Amoy network to your wallet, start with Add Custom Network:</p>
                     <ul className="list-disc list-inside text-gray-300 space-y-1">
                       <li><strong>Network Name:</strong> Polygon Amoy Testnet</li>
                       <li><strong>New RPC URL:</strong> https://rpc-amoy.polygon.technology/</li>
