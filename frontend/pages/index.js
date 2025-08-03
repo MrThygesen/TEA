@@ -15,6 +15,7 @@ export default function Home() {
   const [email, setEmail] = useState('')
   const [emailStatus, setEmailStatus] = useState('')
   const [isLoadingEmail, setIsLoadingEmail] = useState(false)
+  const [showAmoyInfo, setShowAmoyInfo] = useState(false)
 
   useEffect(() => {
     if (address) {
@@ -152,9 +153,32 @@ export default function Home() {
               <WebAccessSBT darkMode={true} />
             )
           ) : (
-            <p className="text-center text-gray-400">
-              Please connect your wallet to POLYGON AMOY and access your dashboard and see which deals are open right now.
-            </p>
+            <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-6 border shadow-lg transition-colors duration-300">
+              <p className="text-center text-gray-300 mb-4">
+                Please connect your wallet to the <strong>Polygon Amoy Testnet</strong> to access your dashboard and see which deals are open right now.
+              </p>
+              <div className="text-center">
+                <button
+                  onClick={() => setShowAmoyInfo((prev) => !prev)}
+                  className="text-blue-400 hover:underline text-sm"
+                >
+                  {showAmoyInfo ? 'Hide Amoy Network Setup' : '📘 How to add Amoy to your wallet'}
+                </button>
+
+                {showAmoyInfo && (
+                  <div className="mt-4 text-sm text-left bg-zinc-800 border border-zinc-600 rounded-lg p-4 max-w-md mx-auto">
+                    <p className="mb-2">To add the Amoy network to your wallet, use the following:</p>
+                    <ul className="list-disc list-inside text-gray-300 space-y-1">
+                      <li><strong>Network Name:</strong> Polygon Amoy Testnet</li>
+                      <li><strong>New RPC URL:</strong> https://rpc-amoy.polygon.technology/</li>
+                      <li><strong>Chain ID:</strong> 80002</li>
+                      <li><strong>Currency Symbol:</strong> POL</li>
+                      <li><strong>Block Explorer URL:</strong> https://amoy.polygonscan.com/</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </section>
           )}
         </section>
 
