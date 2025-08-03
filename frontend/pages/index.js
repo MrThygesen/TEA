@@ -11,7 +11,6 @@ export default function Home() {
   const isAdmin =
     address?.toLowerCase() === process.env.NEXT_PUBLIC_ADMIN?.toLowerCase()
 
-  // Email modal state and logic lifted here
   const [showEmailModal, setShowEmailModal] = useState(false)
   const [email, setEmail] = useState('')
   const [emailStatus, setEmailStatus] = useState('')
@@ -67,7 +66,6 @@ export default function Home() {
       <div className="w-full max-w-3xl space-y-10">
         {/* Header / Connect Button + Email Notification button */}
         <header className="relative bg-zinc-900 border-zinc-700 shadow-lg rounded-3xl p-8 flex flex-col items-center space-y-4 border transition-colors duration-300 overflow-hidden">
-          {/* Animated Hex Background - behind content */}
           <div className="absolute inset-0 -z-10 opacity-10 animate-spin-slow pointer-events-none select-none">
             <svg
               className="w-full h-full"
@@ -124,6 +122,27 @@ export default function Home() {
           )}
         </header>
 
+        {/* Static SBT Preview for non-connected users */}
+        {!isConnected && (
+          <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg transition-colors duration-300">
+            <h2 className="text-2xl font-semibold mb-4 text-blue-400 text-center">
+              Explore Sample Perk Deals
+            </h2>
+            <p className="text-center text-gray-400 mb-6">
+              Here are examples of social deal passes. Connect your wallet to access available and claimable deals.
+            </p>
+            <div className="grid md:grid-cols-3 gap-6">
+              {[
+                'https://raw.githubusercontent.com/MrThygesen/TEA/main/data/genesis.json',
+                'https://raw.githubusercontent.com/MrThygesen/TEA/main/data/night-owls-copenhagen.json',
+                'https://raw.githubusercontent.com/MrThygesen/TEA/main/data/wine-pass-copenhagen.json',
+              ].map((url, index) => (
+                <StaticSBTCard key={index} url={url} />
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* SBT Access Section */}
         <section>
           {isConnected ? (
@@ -134,7 +153,7 @@ export default function Home() {
             )
           ) : (
             <p className="text-center text-gray-400">
-              Please connect your wallet to access your dashboard.
+              Please connect your wallet to POLYGON AMOY and access your dashboard and see which deals are open right now.
             </p>
           )}
         </section>
@@ -260,6 +279,41 @@ export default function Home() {
         </div>
       )}
     </main>
+  )
+}
+
+function StaticSBTCard({ url }) {
+  const [data, setData] = useState(null)
+
+  useEffect(() => {
+    fetch(url)
+      .then((res) => res.json())
+      .then(setData)
+      .catch(() => {})
+  }, [url])
+
+  if (!data) return null
+
+  const tags = data.attributes?.find((a) =>
+    a.trait_type?.toLowerCase().includes('tag')
+  )?.value?.split(',') || []
+
+  return (
+    <div className="border border-zinc-700 rounded-lg p-4 text-left bg-zinc-800 shadow">
+      <img src={data.image} alt={data.name} className="w-full h-40 object-cover rounded mb-3" />
+      <h3 className="text-lg font-semibold mb-1">{data.name}</h3>
+      <p className="text-sm mb-2">{data.description?.slice(0, 100)}...</p>
+      <div className="flex flex-wrap gap-2">
+        {tags.map((tag, idx) => (
+          <span
+            key={idx}
+            className="border border-blue-400 text-blue-300 text-xs px-2 py-1 rounded-full"
+          >
+            {tag.trim()}
+          </span>
+        ))}
+      </div>
+    </div>
   )
 }
 
