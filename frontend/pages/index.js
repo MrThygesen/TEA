@@ -308,6 +308,7 @@ export default function Home() {
 
 function StaticSBTCard({ url }) {
   const [data, setData] = useState(null)
+  const [showModal, setShowModal] = useState(false)
 
   useEffect(() => {
     fetch(url)
@@ -322,22 +323,70 @@ function StaticSBTCard({ url }) {
     a.trait_type?.toLowerCase().includes('tag')
   )?.value?.split(',') || []
 
+  const filteredAttributes = data.attributes?.filter(
+    (attr) =>
+      attr.trait_type?.toLowerCase() !== 'typeid' &&
+      attr.trait_type?.toLowerCase() !== 'tokenid'
+  )
+
   return (
-    <div className="border border-zinc-700 rounded-lg p-4 text-left bg-zinc-800 shadow">
-      <img src={data.image} alt={data.name} className="w-full h-40 object-cover rounded mb-3" />
-      <h3 className="text-lg font-semibold mb-1">{data.name}</h3>
-      <p className="text-sm mb-2">{data.description?.slice(0, 100)}...</p>
-      <div className="flex flex-wrap gap-2">
-        {tags.map((tag, idx) => (
-          <span
-            key={idx}
-            className="border border-blue-400 text-blue-300 text-xs px-2 py-1 rounded-full"
-          >
-            {tag.trim()}
-          </span>
-        ))}
+    <>
+      <div className="border border-zinc-700 rounded-lg p-4 text-left bg-zinc-800 shadow">
+        <img src={data.image} alt={data.name} className="w-full h-40 object-cover rounded mb-3" />
+        <h3 className="text-lg font-semibold mb-1">{data.name}</h3>
+        <p className="text-sm mb-2">{data.description?.slice(0, 100)}...</p>
+        <div className="flex flex-wrap gap-2 mb-2">
+          {tags.map((tag, idx) => (
+            <span
+              key={idx}
+              className="border border-blue-400 text-blue-300 text-xs px-2 py-1 rounded-full"
+            >
+              {tag.trim()}
+            </span>
+          ))}
+        </div>
+<button
+  onClick={() => setShowModal(true)}
+  className="mt-2 text-white bg-blue-600 hover:bg-blue-700 px-5 py-2 rounded text-base font-semibold w-full"
+>
+  Preview
+</button>
+
       </div>
-    </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-70 flex items-center justify-center px-4">
+          <div className="bg-zinc-900 text-white rounded-lg p-6 max-w-lg w-full relative overflow-y-auto max-h-[90vh]">
+            <button
+              onClick={() => setShowModal(false)}
+              className="absolute top-2 right-3 text-2xl font-bold cursor-pointer"
+              aria-label="Close modal"
+            >
+              ×
+            </button>
+
+            <h2 className="text-2xl font-bold mb-2">{data.name}</h2>
+            <img
+              src={data.image}
+              alt={data.name}
+              className="w-full h-48 object-cover rounded mb-4"
+            />
+            <p className="text-sm text-gray-300 mb-4">{data.description}</p>
+
+            <div className="space-y-2 text-sm">
+              {filteredAttributes?.map((attr, idx) => (
+                <div key={idx} className="flex justify-between border-b border-zinc-700 pb-1">
+                  <span className="font-medium text-blue-300">
+                    {attr.trait_type}
+                  </span>
+                  <span className="text-gray-200">{attr.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
