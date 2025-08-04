@@ -125,7 +125,7 @@ export default function Home() {
             </p>
             <div className="grid md:grid-cols-3 gap-6">
               {[
-                'https://raw.githubusercontent.com/MrThygesen/TEA/main/data/genesis.json',
+                'https://raw.githubusercontent.com/MrThygesen/TEA/main/data/dinner-circle-copenhagen.json',
                 'https://raw.githubusercontent.com/MrThygesen/TEA/main/data/night-owls-copenhagen.json',
                 'https://raw.githubusercontent.com/MrThygesen/TEA/main/data/wine-pass-copenhagen.json',
               ].map((url, index) => (
