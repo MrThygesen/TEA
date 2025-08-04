@@ -1,6 +1,6 @@
 {
   "name": "Steak Night",
-  "description": "A cozy singles night out designed for new connections. Perk announcements and confirmation happen in the Telegram group (link).",
+  "description": "A cozy singles night out designed for new connections. Perk announcements in Telegram.",
   "image": "https://raw.githubusercontent.com/MrThygesen/TEA/main/data/dinner.webp",
   "external_url": "https://t.me/TeaNetworkCphSolo",
   "attributes": [
@@ -12,7 +12,7 @@
     { "trait_type": "Telegram Announced", "value": "Yes" },
     { "trait_type": "Reservation", "value": "Telegram" },
     { "trait_type": "Proof", "value": "SBT shown at the venue" },
-    { "trait_type": "Tags", "value": "Dinner, Wine, Romance, Singles" }
+    { "trait_type": "Tags", "value": "Dinner, Wine, Romance" }
   ]
 }
  
