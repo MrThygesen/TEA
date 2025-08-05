@@ -8,7 +8,7 @@ dotenv.config()
 
 const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN
 const MAILERLITE_API_KEY = process.env.TEANET_MAILERLITE_API_KEY
-const PORT = process.env.PORT || 10000 // Make sure this matches Render
+const PORT = process.env.PORT
 
 if (!botToken) {
   console.error('❌ Telegram Bot Token not found in environment variables! Exiting...')
