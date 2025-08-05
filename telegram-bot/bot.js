@@ -8,6 +8,7 @@ dotenv.config()
 
 const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN
 const MAILERLITE_API_KEY = process.env.TEANET_MAILERLITE_API_KEY
+const PORT = process.env.PORT || 10000 // Make sure this matches Render
 
 if (!botToken) {
   console.error('❌ Telegram Bot Token not found in environment variables! Exiting...')
@@ -15,25 +16,19 @@ if (!botToken) {
 }
 console.log('✅ Telegram Bot Token loaded successfully.')
 
-const app = express()
-app.use(express.json())
-
-const PORT = process.env.PORT || 3000
-const HOST_URL = process.env.RENDER_EXTERNAL_URL || `https://your-render-app-name.onrender.com`
-
-const bot = new TelegramBot(botToken)
-bot.setWebHook(`${HOST_URL}/bot${botToken}`)
-
-// Webhook route
-app.post(`/bot${botToken}`, (req, res) => {
-  bot.processUpdate(req.body)
-  res.sendStatus(200)
+// Initialize bot with webhook mode
+const bot = new TelegramBot(botToken, {
+  webHook: {
+    port: PORT,
+  }
 })
+
+// Set webhook to your Render URL
+bot.setWebHook(`https://tea-gwwb.onrender.com/bot${botToken}`)
 
 // In-memory user session state
 const userStates = {}
 
-// Helper: fetch all open events
 async function getOpenEvents() {
   const res = await pool.query(`
     SELECT id, name, datetime, min_attendees, max_attendees, is_confirmed, group_id
@@ -45,7 +40,6 @@ async function getOpenEvents() {
   return res.rows
 }
 
-// Helper: fetch event registration count
 async function getEventRegistrationCount(eventId) {
   const res = await pool.query(
     'SELECT COUNT(*) FROM registrations WHERE event_id = $1',
@@ -54,10 +48,10 @@ async function getEventRegistrationCount(eventId) {
   return parseInt(res.rows[0].count, 10)
 }
 
-// /welcome command — friendly intro message
+// /welcome
 bot.onText(/\/welcome/, (msg) => {
   const chatId = msg.chat.id
-  const welcomeMsg = 
+  const welcomeMsg =
     "👋 Welcome to the Event Registration Bot!\n\n" +
     "Use /start to see available events and register.\n" +
     "Use /myevents to see events you've signed up for.\n" +
@@ -67,7 +61,7 @@ bot.onText(/\/welcome/, (msg) => {
   bot.sendMessage(chatId, welcomeMsg)
 })
 
-// /help command — show available commands and usage
+// /help
 bot.onText(/\/help/, (msg) => {
   const chatId = msg.chat.id
   const helpMsg =
@@ -85,7 +79,7 @@ bot.onText(/\/help/, (msg) => {
   bot.sendMessage(chatId, helpMsg, { parse_mode: 'Markdown' })
 })
 
-// /start command
+// /start
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id
   const events = await getOpenEvents()
@@ -112,7 +106,7 @@ bot.onText(/\/start/, async (msg) => {
   bot.sendMessage(chatId, message, { parse_mode: 'Markdown' })
 })
 
-// Handle replies in registration flow
+// Handle reply flow
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id
   const username = msg.from?.username || ''
@@ -179,7 +173,7 @@ bot.on('message', async (msg) => {
   }
 })
 
-// Save registration & send MailerLite + auto-confirm
+// Save registration & notify
 async function saveRegistration(telegram_id, username, email, wallet, event_id) {
   try {
     await pool.query(`
@@ -217,16 +211,11 @@ async function saveRegistration(telegram_id, username, email, wallet, event_id) 
       }
     }
 
-    const countRes = await pool.query(
-      `SELECT COUNT(*) FROM registrations WHERE event_id = $1`,
-      [event_id]
-    )
+    // Auto-confirm logic
+    const countRes = await pool.query(`SELECT COUNT(*) FROM registrations WHERE event_id = $1`, [event_id])
     const currentCount = parseInt(countRes.rows[0].count, 10)
 
-    const eventRes = await pool.query(
-      `SELECT name, min_attendees, is_confirmed FROM events WHERE id = $1`,
-      [event_id]
-    )
+    const eventRes = await pool.query(`SELECT name, min_attendees, is_confirmed FROM events WHERE id = $1`, [event_id])
     const { name, min_attendees, is_confirmed } = eventRes.rows[0]
 
     if (!is_confirmed && currentCount >= min_attendees) {
@@ -307,7 +296,7 @@ bot.onText(/\/attendees/, async (msg) => {
   bot.sendMessage(chatId, message, { parse_mode: 'Markdown' })
 })
 
-// /status
+// /status <event>
 bot.onText(/\/status (.+)/, async (msg, match) => {
   const chatId = msg.chat.id
   const input = match[1].trim()
@@ -340,13 +329,18 @@ bot.onText(/\/status (.+)/, async (msg, match) => {
   bot.sendMessage(chatId, msgText, { parse_mode: 'Markdown' })
 })
 
-// Health check
-app.get('/', (req, res) => {
-  res.send('Telegram Bot is running (webhook mode) 🎯')
+// Express HTTP server
+const app = express()
+
+// Must expose webhook route!
+app.use(express.json())
+app.post(`/bot${botToken}`, (req, res) => {
+  bot.processUpdate(req.body)
+  res.sendStatus(200)
 })
 
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' })
+app.get('/', (req, res) => {
+  res.send('Telegram Bot is running with webhook!')
 })
 
 app.listen(PORT, () => {
