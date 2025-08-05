@@ -329,9 +329,10 @@ bot.onText(/\/status (.+)/, async (msg, match) => {
     msgText += "⏳ Not enough participants yet.\n"
   }
 
-  bot.sendMessage(chatId, msgText, { parse_mode: 'Markdown' })
+    bot.sendMessage(chatId, msgText, { parse_mode: 'Markdown' })
+})  // <-- close the /status handler
 
-
+// Express server code below
 const app = express()
 const PORT = process.env.PORT || 3000
 
@@ -346,5 +347,10 @@ app.get('/health', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Express server listening on port ${PORT}`)
 })
+
+
+
+
+
 
 
