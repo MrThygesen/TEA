@@ -1,0 +1,11 @@
+.env
+*.db
+data/
+opt/
+node_modules/
+
+
+.env
+data/
+opt/
+*.db

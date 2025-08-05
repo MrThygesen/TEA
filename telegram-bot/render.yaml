@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: telegram-event-bot
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: 'npm install && npm run init-db'
+    startCommand: 'npm start'
+    envVars:
+      - key: BOT_TOKEN
+        value: your_actual_bot_token_here
+      - key: EVENT_ID
+        value: your_event_id_here
+    autoDeploy: false
+    env: node
+    disk:
+      name: bot-data
+      mountPath: /opt/render/project/data
+      sizeGB: 1
+    
