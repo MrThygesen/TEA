@@ -1,9 +1,19 @@
 import TelegramBot from 'node-telegram-bot-api'
-import { pool } from './postgres.js'
+import { pool } from './postgress.js'   // Your PostgreSQL pool file
 import dotenv from 'dotenv'
 dotenv.config()
 
-const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true })
+// Load bot token from env vars (try both keys for safety)
+const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN
+
+if (!botToken) {
+  console.error('❌ Telegram Bot Token not found in environment variables! Exiting...')
+  process.exit(1)
+}
+
+console.log('✅ Telegram Bot Token loaded successfully.')
+
+const bot = new TelegramBot(botToken, { polling: true })
 const EVENT_ID = process.env.EVENT_ID || 'default_event'
 
 // Temporary user states
