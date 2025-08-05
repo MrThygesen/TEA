@@ -22,11 +22,8 @@ if (!botToken) {
 console.log('✅ Telegram Bot Token loaded successfully.')
 
 // Initialize bot with webhook mode
-const bot = new TelegramBot(botToken, {
-  webHook: {
-    port: PORT,
-  }
-})
+const bot = new TelegramBot(botToken, { polling: false })
+
 
 // Set webhook to your Render URL
 bot.setWebHook(`https://tea-gwwb.onrender.com/bot${botToken}`)
