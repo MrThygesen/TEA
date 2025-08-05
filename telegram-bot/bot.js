@@ -15,7 +15,20 @@ if (!botToken) {
 }
 console.log('✅ Telegram Bot Token loaded successfully.')
 
-const bot = new TelegramBot(botToken, { polling: true })
+const app = express()
+app.use(express.json())
+
+const PORT = process.env.PORT || 3000
+const HOST_URL = process.env.RENDER_EXTERNAL_URL || `https://your-render-app-name.onrender.com`
+
+const bot = new TelegramBot(botToken)
+bot.setWebHook(`${HOST_URL}/bot${botToken}`)
+
+// Webhook route
+app.post(`/bot${botToken}`, (req, res) => {
+  bot.processUpdate(req.body)
+  res.sendStatus(200)
+})
 
 // In-memory user session state
 const userStates = {}
@@ -179,7 +192,6 @@ async function saveRegistration(telegram_id, username, email, wallet, event_id) 
 
     console.log(`✅ Saved registration for telegram_id=${telegram_id}, event_id=${event_id}`)
 
-    // MailerLite integration
     if (email && MAILERLITE_API_KEY) {
       const res = await fetch('https://connect.mailerlite.com/api/subscribers', {
         method: 'POST',
@@ -205,7 +217,6 @@ async function saveRegistration(telegram_id, username, email, wallet, event_id) 
       }
     }
 
-    // Auto-confirmation logic
     const countRes = await pool.query(
       `SELECT COUNT(*) FROM registrations WHERE event_id = $1`,
       [event_id]
@@ -222,7 +233,6 @@ async function saveRegistration(telegram_id, username, email, wallet, event_id) 
       await pool.query(`UPDATE events SET is_confirmed = true WHERE id = $1`, [event_id])
       console.log(`🎉 Event "${name}" confirmed!`)
 
-      // Notify all email registrants
       const notifyRes = await pool.query(`
         SELECT telegram_user_id FROM registrations
         WHERE event_id = $1 AND email IS NOT NULL
@@ -246,7 +256,7 @@ async function saveRegistration(telegram_id, username, email, wallet, event_id) 
   }
 }
 
-// /myevents — user can view their own registrations
+// /myevents
 bot.onText(/\/myevents/, async (msg) => {
   const chatId = msg.chat.id
   const res = await pool.query(`
@@ -272,11 +282,9 @@ bot.onText(/\/myevents/, async (msg) => {
   bot.sendMessage(chatId, message, { parse_mode: 'Markdown' })
 })
 
-// /attendees — admin command to list all event counts
+// /attendees
 bot.onText(/\/attendees/, async (msg) => {
   const chatId = msg.chat.id
-
-  // You might want to restrict this command by checking chatId or user ID for admin only
 
   const res = await pool.query(`
     SELECT e.id, e.name, COUNT(r.id) AS count
@@ -299,7 +307,7 @@ bot.onText(/\/attendees/, async (msg) => {
   bot.sendMessage(chatId, message, { parse_mode: 'Markdown' })
 })
 
-// /status <event name or id> — check participant count
+// /status
 bot.onText(/\/status (.+)/, async (msg, match) => {
   const chatId = msg.chat.id
   const input = match[1].trim()
@@ -329,15 +337,12 @@ bot.onText(/\/status (.+)/, async (msg, match) => {
     msgText += "⏳ Not enough participants yet.\n"
   }
 
-    bot.sendMessage(chatId, msgText, { parse_mode: 'Markdown' })
-})  // <-- close the /status handler
+  bot.sendMessage(chatId, msgText, { parse_mode: 'Markdown' })
+})
 
-// Express server code below
-const app = express()
-const PORT = process.env.PORT || 3000
-
+// Health check
 app.get('/', (req, res) => {
-  res.send('Telegram Bot is running!')
+  res.send('Telegram Bot is running (webhook mode) 🎯')
 })
 
 app.get('/health', (req, res) => {
@@ -345,12 +350,6 @@ app.get('/health', (req, res) => {
 })
 
 app.listen(PORT, () => {
-  console.log(`Express server listening on port ${PORT}`)
+  console.log(`🚀 Express server listening on port ${PORT}`)
 })
-
-
-
-
-
-
 
