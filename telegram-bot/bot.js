@@ -1,7 +1,23 @@
+import express from 'express'
 import TelegramBot from 'node-telegram-bot-api'
-import { pool } from './postgres.js'   // Your PostgreSQL pool file
+import { pool } from './postgress.js'   // Your PostgreSQL pool file
 import dotenv from 'dotenv'
+
 dotenv.config()
+
+const app = express()
+const PORT = process.env.PORT || 3000
+
+// Minimal HTTP server for Render health check
+app.get('/', (req, res) => {
+  res.send('Telegram bot is running')
+})
+
+app.listen(PORT, () => {
+  console.log(`✅ HTTP server listening on port ${PORT}`)
+})
+
+// Telegram bot setup
 
 // Load bot token from env vars (try both keys for safety)
 const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN
