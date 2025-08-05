@@ -1,5 +1,5 @@
 import TelegramBot from 'node-telegram-bot-api'
-import { pool } from './postgress.js'   // Your PostgreSQL pool file
+import { pool } from './postgres.js'   // Your PostgreSQL pool file
 import dotenv from 'dotenv'
 dotenv.config()
 
