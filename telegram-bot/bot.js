@@ -21,6 +21,19 @@ if (!botToken) {
 }
 console.log('✅ Telegram Bot Token loaded successfully.')
 
+
+async function testDbConnection() {
+  try {
+    const res = await pool.query('SELECT NOW()')
+    console.log('✅ Database connection test:', res.rows[0])
+  } catch (err) {
+    console.error('❌ Database connection test failed:', err)
+  }
+}
+
+testDbConnection()
+
+
 const app = express()
 
 // Health check endpoint
