@@ -1,14 +1,3 @@
--- Registrations table
-CREATE TABLE IF NOT EXISTS registrations (
-  id SERIAL PRIMARY KEY,
-  event_id TEXT NOT NULL,
-  telegram_user_id TEXT NOT NULL,
-  telegram_username TEXT,
-  email TEXT,
-  wallet_address TEXT,
-  timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
-
 -- Events table
 CREATE TABLE IF NOT EXISTS events (
   id SERIAL PRIMARY KEY,
@@ -21,3 +10,14 @@ CREATE TABLE IF NOT EXISTS events (
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Registrations table
+CREATE TABLE IF NOT EXISTS registrations (
+  id SERIAL PRIMARY KEY,
+  event_id INTEGER NOT NULL REFERENCES events(id),
+  telegram_user_id TEXT NOT NULL,
+  telegram_username TEXT,
+  email TEXT,
+  wallet_address TEXT,
+  timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (event_id, telegram_user_id)  -- 🔧 <-- This line fixes the issue
+);
