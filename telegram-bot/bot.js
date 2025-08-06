@@ -178,26 +178,40 @@ bot.on('message', async (msg) => {
     )
   }
   else if (state.step === 'ask_wallet') {
-    const wallet = input.toLowerCase() === 'no' ? null : input
-    state.wallet = wallet
+  let wallet = input.toLowerCase()
 
-    await saveRegistration(chatId, username, state.email, state.wallet, state.event_id)
-
-    const tier = wallet ? 3 : (state.email ? 2 : 1)
-    const messages = {
-      1: "✅ Tier 1: Free entry to the event.",
-      2: "✅ Tier 2: Free entry + 10% discount.",
-      3: "✅ Tier 3: All perks + claim an SBT.",
+  if (wallet === 'no') {
+    state.wallet = null
+  } else {
+    const walletRegex = /^0x[a-fA-F0-9]{40}$/
+    if (!walletRegex.test(wallet)) {
+      return bot.sendMessage(
+        chatId,
+        "❌ Invalid wallet address. It must start with `0x` and be 42 characters long (40 hex digits).\nPlease try again or type `no` to skip.",
+        { parse_mode: 'Markdown' }
+      )
     }
-
-    let finalMsg = messages[tier] + "\n\n"
-    finalMsg +=
-      "Show your Telegram approval, email, or SBT at the entrance.\n\n" +
-      `*Event:* ${state.event_name}\n*Date:* ${state.event_datetime || 'TBA'}\n*Organizer:* ${state.event_group || 'N/A'}`
-
-    bot.sendMessage(chatId, finalMsg, { parse_mode: 'Markdown' })
-    delete userStates[chatId]
+    state.wallet = wallet
   }
+
+  await saveRegistration(chatId, username, state.email, state.wallet, state.event_id)
+
+  const tier = state.wallet ? 3 : (state.email ? 2 : 1)
+  const messages = {
+    1: "✅ Tier 1: Free entry to the event.",
+    2: "✅ Tier 2: Free entry + 10% discount.",
+    3: "✅ Tier 3: All perks + claim an SBT.",
+  }
+
+  let finalMsg = messages[tier] + "\n\n"
+  finalMsg +=
+    "Show your Telegram approval, email, or SBT at the entrance.\n\n" +
+    `*Event:* ${state.event_name}\n*Date:* ${state.event_datetime || 'TBA'}\n*Organizer:* ${state.event_group || 'N/A'}`
+
+  bot.sendMessage(chatId, finalMsg, { parse_mode: 'Markdown' })
+  delete userStates[chatId]
+}
+
 })
 
 async function saveRegistration(telegram_id, username, email, wallet, event_id) {
