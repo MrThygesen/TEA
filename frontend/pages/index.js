@@ -18,6 +18,8 @@ export default function Home() {
   const [showAmoyInfo, setShowAmoyInfo] = useState(false)
   const [showFullRoadmap, setShowFullRoadmap] = useState(false)
 
+  const [emailFormStatus, setEmailFormStatus] = useState(null) // 'loading', 'success', 'error'
+
   useEffect(() => {
     if (address) {
       fetch(`/api/email-optin?wallet=${address}`)
@@ -61,6 +63,33 @@ export default function Home() {
       setEmailStatus('Error deleting email')
     }
     setIsLoadingEmail(false)
+  }
+
+  const handleEmailSubmit = async (e) => {
+    e.preventDefault()
+    setEmailFormStatus('loading')
+    const formData = new FormData(e.target)
+
+    try {
+      const res = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.get('name'),
+          email: formData.get('email'),
+          message: formData.get('message'),
+        }),
+      })
+
+      if (res.ok) {
+        setEmailFormStatus('success')
+        e.target.reset()
+      } else {
+        setEmailFormStatus('error')
+      }
+    } catch {
+      setEmailFormStatus('error')
+    }
   }
 
   return (
@@ -259,98 +288,53 @@ export default function Home() {
               ))}
             </div>
           )}
-        </section> 
+        </section>
 
-{/* Contact Form Section */}
-<section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg transition-colors duration-300">
-  <h2 className="text-2xl font-semibold mb-4 text-center text-blue-400">Get in Touch</h2>
-  <p className="text-center text-gray-400 mb-6">Send us your thoughts, ideas, or partnership requests.</p>
-
-  <form
-    onSubmit={async (e) => {
-      e.preventDefault()
-      const formData = new FormData(e.target)
-      const payload = {
-        email: formData.get('email'),
-        wallet: formData.get('wallet'),
-        firstname: formData.get('firstname'),
-        lastname: formData.get('lastname'),
-        city: formData.get('city'),
-        country: formData.get('country'),
-        zip: formData.get('zip'),
-      }
-
-      const res = await fetch('/api/email-optin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-
-      if (res.ok) {
-        alert('🎉 Thanks! You’re added to our MailerLite list.')
-        e.target.reset()
-      } else {
-        alert('⚠️ Something went wrong.')
-      }
-    }}
-    className="max-w-lg mx-auto space-y-4"
-  >
-    <input
-      name="firstname"
-      type="text"
-      placeholder="First Name"
-      className="w-full p-3 rounded-lg bg-zinc-800 border border-zinc-600 text-white"
-    />
-    <input
-      name="lastname"
-      type="text"
-      placeholder="Last Name"
-      className="w-full p-3 rounded-lg bg-zinc-800 border border-zinc-600 text-white"
-    />
-    <input
-      name="email"
-      type="email"
-      required
-      placeholder="Your Email"
-      className="w-full p-3 rounded-lg bg-zinc-800 border border-zinc-600 text-white"
-    />
-    <input
-      name="wallet"
-      type="text"
-      placeholder="Wallet (optional)"
-      className="w-full p-3 rounded-lg bg-zinc-800 border border-zinc-600 text-white"
-    />
-    <input
-      name="city"
-      type="text"
-      placeholder="City (optional)"
-      className="w-full p-3 rounded-lg bg-zinc-800 border border-zinc-600 text-white"
-    />
-    <input
-      name="zip"
-      type="text"
-      placeholder="ZIP Code (optional)"
-      className="w-full p-3 rounded-lg bg-zinc-800 border border-zinc-600 text-white"
-    />
-    <input
-      name="country"
-      type="text"
-      placeholder="Country (optional)"
-      className="w-full p-3 rounded-lg bg-zinc-800 border border-zinc-600 text-white"
-    />
-
-    <button
-      type="submit"
-      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition"
-    >
-      ✉️ Subscribe / Contact
-    </button>
-  </form>
-</section>
-
-
-
-
+        {/* Contact Form Section */}
+        <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg transition-colors duration-300">
+          <h2 className="text-2xl font-semibold mb-4 text-center text-blue-400">Get in Touch</h2>
+          <p className="text-center text-gray-400 mb-6">Send us your thoughts, ideas, or partnership requests.</p>
+          <form
+            onSubmit={handleEmailSubmit}
+            className="max-w-lg mx-auto space-y-4"
+          >
+            <input
+              name="name"
+              type="text"
+              required
+              placeholder="Your Name"
+              className="w-full p-3 rounded-lg bg-zinc-800 border border-zinc-600 text-white"
+            />
+            <input
+              name="email"
+              type="email"
+              required
+              placeholder="Your Email"
+              className="w-full p-3 rounded-lg bg-zinc-800 border border-zinc-600 text-white"
+            />
+            <textarea
+              name="message"
+              required
+              rows="5"
+              placeholder="Your Message"
+              className="w-full p-3 rounded-lg bg-zinc-800 border border-zinc-600 text-white"
+            />
+            <button
+              type="submit"
+              disabled={emailFormStatus === 'loading'}
+              className={`w-full py-3 rounded-lg font-semibold transition
+                ${emailFormStatus === 'loading' ? 'bg-blue-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+            >
+              {emailFormStatus === 'loading' ? 'Sending...' : '✉️ Send Message'}
+            </button>
+          </form>
+          {emailFormStatus === 'success' && (
+            <p className="mt-3 text-green-400 text-center">Thanks! Your message has been sent.</p>
+          )}
+          {emailFormStatus === 'error' && (
+            <p className="mt-3 text-red-400 text-center">Oops, something went wrong. Please try again later.</p>
+          )}
+        </section>
 
         {/* Footer */}
         <footer className="bg-zinc-900 border-zinc-700 text-gray-400 rounded-3xl p-6 border shadow-lg text-center space-y-2 transition-colors duration-300">
@@ -432,49 +416,47 @@ function StaticSBTCard({ url }) {
       <div className="border border-zinc-700 rounded-lg p-4 text-left bg-zinc-800 shadow">
         <img src={data.image} alt={data.name} className="w-full h-40 object-cover rounded mb-3" />
         <h3 className="text-lg font-semibold mb-1">{data.name}</h3>
-        <p className="text-sm mb-2">{data.description?.slice(0, 100)}...</p>
-        <div className="flex flex-wrap gap-2 mb-2">
-          {tags.map((tag, idx) => (
-            <span
-              key={idx}
-              className="border border-blue-400 text-blue-300 text-xs px-2 py-1 rounded-full"
-            >
+        <p className="text-sm mb-2">{data.description}</p>
+        <div className="flex flex-wrap gap-1 mb-3">
+          {tags.map((tag, i) => (
+            <span key={i} className="bg-blue-700 text-xs px-2 py-1 rounded">
               {tag.trim()}
             </span>
           ))}
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="mt-2 text-white bg-blue-600 hover:bg-blue-700 px-5 py-2 rounded text-base font-semibold w-full"
+          className="text-blue-400 hover:underline text-sm"
         >
-          Preview
+          Preview Details
         </button>
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-70 flex items-center justify-center px-4">
-          <div className="bg-zinc-900 text-white rounded-lg p-6 max-w-lg w-full relative overflow-y-auto max-h-[90vh]">
+        <div
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowModal(false)}
+        >
+          <div
+            className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold mb-4">{data.name}</h2>
+            <img src={data.image} alt={data.name} className="w-full h-56 object-contain rounded mb-4" />
+            <p className="mb-4">{data.description}</p>
+            <ul className="list-disc list-inside space-y-1">
+              {filteredAttributes.map(({ trait_type, value }, idx) => (
+                <li key={idx}>
+                  <strong>{trait_type}:</strong> {value}
+                </li>
+              ))}
+            </ul>
             <button
               onClick={() => setShowModal(false)}
-              className="absolute top-2 right-3 text-2xl font-bold cursor-pointer"
+              className="mt-6 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
             >
-              ×
+              Close
             </button>
-            <h2 className="text-2xl font-bold mb-2">{data.name}</h2>
-            <img
-              src={data.image}
-              alt={data.name}
-              className="w-full h-48 object-cover rounded mb-4"
-            />
-            <p className="text-sm text-gray-300 mb-4">{data.description}</p>
-            <div className="space-y-2 text-sm">
-              {filteredAttributes?.map((attr, idx) => (
-                <div key={idx} className="flex justify-between border-b border-zinc-700 pb-1">
-                  <span className="font-medium text-blue-300">{attr.trait_type}</span>
-                  <span className="text-gray-200">{attr.value}</span>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       )}
