@@ -332,15 +332,33 @@ bot.onText(/\/status (.+)/, async (msg, match) => {
 })
 
 
+async function ensureWebhook() {
+  try {
+    const info = await bot.getWebHookInfo()
+    if (info.url !== `https://tea-gwwb.onrender.com/bot${botToken}`) {
+      await bot.setWebHook(`https://tea-gwwb.onrender.com/bot${botToken}`)
+      console.log('✅ Webhook set successfully.')
+    } else {
+      console.log('ℹ️ Webhook already set, skipping.')
+    }
+  } catch (err) {
+    if (err.response && err.response.statusCode === 429) {
+      const retryAfter = err.response.headers['retry-after'] || 1
+      console.warn(`⚠️ Rate limited by Telegram. Retry after ${retryAfter} seconds.`)
+      // Optional: wait and retry after retryAfter seconds
+    } else {
+      throw err
+    }
+  }
+}
+
 async function init() {
   try {
     await runMigrations()
     console.log('✅ Migrations completed.')
 
-    // Set webhook
-    await bot.setWebHook(`https://tea-gwwb.onrender.com/bot${botToken}`)
+    await ensureWebhook()
 
-    // Start Express
     app.listen(PORT, () => {
       console.log(`🚀 Express server listening on port ${PORT}`)
     })
@@ -351,3 +369,4 @@ async function init() {
 }
 
 init()
+
