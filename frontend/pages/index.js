@@ -290,58 +290,14 @@ export default function Home() {
           )}
         </section>
 
-        {/* Contact Form Section */}
-        <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg transition-colors duration-300">
-          <h2 className="text-2xl font-semibold mb-4 text-center text-blue-400">Get in Touch</h2>
-          <p className="text-center text-gray-400 mb-6">Send us your thoughts, ideas, or partnership requests.</p>
-          <form
-            onSubmit={handleEmailSubmit}
-            className="max-w-lg mx-auto space-y-4"
-          >
-            <input
-              name="name"
-              type="text"
-              required
-              placeholder="Your Name"
-              className="w-full p-3 rounded-lg bg-zinc-800 border border-zinc-600 text-white"
-            />
-            <input
-              name="email"
-              type="email"
-              required
-              placeholder="Your Email"
-              className="w-full p-3 rounded-lg bg-zinc-800 border border-zinc-600 text-white"
-            />
-            <textarea
-              name="message"
-              required
-              rows="5"
-              placeholder="Your Message"
-              className="w-full p-3 rounded-lg bg-zinc-800 border border-zinc-600 text-white"
-            />
-            <button
-              type="submit"
-              disabled={emailFormStatus === 'loading'}
-              className={`w-full py-3 rounded-lg font-semibold transition
-                ${emailFormStatus === 'loading' ? 'bg-blue-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
-            >
-              {emailFormStatus === 'loading' ? 'Sending...' : '✉️ Send Message'}
-            </button>
-          </form>
-          {emailFormStatus === 'success' && (
-            <p className="mt-3 text-green-400 text-center">Thanks! Your message has been sent.</p>
-          )}
-          {emailFormStatus === 'error' && (
-            <p className="mt-3 text-red-400 text-center">Oops, something went wrong. Please try again later.</p>
-          )}
-        </section>
+    
 
         {/* Footer */}
         <footer className="bg-zinc-900 border-zinc-700 text-gray-400 rounded-3xl p-6 border shadow-lg text-center space-y-2 transition-colors duration-300">
           <p>Docs: <a href="https://github.com/MrThygesen/TEA" className="text-blue-400 hover:underline" target="_blank">GitHub Repository</a></p>
           <p>Twitter: <a href="https://twitter.com/yourtwitterhandle" className="text-blue-400 hover:underline" target="_blank">@TEAProject</a></p>
           <p>Intro Video: <a href="https://youtu.be/5QSHQ26JMm8" className="text-blue-400 hover:underline" target="_blank">Watch on YouTube</a></p>
-          <p>Contact: <a href="mailto:hello@teanet.xyz" className="text-blue-400 hover:underline">hello@teanet.xyz</a></p>
+          <p>Contact: <a href="linkedin.com/in/mortenthygesens" className="text-blue-400 hover:underline">Connect On Linkedin</a></p>
           <p className="text-xs mt-4">&copy; 2025 TEA Project Team</p>
         </footer>
       </div>
