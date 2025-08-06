@@ -1,3 +1,4 @@
+import { runMigrations } from './migrations.js'
 import TelegramBot from 'node-telegram-bot-api'
 import { pool } from './postgres.js'
 import dotenv from 'dotenv'
@@ -9,11 +10,10 @@ dotenv.config()
 const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN
 const MAILERLITE_API_KEY = process.env.TEANET_MAILERLITE_API_KEY
 const PORT = process.env.PORT
+
 if (!PORT) {
   throw new Error('❌ process.env.PORT is not defined. Render requires PORT to be set.')
 }
-
-
 
 if (!botToken) {
   console.error('❌ Telegram Bot Token not found in environment variables! Exiting...')
@@ -21,9 +21,9 @@ if (!botToken) {
 }
 console.log('✅ Telegram Bot Token loaded successfully.')
 
-// Initialize bot with webhook mode
-const bot = new TelegramBot(botToken, { polling: false })
+const app = express()
 
+const bot = new TelegramBot(botToken, { polling: false })
 
 // Set webhook to your Render URL
 bot.setWebHook(`https://tea-gwwb.onrender.com/bot${botToken}`)
@@ -331,21 +331,23 @@ bot.onText(/\/status (.+)/, async (msg, match) => {
   bot.sendMessage(chatId, msgText, { parse_mode: 'Markdown' })
 })
 
-// Express HTTP server
-const app = express()
 
-// Must expose webhook route!
-app.use(express.json())
-app.post(`/bot${botToken}`, (req, res) => {
-  bot.processUpdate(req.body)
-  res.sendStatus(200)
-})
+async function init() {
+  try {
+    await runMigrations()
+    console.log('✅ Migrations completed.')
 
-app.get('/', (req, res) => {
-  res.send('Telegram Bot is running with webhook!')
-})
+    // Set webhook
+    await bot.setWebHook(`https://tea-gwwb.onrender.com/bot${botToken}`)
 
-app.listen(PORT, () => {
-  console.log(`🚀 Express server listening on port ${PORT}`)
-})
+    // Start Express
+    app.listen(PORT, () => {
+      console.log(`🚀 Express server listening on port ${PORT}`)
+    })
+  } catch (err) {
+    console.error('❌ Startup error:', err)
+    process.exit(1)
+  }
+}
 
+init()
