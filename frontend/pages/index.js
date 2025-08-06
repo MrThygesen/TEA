@@ -259,7 +259,64 @@ export default function Home() {
               ))}
             </div>
           )}
-        </section>
+        </section> 
+
+{/* Contact Form Section */}
+<section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg transition-colors duration-300">
+  <h2 className="text-2xl font-semibold mb-4 text-center text-blue-400">Get in Touch</h2>
+  <p className="text-center text-gray-400 mb-6">Send us your thoughts, ideas, or partnership requests.</p>
+  <form
+    onSubmit={async (e) => {
+      e.preventDefault()
+      const formData = new FormData(e.target)
+      const res = await fetch('/api/send-email', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: formData.get('name'),
+          email: formData.get('email'),
+          message: formData.get('message')
+        }),
+        headers: { 'Content-Type': 'application/json' }
+      })
+      if (res.ok) alert('Thanks! Your message has been sent.')
+      else alert('Something went wrong. Try again later.')
+      e.target.reset()
+    }}
+    className="max-w-lg mx-auto space-y-4"
+  >
+    <input
+      name="name"
+      type="text"
+      required
+      placeholder="Your Name"
+      className="w-full p-3 rounded-lg bg-zinc-800 border border-zinc-600 text-white"
+    />
+    <input
+      name="email"
+      type="email"
+      required
+      placeholder="Your Email"
+      className="w-full p-3 rounded-lg bg-zinc-800 border border-zinc-600 text-white"
+    />
+    <textarea
+      name="message"
+      required
+      rows="5"
+      placeholder="Your Message"
+      className="w-full p-3 rounded-lg bg-zinc-800 border border-zinc-600 text-white"
+    />
+    <button
+      type="submit"
+      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition"
+    >
+      ✉️ Send Message
+    </button>
+  </form>
+</section>
+
+
+
+
 
         {/* Footer */}
         <footer className="bg-zinc-900 border-zinc-700 text-gray-400 rounded-3xl p-6 border shadow-lg text-center space-y-2 transition-colors duration-300">
