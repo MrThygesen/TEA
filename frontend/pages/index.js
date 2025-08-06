@@ -265,8 +265,8 @@ export default function Home() {
         <footer className="bg-zinc-900 border-zinc-700 text-gray-400 rounded-3xl p-6 border shadow-lg text-center space-y-2 transition-colors duration-300">
           <p>Docs: <a href="https://github.com/MrThygesen/TEA" className="text-blue-400 hover:underline" target="_blank">GitHub Repository</a></p>
           <p>Twitter: <a href="https://twitter.com/yourtwitterhandle" className="text-blue-400 hover:underline" target="_blank">@TEAProject</a></p>
-          <p>Intro Video: <a href="https://youtu.be/yourvideolink" className="text-blue-400 hover:underline" target="_blank">Watch on YouTube</a></p>
-          <p>Contact: <a href="mailto:contact@teaproject.xyz" className="text-blue-400 hover:underline">contact@teaproject.xyz</a></p>
+          <p>Intro Video: <a href="https://youtu.be/5QSHQ26JMm8" className="text-blue-400 hover:underline" target="_blank">Watch on YouTube</a></p>
+          <p>Contact: <a href="mailto:hello@teanet.xyz" className="text-blue-400 hover:underline">hello@teanet.xyz</a></p>
           <p className="text-xs mt-4">&copy; 2025 TEA Project Team</p>
         </footer>
       </div>
