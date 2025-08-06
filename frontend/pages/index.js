@@ -265,30 +265,46 @@ export default function Home() {
 <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg transition-colors duration-300">
   <h2 className="text-2xl font-semibold mb-4 text-center text-blue-400">Get in Touch</h2>
   <p className="text-center text-gray-400 mb-6">Send us your thoughts, ideas, or partnership requests.</p>
+
   <form
     onSubmit={async (e) => {
       e.preventDefault()
       const formData = new FormData(e.target)
-      const res = await fetch('/api/send-email', {
+      const payload = {
+        email: formData.get('email'),
+        wallet: formData.get('wallet'),
+        firstname: formData.get('firstname'),
+        lastname: formData.get('lastname'),
+        city: formData.get('city'),
+        country: formData.get('country'),
+        zip: formData.get('zip'),
+      }
+
+      const res = await fetch('/api/email-optin', {
         method: 'POST',
-        body: JSON.stringify({
-          name: formData.get('name'),
-          email: formData.get('email'),
-          message: formData.get('message')
-        }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       })
-      if (res.ok) alert('Thanks! Your message has been sent.')
-      else alert('Something went wrong. Try again later.')
-      e.target.reset()
+
+      if (res.ok) {
+        alert('🎉 Thanks! You’re added to our MailerLite list.')
+        e.target.reset()
+      } else {
+        alert('⚠️ Something went wrong.')
+      }
     }}
     className="max-w-lg mx-auto space-y-4"
   >
     <input
-      name="name"
+      name="firstname"
       type="text"
-      required
-      placeholder="Your Name"
+      placeholder="First Name"
+      className="w-full p-3 rounded-lg bg-zinc-800 border border-zinc-600 text-white"
+    />
+    <input
+      name="lastname"
+      type="text"
+      placeholder="Last Name"
       className="w-full p-3 rounded-lg bg-zinc-800 border border-zinc-600 text-white"
     />
     <input
@@ -298,18 +314,36 @@ export default function Home() {
       placeholder="Your Email"
       className="w-full p-3 rounded-lg bg-zinc-800 border border-zinc-600 text-white"
     />
-    <textarea
-      name="message"
-      required
-      rows="5"
-      placeholder="Your Message"
+    <input
+      name="wallet"
+      type="text"
+      placeholder="Wallet (optional)"
       className="w-full p-3 rounded-lg bg-zinc-800 border border-zinc-600 text-white"
     />
+    <input
+      name="city"
+      type="text"
+      placeholder="City (optional)"
+      className="w-full p-3 rounded-lg bg-zinc-800 border border-zinc-600 text-white"
+    />
+    <input
+      name="zip"
+      type="text"
+      placeholder="ZIP Code (optional)"
+      className="w-full p-3 rounded-lg bg-zinc-800 border border-zinc-600 text-white"
+    />
+    <input
+      name="country"
+      type="text"
+      placeholder="Country (optional)"
+      className="w-full p-3 rounded-lg bg-zinc-800 border border-zinc-600 text-white"
+    />
+
     <button
       type="submit"
       className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition"
     >
-      ✉️ Send Message
+      ✉️ Subscribe / Contact
     </button>
   </form>
 </section>
