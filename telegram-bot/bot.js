@@ -1,4 +1,4 @@
-import { runMigrations } from './migrations.js'
+import { runMigrations } from './migrations.js'  
 import TelegramBot from 'node-telegram-bot-api'
 import { pool } from './postgres.js'
 import dotenv from 'dotenv'
