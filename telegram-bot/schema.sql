@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS events (
   group_id TEXT,
   name TEXT,
   datetime TIMESTAMPTZ,
-  min_attendees INTEGER DEFAULT 20,
+  min_attendees INTEGER DEFAULT 1,
   max_attendees INTEGER DEFAULT 40,
   is_confirmed BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP

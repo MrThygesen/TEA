@@ -116,7 +116,32 @@ export default function AdminSBTManager() {
         abi: WebAccessSBTV33_ABI,
         functionName: 'createType',
         args: [typeId, uri, BigInt(maxSupply), burnable],
-      })
+      }) 
+
+if (Number(typeId) >= 5000) {
+  const eventPayload = {
+    typeId: Number(typeId),
+    name: previewData?.name || `Event ${typeId}`,
+    datetime: new Date().toISOString()  // You may allow admin to choose in future
+  }
+
+  try {
+    const res = await fetch('/api/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(eventPayload)
+    })
+    if (res.ok) {
+      console.log('✅ Event added to DB')
+    } else {
+      console.error('⚠️ Failed to insert event in DB')
+    }
+  } catch (err) {
+    console.error('❌ Error creating event in DB', err)
+  }
+}
+
+
       toast.success('SBT type created')
     } catch (err) {
       console.error(err)
