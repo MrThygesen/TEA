@@ -1,35 +1,39 @@
 // pages/api/events.js
-import { pool } from '../../lib/db'
+import { pool } from '../../../telegram-bot/postgres.js' // Adjust path if needed
 
 export default async function handler(req, res) {
-  if (req.method === 'POST') {
-    const { typeId, name, datetime } = req.body
-    if (!typeId || !name || !datetime) {
+  const { method, query, body } = req
+
+  if (method === 'POST') {
+    const { typeId, name, datetime, minimum_attendees } = body
+    if (!typeId || !name || !datetime || minimum_attendees == null) {
       return res.status(400).json({ error: 'Missing required fields' })
     }
 
     try {
       const result = await pool.query(
-        'INSERT INTO events (id, name, datetime) VALUES ($1, $2, $3) RETURNING *',
-        [typeId, name, datetime]
+        `INSERT INTO events (id, name, datetime, minimum_attendees)
+         VALUES ($1, $2, $3, $4) RETURNING *`,
+        [typeId, name, datetime, minimum_attendees]
       )
       return res.status(201).json(result.rows[0])
     } catch (err) {
-      console.error('Error inserting event:', err)
+      console.error('[POST] Error inserting event:', err)
       return res.status(500).json({ error: 'Failed to insert event' })
     }
   }
 
-  if (req.method === 'PUT') {
-    const { typeId, name, datetime } = req.body
-    if (!typeId || !name || !datetime) {
+  if (method === 'PUT') {
+    const { typeId, name, datetime, minimum_attendees } = body
+    if (!typeId || !name || !datetime || minimum_attendees == null) {
       return res.status(400).json({ error: 'Missing required fields for update' })
     }
 
     try {
       const result = await pool.query(
-        'UPDATE events SET name = $2, datetime = $3 WHERE id = $1 RETURNING *',
-        [typeId, name, datetime]
+        `UPDATE events SET name = $2, datetime = $3, minimum_attendees = $4
+         WHERE id = $1 RETURNING *`,
+        [typeId, name, datetime, minimum_attendees]
       )
 
       if (result.rowCount === 0) {
@@ -38,26 +42,26 @@ export default async function handler(req, res) {
 
       return res.status(200).json(result.rows[0])
     } catch (err) {
-      console.error('Error updating event:', err)
+      console.error('[PUT] Error updating event:', err)
       return res.status(500).json({ error: 'Failed to update event' })
     }
   }
 
-  if (req.method === 'GET') {
-    const { approvedOnly } = req.query
+  if (method === 'GET') {
     try {
-      const query = approvedOnly === 'true'
-        ? 'SELECT * FROM events WHERE is_confirmed = TRUE ORDER BY datetime ASC'
-        : 'SELECT * FROM events WHERE is_confirmed = FALSE ORDER BY datetime ASC'
-
-      const result = await pool.query(query)
+      const approvedOnly = query.approvedOnly === 'true'
+      const result = await pool.query(
+        approvedOnly
+          ? 'SELECT * FROM events WHERE is_confirmed = TRUE ORDER BY datetime ASC'
+          : 'SELECT * FROM events ORDER BY datetime ASC'
+      )
       return res.status(200).json(result.rows)
     } catch (err) {
-      console.error('Error fetching events:', err)
+      console.error('[GET] Error fetching events:', err)
       return res.status(500).json({ error: 'Failed to fetch events' })
     }
   }
 
-  return res.status(405).json({ error: 'Method not allowed' })
+  return res.status(405).json({ error: `Method ${method} Not Allowed` })
 }
 
