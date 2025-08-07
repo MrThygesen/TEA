@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
-import { useAccount, useContractWrite, useWaitForTransaction } from 'wagmi'
-import WebAccessSBT from '../abis/WebAccessSBTV4.json'
-import { parseEther } from 'viem'
+import { useState, useEffect } from 'react'
+import { useAccount, useWriteContract, usePublicClient } from 'wagmi'
+import WebAccessSBT from '../abis/WebAccessSBTV33_ABI.json'
+import { toast } from 'react-hot-toast'
 
-const CONTRACT_ADDRESS = '0x576c2c7544c180De7EBCa37d25c6c08Db543bBBF'
+const CONTRACT_ADDRESS = '0xA508A0f5733bcfcf6eA0b41ca9344c27855FeEF0'
+
 
 export default function AdminSBTManager() {
   const { address } = useAccount()
