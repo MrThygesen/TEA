@@ -1,13 +1,12 @@
-import pkg from 'pg'
+import { Pool } from 'pg'
 import dotenv from 'dotenv'
-dotenv.config()
 
-const { Pool } = pkg
+dotenv.config() // optional on Vercel, but useful locally
 
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false  // Required on Render for external DB
-  }
+    rejectUnauthorized: false, // for most managed services
+  },
 })
 
