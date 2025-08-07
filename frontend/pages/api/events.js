@@ -20,6 +20,29 @@ export default async function handler(req, res) {
     }
   }
 
+  if (req.method === 'PUT') {
+    const { typeId, name, datetime } = req.body
+    if (!typeId || !name || !datetime) {
+      return res.status(400).json({ error: 'Missing required fields for update' })
+    }
+
+    try {
+      const result = await pool.query(
+        'UPDATE events SET name = $2, datetime = $3 WHERE id = $1 RETURNING *',
+        [typeId, name, datetime]
+      )
+
+      if (result.rowCount === 0) {
+        return res.status(404).json({ error: 'Event not found for update' })
+      }
+
+      return res.status(200).json(result.rows[0])
+    } catch (err) {
+      console.error('Error updating event:', err)
+      return res.status(500).json({ error: 'Failed to update event' })
+    }
+  }
+
   if (req.method === 'GET') {
     const { approvedOnly } = req.query
     try {
