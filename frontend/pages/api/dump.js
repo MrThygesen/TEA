@@ -3,8 +3,8 @@ import { pool } from '../../lib/postgres'
 export default async function handler(req, res) {
   try {
     // You can expand these queries to any table you need
-    const events = await pool.query('SELECT * FROM events ORDER BY created_at DESC')
-    const registrations = await pool.query('SELECT * FROM registrations ORDER BY created_at DESC')
+    const events = await pool.query('SELECT * FROM events')
+    const registrations = await pool.query('SELECT * FROM registrations')
 
     res.status(200).json({
       events: events.rows,
