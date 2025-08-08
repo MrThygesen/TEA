@@ -384,7 +384,47 @@ export default function AdminSBTManager() {
           Burn Token
         </button>
       </div>
+
+      {/* --- New: Database Dump Section --- */}
+      <div className="mt-10 p-4 border rounded bg-gray-50 text-black max-w-4xl mx-auto">
+        <h3 className="font-semibold mb-2 text-lg">Database Dump (Render DB)</h3>
+        <DbDump />
+      </div>
     </div>
+  )
+}
+
+// Database Dump component
+function DbDump() {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    async function fetchDump() {
+      setLoading(true)
+      try {
+        const res = await fetch('/api/dump')
+        if (!res.ok) throw new Error(`Status ${res.status}`)
+        const json = await res.json()
+        setData(json)
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchDump()
+  }, [])
+
+  if (loading) return <p>Loading database dump...</p>
+  if (error) return <p className="text-red-600">Error loading dump: {error}</p>
+  if (!data) return null
+
+  return (
+    <pre className="max-h-96 overflow-auto bg-white p-4 rounded border text-xs">
+      {JSON.stringify(data, null, 2)}
+    </pre>
   )
 }
 
