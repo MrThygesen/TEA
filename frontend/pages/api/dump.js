@@ -1,33 +1,25 @@
-// api/dump.js  (for Vercel Serverless Function)
 import { Pool } from 'pg'
 
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }, // important for Render Postgres from Vercel
+})
+
 export default async function handler(req, res) {
-  // 1. Ensure DATABASE_URL is present
-  if (!process.env.DATABASE_URL) {
-    return res.status(500).json({ error: 'DATABASE_URL is not set' })
+  if (req.method !== 'GET') {
+    res.setHeader('Allow', 'GET')
+    return res.status(405).json({ error: 'Method Not Allowed' })
   }
 
-  // 2. Create a connection pool (avoid global leaks in serverless)
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }, // Needed for Render/Postgres
-  })
-
   try {
-    // 3. Fetch all events & registrations
-    const events = await pool.query('SELECT * FROM events ORDER BY created_at DESC')
-    const registrations = await pool.query('SELECT * FROM registrations')
+    const client = await pool.connect()
+    const result = await client.query('SELECT * FROM events ORDER BY datetime DESC')
+    client.release()
 
-    // 4. Send JSON
-    return res.status(200).json({
-      events: events.rows,
-      registrations: registrations.rows,
-    })
+    return res.status(200).json(result.rows)
   } catch (err) {
-    console.error('❌ Dump API error:', err)
-    return res.status(500).json({ error: err.message })
-  } finally {
-    await pool.end()
+    console.error('[API /dump] DB query failed:', err)
+    return res.status(500).json({ error: 'Failed to fetch database dump' })
   }
 }
 
