@@ -54,25 +54,12 @@ export default function WebAccessSBT() {
 
   const [availableSBTs, setAvailableSBTs] = useState([])
   const [ownedSBTs, setOwnedSBTs] = useState([])
-  const [events, setEvents] = useState([])
   const [previewSBT, setPreviewSBT] = useState(null)
   const [loadingTypeId, setLoadingTypeId] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [selectedTags, setSelectedTags] = useState([])
   const [showOwned, setShowOwned] = useState(true)
   const [policyAccepted, setPolicyAccepted] = useState({})
-
-  const fetchEvents = useCallback(async () => {
-    try {
-      const res = await fetch('/api/events?approvedOnly=true')
-      if (!res.ok) throw new Error('Failed to fetch events')
-      const data = await res.json()
-      setEvents(data)
-    } catch (e) {
-      console.warn('Failed to load events:', e)
-      setEvents([])
-    }
-  }, [])
 
   const extractTags = (attributes) => {
     if (!attributes || !Array.isArray(attributes)) return []
@@ -89,8 +76,6 @@ export default function WebAccessSBT() {
     if (!address || !publicClient) return
 
     setIsLoading(true)
-
-    await fetchEvents()
 
     const maxTypeCount = 100
     const owned = []
@@ -162,35 +147,22 @@ export default function WebAccessSBT() {
         const [uri, active, maxSupply, supply, created] = sbtType
 
         if (created && active && uri && supply < maxSupply) {
-          // Find matching event by typeId === event.id
-          const eventForType = events.find((ev) => ev.id === i)
+          // NO event attendance check here at all, just add as available
 
-          // Allow if no event or minimum attendees condition met
-          const passesAttendanceCheck =
-            !eventForType ||
-            (eventForType.current_attendees >= eventForType.minimum_attendees)
+          const res = await fetch(uri)
+          const metadata = await res.json()
 
-          if (passesAttendanceCheck) {
-            const res = await fetch(uri)
-            const metadata = await res.json()
-
-            available.push({
-              typeId: i,
-              uri,
-              name: metadata.name || `SBT Type ${i}`,
-              image: metadata.image || '',
-              description: metadata.description || '',
-              tags: extractTags(metadata.attributes),
-              tokensLeft: Number(maxSupply) - Number(supply),
-              metadata,
-              eventAttendance: eventForType
-                ? {
-                    minimum_Attendees: eventForType.minimum_attendees,
-                    current_Attendees: eventForType.current_attendees,
-                  }
-                : null,
-            })
-          }
+          available.push({
+            typeId: i,
+            uri,
+            name: metadata.name || `SBT Type ${i}`,
+            image: metadata.image || '',
+            description: metadata.description || '',
+            tags: extractTags(metadata.attributes),
+            tokensLeft: Number(maxSupply) - Number(supply),
+            metadata,
+            eventAttendance: null,
+          })
         }
       } catch (e) {
         console.warn(`Failed to fetch sbtTypes[${i}]:`, e)
@@ -200,7 +172,7 @@ export default function WebAccessSBT() {
     setOwnedSBTs(owned)
     setAvailableSBTs(available)
     setIsLoading(false)
-  }, [address, publicClient, events, fetchEvents])
+  }, [address, publicClient])
 
   useEffect(() => {
     fetchSBTs()
@@ -412,11 +384,6 @@ function SBTCard({ sbt, loadingTypeId, policyAccepted, setPolicyAccepted, onClai
           </span>
         ))}
       </div>
-      {sbt.eventAttendance && (
-        <p className="mt-1 text-xs text-gray-400">
-          Event attendance: {sbt.eventAttendance.current_Attendees} / {sbt.eventAttendance.minimum_Attendees}
-        </p>
-      )}
       <p className={styles.textGray400}>
         Tokens left: {sbt.tokensLeft} · Type ID: {sbt.typeId}
       </p>
