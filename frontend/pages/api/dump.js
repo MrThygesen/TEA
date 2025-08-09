@@ -1,16 +1,4 @@
-// frontend/pages/api/dump.js
-import pkg from 'pg'
-const { Pool } = pkg
-
-// Log DATABASE_URL once on import
-console.log('API /dump: DATABASE_URL =', process.env.DATABASE_URL)
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false, // needed for Render.com SSL
-  },
-})
+import { pool } from '../../lib/postgres.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
