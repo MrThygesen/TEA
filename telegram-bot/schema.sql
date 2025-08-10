@@ -21,3 +21,19 @@ CREATE TABLE IF NOT EXISTS registrations (
   timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (event_id, telegram_user_id)  -- 🔧 <-- This line fixes the issue
 );
+
+
+-- Table to track invites & confirmations
+CREATE TABLE IF NOT EXISTS invitations (
+  id SERIAL PRIMARY KEY,
+  event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  inviter_id TEXT NOT NULL,        -- Telegram ID of inviter
+  inviter_username TEXT,
+  invitee_id TEXT,                 -- Telegram ID of invitee (filled after they join)
+  invitee_username TEXT,
+  confirmed BOOLEAN DEFAULT FALSE,
+  timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+
+

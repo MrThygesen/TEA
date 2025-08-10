@@ -390,6 +390,12 @@ export default function AdminSBTManager() {
         <h3 className="font-semibold mb-2 text-lg">Database Dump (Render DB)</h3>
         <DbDump />
       </div>
+
+      {/* --- New: Create Event Section --- */}
+      <div className="mt-10 p-4 border rounded bg-gray-50 text-black max-w-4xl mx-auto">
+        <h3 className="font-semibold mb-2 text-lg">Create Event (DB Only)</h3>
+        <EventCreator />
+      </div>
     </div>
   )
 }
@@ -425,6 +431,75 @@ function DbDump() {
     <pre className="max-h-96 overflow-auto bg-white p-4 rounded border text-xs">
       {JSON.stringify(data, null, 2)}
     </pre>
+  )
+}
+
+// EventCreator component
+function EventCreator() {
+  const [typeId, setTypeId] = useState('')
+  const [name, setName] = useState('')
+  const [datetime, setDatetime] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState('')
+
+  async function handleCreate() {
+    if (!typeId || !name || !datetime) {
+      setMessage('All fields are required')
+      return
+    }
+    setLoading(true)
+    try {
+      const res = await fetch('/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          typeId: Number(typeId),
+          name,
+          datetime: new Date(datetime).toISOString(),
+          minimum_attendees: 1
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error creating event')
+      setMessage('✅ Event created successfully')
+    } catch (err) {
+      setMessage('❌ ' + err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <input
+        type="number"
+        placeholder="Type ID"
+        value={typeId}
+        onChange={(e) => setTypeId(e.target.value)}
+        className="w-full p-2 border rounded"
+      />
+      <input
+        type="text"
+        placeholder="Event name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        className="w-full p-2 border rounded"
+      />
+      <input
+        type="datetime-local"
+        value={datetime}
+        onChange={(e) => setDatetime(e.target.value)}
+        className="w-full p-2 border rounded"
+      />
+      <button
+        onClick={handleCreate}
+        disabled={loading}
+        className={`px-4 py-2 rounded text-white ${loading ? 'bg-blue-300' : 'bg-blue-600'}`}
+      >
+        {loading ? 'Creating...' : 'Create Event'}
+      </button>
+      {message && <p className="mt-2 text-sm">{message}</p>}
+    </div>
   )
 }
 

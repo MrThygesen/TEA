@@ -10,6 +10,7 @@ dotenv.config()
 const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN
 const MAILERLITE_API_KEY = process.env.TEANET_MAILERLITE_API_KEY
 const PORT = process.env.PORT
+const BOT_USERNAME = process.env.BOT_USERNAME // e.g. 'YourBotName' without @
 
 if (!PORT) {
   throw new Error('❌ process.env.PORT is not defined. Render requires PORT to be set.')
@@ -75,65 +76,160 @@ async function getEventRegistrationCount(eventId) {
   return parseInt(res.rows[0].count, 10)
 }
 
-// /welcome
-bot.onText(/\/welcome/, (msg) => {
-  const chatId = msg.chat.id
-  const welcomeMsg =
-    "👋 Welcome to the Event Registration Bot!\n\n" +
-    "Use /start to see available events and register.\n" +
-    "Use /myevents to see events you've signed up for.\n" +
-    "If you're an organizer, use /attendees to get attendee counts.\n" +
-    "Check event participation anytime with /status <event name or ID>.\n\n" +
-    "Need help? Use /help."
-  bot.sendMessage(chatId, welcomeMsg)
-})
+// --- Invitation commands & handling ---
 
-// /help
-bot.onText(/\/help/, (msg) => {
-  const chatId = msg.chat.id
-  const helpMsg =
-    "🆘 *Help - Available Commands:*\n\n" +
-    "/start — List open events to register.\n" +
-    "/myevents — View your registered events.\n" +
-    "/status <event name or ID> — Check current participants.\n" +
-    "/welcome — Get a friendly welcome message.\n" +
-    "/help — Show this help message.\n\n" +
-    "Organizer commands:\n" +
-    "/attendees — List attendee counts for all events.\n\n" +
-    "To register, just follow the prompts after /start.\n" +
-    "You can skip email or wallet by typing 'no' when asked.\n" +
-    "Enjoy the perks and have a great event!"
-  bot.sendMessage(chatId, helpMsg, { parse_mode: 'Markdown' })
-})
-
-// /start
-bot.onText(/\/start/, async (msg) => {
+// /invite command to list events for inviting
+bot.onText(/\/invite/, async (msg) => {
   const chatId = msg.chat.id
   const events = await getOpenEvents()
 
   if (events.length === 0) {
-    bot.sendMessage(chatId, "❌ Sorry, no active events available to register at the moment.")
+    return bot.sendMessage(chatId, "📭 No upcoming events to invite for.")
+  }
+
+  let buttons = events.map((e, i) => [{
+    text: `${e.name} (${e.datetime ? new Date(e.datetime).toLocaleString() : 'TBA'})`,
+    callback_data: `invite_event_${e.id}`
+  }])
+
+  bot.sendMessage(chatId, 'Select the event you want to invite someone to:', {
+    reply_markup: { inline_keyboard: buttons }
+  })
+})
+
+// Handle callback query for event selection in invite flow
+bot.on('callback_query', async (callbackQuery) => {
+  const msg = callbackQuery.message
+  const chatId = msg.chat.id
+  const data = callbackQuery.data
+  const inviterId = callbackQuery.from.id.toString()
+  const inviterUsername = callbackQuery.from.username || ''
+
+  if (data.startsWith('invite_event_')) {
+    const eventId = parseInt(data.replace('invite_event_', ''), 10)
+
+    try {
+      // Create a new invitation record with inviter & event, invitee info empty for now
+      const result = await pool.query(
+        `INSERT INTO invitations (event_id, inviter_id, inviter_username)
+         VALUES ($1, $2, $3)
+         RETURNING id`,
+        [eventId, inviterId, inviterUsername]
+      )
+      const inviteId = result.rows[0].id
+
+      // Create token: eventId-inviterId-inviteId
+      const token = `${eventId}-${inviterId}-${inviteId}`
+      const inviteLink = `https://t.me/${BOT_USERNAME}?start=${token}`
+
+      await bot.sendMessage(chatId, `📨 Here is your invite link for event #${eventId}:\n${inviteLink}`)
+      await bot.answerCallbackQuery(callbackQuery.id)
+    } catch (err) {
+      console.error('❌ Error creating invitation:', err)
+      await bot.sendMessage(chatId, '❌ Failed to create invite link. Please try again later.')
+    }
+  }
+})
+
+// Modified /start to handle invite tokens
+bot.onText(/\/start(?: (.+))?/, async (msg, match) => {
+  const chatId = msg.chat.id
+  const username = msg.from?.username || ''
+  const payload = match ? match[1] : null
+
+  // If no invite token, run your existing /start logic:
+  if (!payload) {
+    // Your existing /start code here
+    const events = await getOpenEvents()
+
+    if (events.length === 0) {
+      bot.sendMessage(chatId, "❌ Sorry, no active events available to register at the moment.")
+      return
+    }
+
+    userStates[chatId] = { step: 'choose_event', events }
+
+    let message = "🎉 Welcome to the event registration!\n\nWe have the following events open:\n"
+    events.forEach((e, i) => {
+      message += `\n${i + 1}. *${e.name}*\n   📅 When: ${e.datetime || 'TBA'}\n   👥 Min: ${e.min_attendees}, Max: ${e.max_attendees}`
+      message += `\n   📝 Organizer: ${e.group_id || 'N/A'}\n`
+    })
+    message +=
+      "\nReply with the event number you want to participate in.\n\n" +
+      "Perks:\n" +
+      "- 40+ participants unlock discounts.\n" +
+      "- Add email for extra perks.\n" +
+      "- Add wallet to claim an SBT.\n"
+
+    bot.sendMessage(chatId, message, { parse_mode: 'Markdown' })
     return
   }
 
-  userStates[chatId] = { step: 'choose_event', events }
+  // --- Handle invite token payload ---
+  try {
+    const [eventIdStr, inviterId, inviteIdStr] = payload.split('-')
+    const eventId = parseInt(eventIdStr)
+    const inviteId = parseInt(inviteIdStr)
+    const inviteeId = chatId.toString()
 
-  let message = "🎉 Welcome to the event registration!\n\nWe have the following events open:\n"
-  events.forEach((e, i) => {
-    message += `\n${i + 1}. *${e.name}*\n   📅 When: ${e.datetime || 'TBA'}\n   👥 Min: ${e.min_attendees}, Max: ${e.max_attendees}`
-    message += `\n   📝 Organizer: ${e.group_id || 'N/A'}\n`
-  })
-  message +=
-    "\nReply with the event number you want to participate in.\n\n" +
-    "Perks:\n" +
-    "- 40+ participants unlock discounts.\n" +
-    "- Add email for extra perks.\n" +
-    "- Add wallet to claim an SBT.\n"
+    // Count how many distinct inviters have invited this invitee for this event
+    const countRes = await pool.query(
+      `SELECT COUNT(DISTINCT inviter_id) AS count FROM invitations WHERE event_id = $1 AND invitee_id = $2`,
+      [eventId, inviteeId]
+    )
+    const inviteCount = parseInt(countRes.rows[0].count, 10)
 
-  bot.sendMessage(chatId, message, { parse_mode: 'Markdown' })
+    if (inviteCount >= 3) {
+      await bot.sendMessage(chatId, '⚠️ You have already received 3 invitations for this event. No more invites allowed.')
+
+      // Notify inviter that invitee already maxed out invites
+      try {
+        await bot.sendMessage(inviterId, `🚫 Your invite to @${username || 'this user'} was blocked — they already have 3 invitations for event #${eventId}.`)
+      } catch {}
+
+      return
+    }
+
+    // Mark invitation as confirmed
+    await pool.query(
+      `UPDATE invitations
+       SET invitee_id = $1, invitee_username = $2, confirmed = true
+       WHERE id = $3 AND event_id = $4 AND inviter_id = $5`,
+      [inviteeId, username, inviteId, eventId, inviterId]
+    )
+
+    // Register invitee to event if not already registered
+    await pool.query(
+      `INSERT INTO registrations (event_id, telegram_user_id, telegram_username)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (event_id, telegram_user_id) DO NOTHING`,
+      [eventId, inviteeId, username]
+    )
+
+    // Auto-add invitee to group if group_id exists for event
+    const groupRes = await pool.query(`SELECT group_id FROM events WHERE id = $1`, [eventId])
+    if (groupRes.rows.length > 0 && groupRes.rows[0].group_id) {
+      const groupId = groupRes.rows[0].group_id
+      try {
+        // Telegram Bot API allows approveChatJoinRequest only if group uses join requests
+        // If group_id is numeric chat ID
+        await bot.approveChatJoinRequest(groupId, inviteeId)
+        await bot.sendMessage(chatId, `✅ Welcome, @${username || 'guest'}! You are confirmed for event #${eventId} and added to the group.`)
+      } catch (err) {
+        console.error('Error auto-adding user to group:', err.message)
+        await bot.sendMessage(chatId, `✅ Welcome, @${username || 'guest'}! You are confirmed for event #${eventId}. Please join the group manually if not added automatically.`)
+      }
+    } else {
+      await bot.sendMessage(chatId, `✅ Welcome, @${username || 'guest'}! You are confirmed for event #${eventId}.`)
+    }
+
+  } catch (err) {
+    console.error('Error handling /start invite token:', err)
+    bot.sendMessage(chatId, '❌ Invalid or expired invite link.')
+  }
 })
 
-// Handle reply flow
+// Existing message flow for registration (unchanged)
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id
   const username = msg.from?.username || ''
@@ -178,40 +274,39 @@ bot.on('message', async (msg) => {
     )
   }
   else if (state.step === 'ask_wallet') {
-  let wallet = input.toLowerCase()
+    let wallet = input.toLowerCase()
 
-  if (wallet === 'no') {
-    state.wallet = null
-  } else {
-    const walletRegex = /^0x[a-fA-F0-9]{40}$/
-    if (!walletRegex.test(wallet)) {
-      return bot.sendMessage(
-        chatId,
-        "❌ Invalid wallet address. It must start with `0x` and be 42 characters long (40 hex digits).\nPlease try again or type `no` to skip.",
-        { parse_mode: 'Markdown' }
-      )
+    if (wallet === 'no') {
+      state.wallet = null
+    } else {
+      const walletRegex = /^0x[a-fA-F0-9]{40}$/
+      if (!walletRegex.test(wallet)) {
+        return bot.sendMessage(
+          chatId,
+          "❌ Invalid wallet address. It must start with `0x` and be 42 characters long (40 hex digits).\nPlease try again or type `no` to skip.",
+          { parse_mode: 'Markdown' }
+        )
+      }
+      state.wallet = wallet
     }
-    state.wallet = wallet
+
+    await saveRegistration(chatId, username, state.email, state.wallet, state.event_id)
+
+    const tier = state.wallet ? 3 : (state.email ? 2 : 1)
+    const messages = {
+      1: "✅ Tier 1: Free entry to the event.",
+      2: "✅ Tier 2: Free entry + 10% discount.",
+      3: "✅ Tier 3: All perks + claim an SBT.",
+    }
+
+    let finalMsg = messages[tier] + "\n\n"
+    finalMsg +=
+      "Show your Telegram approval, email, or SBT at the entrance.\n\n" +
+      `*Event:* ${state.event_name}\n*Date:* ${state.event_datetime || 'TBA'}\n*Organizer:* ${state.event_group || 'N/A'}`
+
+    bot.sendMessage(chatId, finalMsg, { parse_mode: 'Markdown' })
+    delete userStates[chatId]
   }
-
-  await saveRegistration(chatId, username, state.email, state.wallet, state.event_id)
-
-  const tier = state.wallet ? 3 : (state.email ? 2 : 1)
-  const messages = {
-    1: "✅ Tier 1: Free entry to the event.",
-    2: "✅ Tier 2: Free entry + 10% discount.",
-    3: "✅ Tier 3: All perks + claim an SBT.",
-  }
-
-  let finalMsg = messages[tier] + "\n\n"
-  finalMsg +=
-    "Show your Telegram approval, email, or SBT at the entrance.\n\n" +
-    `*Event:* ${state.event_name}\n*Date:* ${state.event_datetime || 'TBA'}\n*Organizer:* ${state.event_group || 'N/A'}`
-
-  bot.sendMessage(chatId, finalMsg, { parse_mode: 'Markdown' })
-  delete userStates[chatId]
-}
-
 })
 
 async function saveRegistration(telegram_id, username, email, wallet, event_id) {
@@ -285,7 +380,8 @@ async function saveRegistration(telegram_id, username, email, wallet, event_id) 
   }
 }
 
-// /myevents
+// /myevents, /attendees, /status commands unchanged from your original code below...
+
 bot.onText(/\/myevents/, async (msg) => {
   const chatId = msg.chat.id
   const res = await pool.query(`
@@ -311,7 +407,6 @@ bot.onText(/\/myevents/, async (msg) => {
   bot.sendMessage(chatId, message, { parse_mode: 'Markdown' })
 })
 
-// /attendees
 bot.onText(/\/attendees/, async (msg) => {
   const chatId = msg.chat.id
 
@@ -336,7 +431,6 @@ bot.onText(/\/attendees/, async (msg) => {
   bot.sendMessage(chatId, message, { parse_mode: 'Markdown' })
 })
 
-// /status <event>
 bot.onText(/\/status (.+)/, async (msg, match) => {
   const chatId = msg.chat.id
   const input = match[1].trim()
