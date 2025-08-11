@@ -120,7 +120,7 @@ export default function AdminSBTManager() {
           typeId: Number(typeId),
           name: title,
           datetime: new Date(datetime).toISOString(),
-          minimum_attendees: 1, // default minimum attendees
+          min_attendees: 1, // default minimum attendees
         }),
       })
 
@@ -456,7 +456,7 @@ function EventCreator() {
           typeId: Number(typeId),
           name,
           datetime: new Date(datetime).toISOString(),
-          minimum_attendees: 1
+          min_attendees: 1
         }),
       })
       const data = await res.json()
