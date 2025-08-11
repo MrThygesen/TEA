@@ -1,21 +1,17 @@
-// scripts/initPostgres.js
+// tea-project/telegram-bot/scripts/initProgres.js
 import pkg from 'pg'
 import dotenv from 'dotenv'
 
 dotenv.config()
 
 const { Pool } = pkg
-
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
-  }
+  ssl: { rejectUnauthorized: false }
 })
 
-const run = async () => {
+export async function run() {
   const client = await pool.connect()
-
   try {
     await client.query(`
       CREATE TABLE IF NOT EXISTS events (
@@ -23,9 +19,9 @@ const run = async () => {
         group_id TEXT,
         name TEXT,
         datetime TIMESTAMPTZ,
-        min_attendees INTEGER DEFAULT 20,
+        min_attendees INTEGER DEFAULT 1,
         max_attendees INTEGER DEFAULT 40,
-        is_confirmed BOOLEAN DEFAULT false,
+        is_confirmed BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `)
@@ -33,36 +29,40 @@ const run = async () => {
     await client.query(`
       CREATE TABLE IF NOT EXISTS registrations (
         id SERIAL PRIMARY KEY,
-        event_id INTEGER REFERENCES events(id),
+        event_id INTEGER NOT NULL REFERENCES events(id),
         telegram_user_id TEXT NOT NULL,
         telegram_username TEXT,
         email TEXT,
         wallet_address TEXT,
+        timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (event_id, telegram_user_id)
+      );
+    `)
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS invitations (
+        id SERIAL PRIMARY KEY,
+        event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+        inviter_id TEXT NOT NULL,
+        inviter_username TEXT,
+        invitee_id TEXT,
+        invitee_username TEXT,
+        confirmed BOOLEAN DEFAULT FALSE,
         timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `)
 
-    const res = await client.query('SELECT COUNT(*) FROM events')
-    if (parseInt(res.rows[0].count) === 0) {
-      await client.query(`
-       INSERT INTO events (group_id, name, datetime, min_attendees, max_attendees, is_confirmed)
-VALUES
-  ('-1001234567890', 'Coffee & Co-Work – Aug 12', '2025-08-12 10:00:00+02', 1, 40, false),
-  ('-1001234567891', 'Startup Legal Meetup – Aug 15', '2025-08-15 17:00:00+02', 1, 40, false),
-  ('-1001234567892', 'NEW DAO Builder Talk – Aug 20', '2025-08-20 18:00:00+02', 1, 40, false);
-
-      `)
-      console.log('☕ Injected 3 sample events into the database.')
-    } else {
-      console.log('📌 Events already exist, skipping insertion.')
-    }
+    console.log('✅ Database schema updated.')
   } catch (err) {
     console.error('❌ Error initializing DB:', err)
+    throw err
   } finally {
     client.release()
-    process.exit(0)
   }
 }
 
-run()
+// If run directly via CLI
+if (process.argv[1] === new URL(import.meta.url).pathname) {
+  run().then(() => process.exit(0))
+}
 
