@@ -36,3 +36,18 @@ export default async function handler(req, res) {
   }
 }
 
+
+const eventsResult = await pool.query(`
+  SELECT 
+    id,
+    name,
+    datetime,
+    min_attendees,
+    max_attendees,
+    is_confirmed,
+    group_id,
+    created_at
+  FROM events
+  ORDER BY datetime ASC
+`);
+

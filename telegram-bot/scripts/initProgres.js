@@ -49,7 +49,7 @@ const run = async () => {
 VALUES
   ('-1001234567890', 'Coffee & Co-Work – Aug 12', '2025-08-12 10:00:00+02', 1, 40, false),
   ('-1001234567891', 'Startup Legal Meetup – Aug 15', '2025-08-15 17:00:00+02', 1, 40, false),
-  ('-1001234567892', 'DAO Builder Talk – Aug 20', '2025-08-20 18:00:00+02', 1, 40, false);
+  ('-1001234567892', 'NEW DAO Builder Talk – Aug 20', '2025-08-20 18:00:00+02', 1, 40, false);
 
       `)
       console.log('☕ Injected 3 sample events into the database.')
