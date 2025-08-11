@@ -1,39 +1,41 @@
-// pages/api/events.js
+// frontend/pages/api/events.js
 import { pool } from '../../lib/postgres.js'
 
 export default async function handler(req, res) {
   const { method, query, body } = req;
 
   if (method === 'POST') {
-    const { typeId, name, datetime, minimum_attendees } = body;
-    if (!typeId || !name || !datetime || minimum_attendees == null) {
+    const { typeId, name, datetime, min_attendees } = body;
+    if (!typeId || !name || !datetime || min_attendees == null) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
     try {
       const result = await pool.query(
-        `INSERT INTO events (id, name, datetime, minimum_attendees)
+        `INSERT INTO events (id, name, datetime, min_attendees)
          VALUES ($1, $2, $3, $4) RETURNING *`,
-        [typeId, name, datetime, minimum_attendees]
+        [typeId, name, datetime, min_attendees]
       );
       return res.status(201).json(result.rows[0]);
     } catch (err) {
       console.error('[POST] Error inserting event:', err);
-      return res.status(500).json({ error: 'Failed to insert event' });
+      return res.status(500).json({ error: 'Failed to insert event', details: err.message });
     }
   }
 
   if (method === 'PUT') {
-    const { typeId, name, datetime, minimum_attendees } = body;
-    if (!typeId || !name || !datetime || minimum_attendees == null) {
+    const { typeId, name, datetime, min_attendees } = body;
+    if (!typeId || !name || !datetime || min_attendees == null) {
       return res.status(400).json({ error: 'Missing required fields for update' });
     }
 
     try {
       const result = await pool.query(
-        `UPDATE events SET name = $2, datetime = $3, minimum_attendees = $4
-         WHERE id = $1 RETURNING *`,
-        [typeId, name, datetime, minimum_attendees]
+        `UPDATE events
+         SET name = $2, datetime = $3, min_attendees = $4
+         WHERE id = $1
+         RETURNING *`,
+        [typeId, name, datetime, min_attendees]
       );
 
       if (result.rowCount === 0) {
@@ -43,7 +45,7 @@ export default async function handler(req, res) {
       return res.status(200).json(result.rows[0]);
     } catch (err) {
       console.error('[PUT] Error updating event:', err);
-      return res.status(500).json({ error: 'Failed to update event' });
+      return res.status(500).json({ error: 'Failed to update event', details: err.message });
     }
   }
 
@@ -58,7 +60,7 @@ export default async function handler(req, res) {
       return res.status(200).json(result.rows);
     } catch (err) {
       console.error('[GET] Error fetching events:', err);
-      return res.status(500).json({ error: 'Failed to fetch events' });
+      return res.status(500).json({ error: 'Failed to fetch events', details: err.message });
     }
   }
 
