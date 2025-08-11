@@ -1,17 +1,56 @@
 // tea-project/frontend/pages/api/initdb.js
-import path from 'path'
+import pkg from 'pg'
 
-// Import your existing init script
-import { run as initDB } from '../../../telegram-bot/scripts/initProgres.js'
+const { Pool } = pkg
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+})
 
-// API handler
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method Not Allowed' })
   }
 
   try {
-    await initDB()
+    const client = await pool.connect()
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS events (
+        id SERIAL PRIMARY KEY,
+        group_id TEXT,
+        name TEXT,
+        datetime TIMESTAMPTZ,
+        min_attendees INTEGER DEFAULT 1,
+        max_attendees INTEGER DEFAULT 40,
+        is_confirmed BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+    `)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS registrations (
+        id SERIAL PRIMARY KEY,
+        event_id INTEGER NOT NULL REFERENCES events(id),
+        telegram_user_id TEXT NOT NULL,
+        telegram_username TEXT,
+        email TEXT,
+        wallet_address TEXT,
+        timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (event_id, telegram_user_id)
+      );
+    `)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS invitations (
+        id SERIAL PRIMARY KEY,
+        event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+        inviter_id TEXT NOT NULL,
+        inviter_username TEXT,
+        invitee_id TEXT,
+        invitee_username TEXT,
+        confirmed BOOLEAN DEFAULT FALSE,
+        timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+    `)
+    client.release()
     res.status(200).json({ message: '✅ Database initialized/updated successfully' })
   } catch (err) {
     console.error('❌ Init DB error:', err)
