@@ -125,11 +125,10 @@ export default function Home() {
           </div>
 
           <img src="/tea.png" alt="TEA Project Logo" className="w-24 h-24 object-contain" />
-<h1 className="text-4xl font-bold text-blue-400 text-left">WELCOME TO THE TEA NETWORK</h1> <p className="text-left text-gray-400 mb-6"> We’re the club for social and/or business meetings. The TEA Network operates in the cafe, bar, restaurant domain. You get to meet new and old connections and enjoy a free welcome drink, coffee or dessert. Perks depends on our partners' interests. We are working with Polygon blockchain technology to expand your network and benefits.  </p> 
+<h1 className="text-4xl font-bold text-blue-400 text-left">WELCOME TO THE TEA NETWORK</h1> <p className="text-left text-gray-400 mb-6"> We’re the club for social / business meetings. The TEA Network operates in the cafe, bar and restaurant domain, where you get to meet new and old connections and enjoy a free welcome drink, coffee or dessert. Perks depends on our partners' interests. We are working with Polygon blockchain technology to expand your network and benefits.  </p> 
 
-<p> <a href="https://youtu.be/5QSHQ26JMm8" className="text-blue-400 hover:underline" target="_blank">Learn more about the TEA network (Video) </a></p>
+// <p> <a href="https://youtu.be/5QSHQ26JMm8" className="text-blue-400 hover:underline" target="_blank">Learn more about the TEA network (Video) </a></p>
     
-
  <div className="flex gap-3 items-center">
             <ConnectButton />
             {isConnected && (
@@ -158,11 +157,7 @@ export default function Home() {
             ) : (
               <WebAccessSBT darkMode={true} />
             )
-          ) : (
-            <p className="text-center text-gray-400">
-              Please connect your wallet to access your dashboard.
-            </p>
-          )}
+          ) : ()}
         </section>
 
 <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg transition-colors duration-300">
