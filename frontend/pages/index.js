@@ -125,9 +125,12 @@ export default function Home() {
           </div>
 
           <img src="/tea.png" alt="TEA Project Logo" className="w-24 h-24 object-contain" />
-          <h1 className="text-4xl font-bold text-blue-400 text-center">WELCOME TO THE TEA NETWORK</h1>
-          <div className="flex gap-3 items-center">
-            <ConnectButton />
+<h1 className="text-4xl font-bold text-blue-400 text-left">WELCOME TO THE TEA NETWORK</h1> <p className="text-left text-gray-400 mb-6"> We’re the club for social and/or business meetings. The TEA Network operates in the cafe, bar, restaurant domain. You get to meet new and old connections and enjoy a free welcome drink, coffee or dessert. Perks depends on our partners' interests. We are working with Polygon blockchain technology to expand your network and benefits.  </p> 
+
+<p> <a href="https://youtu.be/5QSHQ26JMm8" className="text-blue-400 hover:underline" target="_blank">Learn more about the TEA network (Video) </a></p>
+    
+
+ <div className="flex gap-3 items-center">
             {isConnected && (
               <button
                 onClick={() => setShowEmailModal(true)}
@@ -144,13 +147,20 @@ export default function Home() {
           )}
         </header>
 
+
+<section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg transition-colors duration-300">
+            <h2 className="text-2xl font-semibold mb-4 text-blue-400 text-center">
+              We Onboard with Telegram for Web2 and Web3 users.
+            </h2>
+</section>
+
         {!isConnected && (
           <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg transition-colors duration-300">
             <h2 className="text-2xl font-semibold mb-4 text-blue-400 text-center">
-              Explore Sample Perk Deals
+              FREE Basic Access (No Wallet):
             </h2>
             <p className="text-center text-gray-400 mb-6">
-              Here are examples of social deal passes. Connect your wallet to access available and claimable deals.
+              Register Event On Telegram to Get in!
             </p>
             <div className="grid md:grid-cols-3 gap-6">
               {[
@@ -161,52 +171,113 @@ export default function Home() {
                 <StaticSBTCard key={index} url={url} />
               ))}
             </div>
+
+            {/* Telegram Register Button */}
+            <div className="mt-8 flex justify-center">
+              <a
+                href="https://t.me/TeaIsHereBot"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition"
+              >
+                <img src="/telegram-logo.png" alt="Telegram" className="w-5 h-5" />
+                Telegram Basic Access 
+              </a>
+            </div>
           </section>
         )}
 
-        <section>
-          {isConnected ? (
-            isAdmin ? (
-              <AdminSBTManager darkMode={true} />
-            ) : (
-              <WebAccessSBT darkMode={true} />
-            )
-          ) : (
-            <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-6 border shadow-lg transition-colors duration-300">
-              <p className="text-center text-gray-300 mb-4">
-                Please connect your wallet to the <strong>Polygon Amoy Testnet</strong> to access your dashboard and see which deals are open right now.
-              </p>
-              <div className="text-center">
-                <button
-                  onClick={() => setShowAmoyInfo((prev) => !prev)}
-                  className="text-blue-400 hover:underline text-sm"
-                >
-                  {showAmoyInfo ? 'Hide Amoy Network Setup' : '📘 How to add Amoy to your wallet'}
-                </button>
-                {showAmoyInfo && (
-                  <div className="mt-4 text-sm text-left bg-zinc-800 border border-zinc-600 rounded-lg p-4 max-w-md mx-auto">
-                    <p className="mb-2">To add the Amoy network to your wallet, start with Add Custom Network:</p>
-                    <ul className="list-disc list-inside text-gray-300 space-y-1">
-                      <li><strong>Network Name:</strong> Polygon Amoy Testnet</li>
-                      <li><strong>New RPC URL:</strong> https://rpc-amoy.polygon.technology/</li>
-                      <li><strong>Chain ID:</strong> 80002</li>
-                      <li><strong>Currency Symbol:</strong> POL</li>
-                      <li><strong>Block Explorer URL:</strong> https://amoy.polygonscan.com/</li>
-                    </ul>
-                  </div>
-                )}
+        {/* Pro Access Section */}
+
+{!isConnected && (
+          <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg transition-colors duration-300">
+            <h2 className="text-2xl font-semibold mb-4 text-blue-400 text-center">
+              FREE Advanced Access (Wallet Required):
+            </h2>
+            <p className="text-center text-gray-400 mb-6">
+              Register Event on Telegram to get in!!!
+            </p>
+            <div className="grid md:grid-cols-3 gap-6">
+              {[
+                'https://raw.githubusercontent.com/MrThygesen/TEA/main/data/dinner-circle-copenhagen.json',
+                'https://raw.githubusercontent.com/MrThygesen/TEA/main/data/night-owls-copenhagen.json',
+                'https://raw.githubusercontent.com/MrThygesen/TEA/main/data/wine-pass-copenhagen.json',
+              ].map((url, index) => (
+                <StaticSBTCard key={index} url={url} />
+              ))}
+            </div>
+
+            {/* Telegram Register Button */}
+            <div className="mt-8 flex justify-center">
+              <a
+                href="https://t.me/TeaIsHereBotPro"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition"
+              >
+                <img src="/telegram-logo.png" alt="Telegram" className="w-5 h-5" />
+                Telegram Web3 Pro Access
+              </a>
+            </div>
+          </section>
+        )}         
+
+
+ <div className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-6 border shadow-lg transition-colors duration-300">
+            
+  <h2 className="text-2xl font-bold mb-4 text-center text-blue-400">Get Web3 Deal Done </h2>
+<p className="text-center text-gray-300 mb-4">  
+
+After your event registration and event is confirmed on Telegram, you would need to claim the deal (SBT). This is done here, and then the SBT is registered on the Polygon Amoy Blockchain. This is now your Digital Access Card to the real life extended perk / discount deal at the venue.
+            </p>
+            <div className="text-center">
+              <button
+                onClick={() => setShowAmoyInfo(prev => !prev)}
+                className="text-blue-400 hover:underline text-sm"
+              >
+                {showAmoyInfo ? 'Hide Amoy Network Setup' : '📘 How to add Amoy to your wallet'}
+              </button>
+
+              {showAmoyInfo && (
+                <div className="mt-4 text-sm text-left bg-zinc-800 border border-zinc-600 rounded-lg p-4 max-w-md mx-auto">
+                  <p className="mb-2">To add the Amoy network to your wallet, start with Add Custom Network:</p>
+                  <ul className="list-disc list-inside text-gray-300 space-y-1">
+                    <li><strong>Network Name:</strong> Polygon Amoy Testnet</li>
+                    <li><strong>New RPC URL:</strong> https://rpc-amoy.polygon.technology/</li>
+                    <li><strong>Chain ID:</strong> 80002</li>
+                    <li><strong>Currency Symbol:</strong> POL</li>
+                    <li><strong>Block Explorer URL:</strong> https://amoy.polygonscan.com/</li>
+
+<li><strong>Polygon Amoy Coins:</strong>, we can provide it for you, contact on linkedin</li>
+                  </ul>
+                </div>
+              )}
+
+              {/* Wallet Connect Button */}
+              <div className="mt-6 flex justify-center">
+                <ConnectButton />
               </div>
-            </section>
-          )}
-        </section>
+            </div>
+          </div>
 
         {/* Intro Section */}
         <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg text-center space-y-4 transition-colors duration-300">
-          <h2 className="text-3xl font-bold text-blue-400">TEA NETWORK:</h2>
-          <p>We are a community-driven Layer 3 blockchain network designed to unlock real-life perks and expand your real life network.</p>
-          <p className="text-md">Use your wallet to claim Soulbound Tokens that help you connect for friendship, business, or dating — and enjoy a few discounted drinks along the way</p>  
+          <h2 className="text-3xl font-bold text-blue-400">TEA NETWORK (EXTENDED INFO):</h2>
+                    <p className="text-center text-gray-300 mb-4">
+ We are a community-driven network designed to unlock real-life perks and expand your network.</p>
+          <p className="text-center text-gray-300 mb-4"> We are building a Web3 meeting space on the Polygon blockchain, designed to bridge Web2 accessibility with Web3 trust. We strongly believe in the telegram potential with automated bots and invitations. The onboarding process provided by the bot is designed according to the audience preference for web2 (no wallet), or Web3 (wallet). </p>
 
-          <p className="text-sm italic text-gray-300">Technically, we build this Web3 meeting space on the Polygon blockchain. </p>
+<p className="text-center text-gray-300 mb-4"> 
+We like to support all ends of our network. You come alone or bring a few friends as part of the network, its all open. </p> 
+
+<p className="text-center text-gray-300 mb-4"> 
+We foresee a more accountable future with pro-booked meetings, pre-payments, deposits and network confirmed meetings with enhacned venue based user validations. This is the Web3 approach. But we are also open for people who actually dislike too much "surveillance" and can opt-in on more flexible terms with some level of benefits.
+We are ready to find the best way for most people and partners.
+</p> 
+
+<p className="text-center text-gray-300 mb-4"> 
+TEA NETWORK is here to help you connect friendships, business, dating— and enjoy a few discounted drinks along the way.</p>
+
         </section>
 
         {/* Roadmap Section */}
@@ -289,8 +360,6 @@ export default function Home() {
             </div>
           )}
         </section>
-
-    
 
         {/* Footer */}
         <footer className="bg-zinc-900 border-zinc-700 text-gray-400 rounded-3xl p-6 border shadow-lg text-center space-y-2 transition-colors duration-300">
