@@ -125,10 +125,11 @@ export default function Home() {
           </div>
 
           <img src="/tea.png" alt="TEA Project Logo" className="w-24 h-24 object-contain" />
-<h1 className="text-4xl font-bold text-blue-400 text-left">WELCOME TO THE TEA NETWORK</h1> <p className="text-left text-gray-400 mb-6"> We’re the club for social / business meetings. The TEA Network operates in the cafe, bar and restaurant domain, where you get to meet new and old connections and enjoy a free welcome drink, coffee or dessert. Perks depends on our partners' interests. We are working with Polygon blockchain technology to expand your network and benefits.  </p> 
+<h1 className="text-4xl font-bold text-blue-400 text-left">WELCOME TO THE TEA NETWORK</h1> <p className="text-left text-gray-400 mb-6"> We’re the club for social and/or business meetings. The TEA Network operates in the cafe, bar, restaurant domain. You get to meet new and old connections and enjoy a free welcome drink, coffee or dessert. Perks depends on our partners' interests. We are working with Polygon blockchain technology to expand your network and benefits.  </p> 
 
-// <p> <a href="https://youtu.be/5QSHQ26JMm8" className="text-blue-400 hover:underline" target="_blank">Learn more about the TEA network (Video) </a></p>
+<p> <a href="https://youtu.be/5QSHQ26JMm8" className="text-blue-400 hover:underline" target="_blank">Learn more about the TEA network (Video) </a></p>
     
+
  <div className="flex gap-3 items-center">
             <ConnectButton />
             {isConnected && (
@@ -157,13 +158,19 @@ export default function Home() {
             ) : (
               <WebAccessSBT darkMode={true} />
             )
-          ) : ()}
+          ) : (
+            <p className="text-center text-gray-400">
+                       </p>
+          )}
         </section>
 
 <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg transition-colors duration-300">
             <h2 className="text-2xl font-semibold mb-4 text-blue-400 text-center">
-              We Onboard with Telegram for Web2 and Web3 users.
-            </h2>
+              We use our own Telegram-bot for onboarding to each event.</h2>
+
+<p className="text-left text-gray-400 mb-6">  
+Register that you are joining the specific event through our Telegram-Bot (select below according to your preference). 
+</p> 
 </section>
 
         {!isConnected && (
@@ -237,10 +244,10 @@ export default function Home() {
 
  <div className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-6 border shadow-lg transition-colors duration-300">
             
-  <h2 className="text-2xl font-bold mb-4 text-center text-blue-400">Advanced Wallet Access- Get Your Web3 Deal Done </h2>
-<p className="text-center text-gray-300 mb-4">  
+  <h2 className="text-2xl font-bold mb-4 text-center text-blue-400"> Web3 Wallet User   </h2>
+<p className="text-left text-gray-300 mb-4">  
 
-After your event registration and event is confirmed on Telegram, you would need to claim the deal (SBT). This is done here, and then the SBT is registered on the Polygon Amoy Blockchain. This is now your Digital Access Card to the real life extended perk / discount deal at the venue.
+After the event is confirmed with minimum guests, the web3 user has to claim the deal and collect the Event Access Card, which serves as a ticket to the real life extended perk at the venue. 
             </p>
             <div className="text-center">
               <button
@@ -265,30 +272,23 @@ After your event registration and event is confirmed on Telegram, you would need
                 </div>
               )}
 
-              {/* Wallet Connect Button */}
-              <div className="mt-6 flex justify-center">
-                <ConnectButton />
-              </div>
             </div>
           </div>
 
         {/* Intro Section */}
         <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg text-center space-y-4 transition-colors duration-300">
           <h2 className="text-3xl font-bold text-blue-400">TEA NETWORK (EXTENDED INFO):</h2>
-                    <p className="text-center text-gray-300 mb-4">
- We are a community-driven network designed to unlock real-life perks and expand your network.</p>
-          <p className="text-center text-gray-300 mb-4"> We are building a Web3 meeting space on the Polygon blockchain, designed to bridge Web2 accessibility with Web3 trust. We strongly believe in the telegram potential with automated bots and invitations. The onboarding process provided by the bot is designed according to the audience preference for web2 (no wallet), or Web3 (wallet). </p>
+<p className="text-left text-gray-300 mb-4">
+We are a community-driven network designed to unlock real-life perks and expand your network.</p>
 
-<p className="text-center text-gray-300 mb-4"> 
-We like to support all ends of our network. You come alone or bring a few friends as part of the network, its all open. </p> 
+<p className="text-left text-gray-300 mb-4"> 
 
-<p className="text-center text-gray-300 mb-4"> 
-We foresee a more accountable future with pro-booked meetings, pre-payments, deposits and network confirmed meetings with enhacned venue based user validations. This is the Web3 approach. But we are also open for people who actually dislike too much "surveillance" and can opt-in on more flexible terms with some level of benefits.
-We are ready to find the best way for most people and partners.
-</p> 
+TEA NETWORK is here to help you connect friendships, business, dating— and enjoy a few discounted drinks along the way. 
+We provide the deal and coordinate between users and partners providing food, coffee, beer etc. 
+We believe in groups getting perks for going out. </p>  
 
-<p className="text-center text-gray-300 mb-4"> 
-TEA NETWORK is here to help you connect friendships, business, dating— and enjoy a few discounted drinks along the way.</p>
+<p className="text-left text-gray-300 mb-4"> 
+Come alone or bring a few friends as part of the network, its all open.</p>
 
         </section>
 
