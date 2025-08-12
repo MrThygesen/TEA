@@ -131,12 +131,14 @@ export default function Home() {
     
 
  <div className="flex gap-3 items-center">
+            <ConnectButton />
             {isConnected && (
               <button
                 onClick={() => setShowEmailModal(true)}
                 className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition"
               >
-                📧 Email Notifications
+
+               📧 Email Notifications
               </button>
             )}
           </div>
@@ -147,6 +149,21 @@ export default function Home() {
           )}
         </header>
 
+
+        {/* SBT Access Section */}
+        <section>
+          {isConnected ? (
+            isAdmin ? (
+              <AdminSBTManager darkMode={true} />
+            ) : (
+              <WebAccessSBT darkMode={true} />
+            )
+          ) : (
+            <p className="text-center text-gray-400">
+              Please connect your wallet to access your dashboard.
+            </p>
+          )}
+        </section>
 
 <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg transition-colors duration-300">
             <h2 className="text-2xl font-semibold mb-4 text-blue-400 text-center">
