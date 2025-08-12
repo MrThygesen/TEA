@@ -225,7 +225,7 @@ export default function Home() {
 
  <div className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-6 border shadow-lg transition-colors duration-300">
             
-  <h2 className="text-2xl font-bold mb-4 text-center text-blue-400">Get Web3 Deal Done </h2>
+  <h2 className="text-2xl font-bold mb-4 text-center text-blue-400">Advanced Wallet Access- Get Your Web3 Deal Done </h2>
 <p className="text-center text-gray-300 mb-4">  
 
 After your event registration and event is confirmed on Telegram, you would need to claim the deal (SBT). This is done here, and then the SBT is registered on the Polygon Amoy Blockchain. This is now your Digital Access Card to the real life extended perk / discount deal at the venue.
