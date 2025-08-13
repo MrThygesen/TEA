@@ -14,11 +14,13 @@ export default async function handler(req, res) {
 
   try {
     const client = await pool.connect()
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS events (
         id SERIAL PRIMARY KEY,
         group_id TEXT,
         name TEXT,
+        city TEXT,  -- ✅ NEW: city support
         datetime TIMESTAMPTZ,
         min_attendees INTEGER DEFAULT 1,
         max_attendees INTEGER DEFAULT 40,
@@ -26,6 +28,7 @@ export default async function handler(req, res) {
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `)
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS registrations (
         id SERIAL PRIMARY KEY,
@@ -38,6 +41,7 @@ export default async function handler(req, res) {
         UNIQUE (event_id, telegram_user_id)
       );
     `)
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS invitations (
         id SERIAL PRIMARY KEY,
@@ -50,6 +54,15 @@ export default async function handler(req, res) {
         timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `)
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_emails (
+        id SERIAL PRIMARY KEY,
+        telegram_user_id TEXT UNIQUE,
+        email TEXT NOT NULL
+      );
+    `)
+
     client.release()
     res.status(200).json({ message: '✅ Database initialized/updated successfully' })
   } catch (err) {
