@@ -7,8 +7,6 @@ import { toast } from 'react-hot-toast'
 
 const CONTRACT_ADDRESS = '0xA508A0f5733bcfcf6eA0b41ca9344c27855FeEF0'
 const MAX_TYPES = 100
-
-// Event API endpoint (relative to frontend)
 const EVENTS_API = process.env.NEXT_PUBLIC_EVENTS_API || '/api/events'
 
 export default function AdminSBTManager() {
@@ -21,6 +19,7 @@ export default function AdminSBTManager() {
   const [maxSupply, setMaxSupply] = useState('')
   const [typeId, setTypeId] = useState(1n)
   const [loading, setLoading] = useState(false)
+  const [city, setCity] = useState('') // ✅ new
 
   const [sbtTypesData, setSbtTypesData] = useState([])
   const [availableTemplates, setAvailableTemplates] = useState([])
@@ -30,7 +29,6 @@ export default function AdminSBTManager() {
   const isAdmin = address?.toLowerCase() === process.env.NEXT_PUBLIC_ADMIN?.toLowerCase()
 
   const buildUri = (filename) => `https://raw.githubusercontent.com/MrThygesen/TEA/main/data/${filename}`
-
   const formatDisplayName = (filename) =>
     filename.replace('.json', '').replace(/[_-]/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
 
@@ -50,7 +48,6 @@ export default function AdminSBTManager() {
 
   useEffect(() => {
     if (!publicClient) return
-
     async function fetchTypes() {
       const types = []
       for (let i = 1; i <= MAX_TYPES; i++) {
@@ -62,7 +59,6 @@ export default function AdminSBTManager() {
             args: [i],
           })
           const [uri, active, maxSupplyBig, mintedBig, created, burnableFlag] = sbtType
-
           const maxSupplyNum = Number(maxSupplyBig)
           const mintedNum = Number(mintedBig)
 
@@ -105,13 +101,12 @@ export default function AdminSBTManager() {
     }
   }
 
-  // --- New: POST to /api/events after successful on-chain creation ---
+  // ✅ Updated to include city
   async function postEventToDB(typeId, title, datetime) {
     if (!datetime) {
       toast.error('Event datetime required to register event')
       return
     }
-
     try {
       const res = await fetch(EVENTS_API, {
         method: 'POST',
@@ -119,15 +114,13 @@ export default function AdminSBTManager() {
         body: JSON.stringify({
           typeId: Number(typeId),
           name: title,
+          city,
           datetime: new Date(datetime).toISOString(),
-          min_attendees: 1, // default minimum attendees
+          min_attendees: 1,
         }),
       })
-
       const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data.error || `Status ${res.status}`)
-      }
+      if (!res.ok) throw new Error(data.error || `Status ${res.status}`)
       toast.success('Event registered in database')
       return data
     } catch (err) {
@@ -138,7 +131,7 @@ export default function AdminSBTManager() {
   }
 
   const handleCreateType = async () => {
-    if (!title || !maxSupply || !typeId) {
+    if (!title || !maxSupply || !typeId || !city) {
       toast.error('Please fill in all fields')
       return
     }
@@ -151,10 +144,7 @@ export default function AdminSBTManager() {
         functionName: 'createType',
         args: [typeId, uri, BigInt(maxSupply), burnable],
       })
-
       toast.success('SBT type created')
-
-      // Call backend API to store event record
       if (typeId <= 4999) {
         await postEventToDB(typeId, title, previewData?.date || new Date().toISOString())
       }
@@ -227,71 +217,34 @@ export default function AdminSBTManager() {
       <div>
         <h3 className="font-semibold mb-2">Create New SBT Type</h3>
         <label className="block mb-1">Type ID</label>
-        <input
-          type="number"
-          value={typeId.toString()}
-          onChange={(e) => setTypeId(BigInt(e.target.value))}
-          className="w-full mb-4 p-2 border rounded"
-        />
+        <input type="number" value={typeId.toString()} onChange={(e) => setTypeId(BigInt(e.target.value))} className="w-full mb-4 p-2 border rounded" />
         <label className="block mb-1">Metadata Template</label>
-        <select
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="w-full mb-4 p-2 border rounded"
-        >
+        <select value={title} onChange={(e) => setTitle(e.target.value)} className="w-full mb-4 p-2 border rounded">
           <option value="">Select metadata</option>
           {availableTemplates.map((file, index) => (
-            <option key={index} value={file}>
-              {formatDisplayName(file)}
-            </option>
+            <option key={index} value={file}>{formatDisplayName(file)}</option>
           ))}
         </select>
+        <label className="block mb-1">City</label>
+        <input type="text" value={city} onChange={(e) => setCity(e.target.value)} className="w-full mb-4 p-2 border rounded" />
         <label className="block mb-1">Max Supply</label>
-        <input
-          type="number"
-          value={maxSupply}
-          onChange={(e) => setMaxSupply(e.target.value)}
-          className="w-full mb-4 p-2 border rounded"
-        />
+        <input type="number" value={maxSupply} onChange={(e) => setMaxSupply(e.target.value)} className="w-full mb-4 p-2 border rounded" />
         <label className="block mb-4">
-          <input
-            type="checkbox"
-            checked={burnable}
-            onChange={(e) => setBurnable(e.target.checked)}
-            className="mr-2"
-          />
+          <input type="checkbox" checked={burnable} onChange={(e) => setBurnable(e.target.checked)} className="mr-2" />
           Burnable
         </label>
-        <p className="text-sm text-gray-500 mb-2 break-words">
-          Metadata URI: <code>{buildUri(title)}</code>
-        </p>
+        <p className="text-sm text-gray-500 mb-2 break-words">Metadata URI: <code>{buildUri(title)}</code></p>
         <div className="flex flex-wrap gap-2">
-          <button
-            onClick={handleCreateType}
-            disabled={loading}
-            className={`px-4 py-2 rounded text-white ${loading ? 'bg-blue-300' : 'bg-blue-600'}`}
-          >
+          <button onClick={handleCreateType} disabled={loading} className={`px-4 py-2 rounded text-white ${loading ? 'bg-blue-300' : 'bg-blue-600'}`}>
             {loading ? 'Creating...' : 'Create SBT Type'}
           </button>
-          <button
-            onClick={handleActivate}
-            disabled={loading}
-            className={`px-4 py-2 rounded text-white ${loading ? 'bg-green-300' : 'bg-green-600'}`}
-          >
+          <button onClick={handleActivate} disabled={loading} className={`px-4 py-2 rounded text-white ${loading ? 'bg-green-300' : 'bg-green-600'}`}>
             {loading ? 'Activating...' : 'Activate'}
           </button>
-          <button
-            onClick={handleDeactivate}
-            disabled={loading}
-            className={`px-4 py-2 rounded text-white ${loading ? 'bg-yellow-300' : 'bg-yellow-600'}`}
-          >
+          <button onClick={handleDeactivate} disabled={loading} className={`px-4 py-2 rounded text-white ${loading ? 'bg-yellow-300' : 'bg-yellow-600'}`}>
             {loading ? 'Deactivating...' : 'Deactivate'}
           </button>
-          <button
-            onClick={handlePreview}
-            disabled={!title || loading}
-            className="px-4 py-2 rounded text-white bg-gray-600"
-          >
+          <button onClick={handlePreview} disabled={!title || loading} className="px-4 py-2 rounded text-white bg-gray-600">
             Preview
           </button>
         </div>
@@ -299,46 +252,8 @@ export default function AdminSBTManager() {
         {previewData && (
           <div className="mt-6 p-6 border rounded-lg shadow-md bg-white max-w-xl">
             <h4 className="font-semibold text-xl mb-4">{previewData.name}</h4>
-            {previewData.image && (
-              <img
-                src={previewData.image}
-                alt={previewData.name}
-                className="w-full max-w-xs h-48 object-cover rounded mb-4"
-              />
-            )}
+            {previewData.image && <img src={previewData.image} alt={previewData.name} className="w-full max-w-xs h-48 object-cover rounded mb-4" />}
             <p className="mb-4">{previewData.description}</p>
-            {previewData.external_url && (
-              <a
-                href={previewData.external_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:underline block mb-6"
-              >
-                Visit Event Page ↗
-              </a>
-            )}
-            <div className="mb-6 space-y-2">
-              {previewData.attributes
-                ?.filter((attr) => attr.trait_type !== 'Tag')
-                .map((attr, index) => (
-                  <div key={index} className="flex gap-2">
-                    <span className="font-semibold w-40">{attr.trait_type}:</span>
-                    <span>{attr.value}</span>
-                  </div>
-                ))}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {previewData.attributes
-                ?.filter((attr) => attr.trait_type === 'Tag')
-                .map((tag, index) => (
-                  <span
-                    key={index}
-                    className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm font-semibold"
-                  >
-                    {tag.value}
-                  </span>
-                ))}
-            </div>
           </div>
         )}
       </div>
@@ -347,24 +262,17 @@ export default function AdminSBTManager() {
         <h3 className="font-semibold mb-2">SBT Dashboard</h3>
         <table className="w-full text-sm text-left border">
           <thead className="bg-gray-100">
-            <tr>
-              <th className="px-2 py-1">ID</th>
-              <th className="px-2 py-1">Title</th>
-              <th className="px-2 py-1">Max</th>
-              <th className="px-2 py-1">Minted</th>
-              <th className="px-2 py-1">Active</th>
-              <th className="px-2 py-1">Burnable</th>
-            </tr>
+            <tr><th>ID</th><th>Title</th><th>Max</th><th>Minted</th><th>Active</th><th>Burnable</th></tr>
           </thead>
           <tbody>
             {sbtTypesData.map((type) => (
               <tr key={type.id} className="border-t">
-                <td className="px-2 py-1">{type.id}</td>
-                <td className="px-2 py-1">{type.title || `Type ${type.id}`}</td>
-                <td className="px-2 py-1">{type.maxSupply}</td>
-                <td className="px-2 py-1">{type.minted}</td>
-                <td className="px-2 py-1">{type.active ? '✅' : '❌'}</td>
-                <td className="px-2 py-1">{type.burnable ? '🔥' : '🚫'}</td>
+                <td>{type.id}</td>
+                <td>{type.title || `Type ${type.id}`}</td>
+                <td>{type.maxSupply}</td>
+                <td>{type.minted}</td>
+                <td>{type.active ? '✅' : '❌'}</td>
+                <td>{type.burnable ? '🔥' : '🚫'}</td>
               </tr>
             ))}
           </tbody>
@@ -373,39 +281,28 @@ export default function AdminSBTManager() {
 
       <div>
         <h3 className="font-semibold mb-2">Burn Token</h3>
-        <input
-          type="text"
-          value={burnTokenId}
-          onChange={(e) => setBurnTokenId(e.target.value)}
-          placeholder="Token ID to burn"
-          className="w-full mb-2 p-2 border rounded"
-        />
-        <button onClick={handleBurn} disabled={loading} className="px-4 py-2 rounded text-white bg-red-600">
-          Burn Token
-        </button>
+        <input type="text" value={burnTokenId} onChange={(e) => setBurnTokenId(e.target.value)} placeholder="Token ID to burn" className="w-full mb-2 p-2 border rounded" />
+        <button onClick={handleBurn} disabled={loading} className="px-4 py-2 rounded text-white bg-red-600">Burn Token</button>
       </div>
 
-      {/* --- New: Database Dump Section --- */}
-      <div className="mt-10 p-4 border rounded bg-gray-50 text-black max-w-4xl mx-auto">
-        <h3 className="font-semibold mb-2 text-lg">Database Dump (Render DB)</h3>
+      <div className="mt-10 p-4 border rounded bg-gray-50">
+        <h3 className="font-semibold mb-2">Database Dump (Render DB)</h3>
         <DbDump />
       </div>
 
-      {/* --- New: Create Event Section --- */}
-      <div className="mt-10 p-4 border rounded bg-gray-50 text-black max-w-4xl mx-auto">
-        <h3 className="font-semibold mb-2 text-lg">Create Event (DB Only)</h3>
+      <div className="mt-10 p-4 border rounded bg-gray-50">
+        <h3 className="font-semibold mb-2">Create Event (DB Only)</h3>
         <EventCreator />
       </div>
     </div>
   )
 }
 
-// Database Dump component
+// DbDump unchanged
 function DbDump() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-
   useEffect(() => {
     async function fetchDump() {
       setLoading(true)
@@ -422,28 +319,22 @@ function DbDump() {
     }
     fetchDump()
   }, [])
-
   if (loading) return <p>Loading database dump...</p>
   if (error) return <p className="text-red-600">Error loading dump: {error}</p>
   if (!data) return null
-
-  return (
-    <pre className="max-h-96 overflow-auto bg-white p-4 rounded border text-xs">
-      {JSON.stringify(data, null, 2)}
-    </pre>
-  )
+  return <pre className="max-h-96 overflow-auto bg-white p-4 rounded border text-xs">{JSON.stringify(data, null, 2)}</pre>
 }
 
-// EventCreator component
+// EventCreator updated to include city
 function EventCreator() {
   const [typeId, setTypeId] = useState('')
   const [name, setName] = useState('')
+  const [city, setCity] = useState('')
   const [datetime, setDatetime] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
-
   async function handleCreate() {
-    if (!typeId || !name || !datetime) {
+    if (!typeId || !name || !datetime || !city) {
       setMessage('All fields are required')
       return
     }
@@ -455,8 +346,9 @@ function EventCreator() {
         body: JSON.stringify({
           typeId: Number(typeId),
           name,
+          city,
           datetime: new Date(datetime).toISOString(),
-          min_attendees: 1
+          min_attendees: 1,
         }),
       })
       const data = await res.json()
@@ -468,34 +360,13 @@ function EventCreator() {
       setLoading(false)
     }
   }
-
   return (
     <div className="space-y-2">
-      <input
-        type="number"
-        placeholder="Type ID"
-        value={typeId}
-        onChange={(e) => setTypeId(e.target.value)}
-        className="w-full p-2 border rounded"
-      />
-      <input
-        type="text"
-        placeholder="Event name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        className="w-full p-2 border rounded"
-      />
-      <input
-        type="datetime-local"
-        value={datetime}
-        onChange={(e) => setDatetime(e.target.value)}
-        className="w-full p-2 border rounded"
-      />
-      <button
-        onClick={handleCreate}
-        disabled={loading}
-        className={`px-4 py-2 rounded text-white ${loading ? 'bg-blue-300' : 'bg-blue-600'}`}
-      >
+      <input type="number" placeholder="Type ID" value={typeId} onChange={(e) => setTypeId(e.target.value)} className="w-full p-2 border rounded" />
+      <input type="text" placeholder="Event name" value={name} onChange={(e) => setName(e.target.value)} className="w-full p-2 border rounded" />
+      <input type="text" placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} className="w-full p-2 border rounded" />
+      <input type="datetime-local" value={datetime} onChange={(e) => setDatetime(e.target.value)} className="w-full p-2 border rounded" />
+      <button onClick={handleCreate} disabled={loading} className={`px-4 py-2 rounded text-white ${loading ? 'bg-blue-300' : 'bg-blue-600'}`}>
         {loading ? 'Creating...' : 'Create Event'}
       </button>
       {message && <p className="mt-2 text-sm">{message}</p>}
