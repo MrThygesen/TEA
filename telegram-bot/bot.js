@@ -1,5 +1,3 @@
-// bot.js
-
 import { runMigrations } from './migrations.js'
 import TelegramBot from 'node-telegram-bot-api'
 import { pool } from './postgres.js'
@@ -210,11 +208,12 @@ bot.onText(/\/myevents/, async (msg) => {
     return bot.sendMessage(chatId, "No registrations found.")
   }
 
-  let msg = 'Your events:\n\n'
+  // Rename 'msg' variable here to avoid redeclaration error
+  let messageText = 'Your events:\n\n'
   res.rows.forEach((e, i) => {
-    msg += `${i + 1}. *${e.name}* (${e.city}) — ${e.datetime || 'TBA'} — ${e.is_confirmed ? '✅ Confirmed' : '⏳ Pending'}\n\n`
+    messageText += `${i + 1}. *${e.name}* (${e.city}) — ${e.datetime || 'TBA'} — ${e.is_confirmed ? '✅ Confirmed' : '⏳ Pending'}\n\n`
   })
-  bot.sendMessage(chatId, msg, { parse_mode: 'Markdown' })
+  bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown' })
 })
 
 // /total
