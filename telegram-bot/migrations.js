@@ -1,18 +1,12 @@
 // telegram-bot/migrations.js
-
 import { pool } from './postgres.js'
 
 export async function runMigrations() {
-  console.log('Running migrations...')
+  console.log('Running safe migrations...')
 
-  // 1️⃣ Drop and recreate events table with city column
+  // 1️⃣ Events table (create if missing, add city column if missing)
   await pool.query(`
-    DROP TABLE IF EXISTS events CASCADE;
-  `)
-  console.log('Dropped old events table.')
-
-  await pool.query(`
-    CREATE TABLE events (
+    CREATE TABLE IF NOT EXISTS events (
       id INTEGER PRIMARY KEY,
       name TEXT NOT NULL,
       city TEXT,
@@ -22,9 +16,15 @@ export async function runMigrations() {
       group_id BIGINT
     );
   `)
-  console.log('Created new events table with city column.')
+  console.log('✅ Events table ready.')
 
-  // 2️⃣ Keep your other migrations here (registrations, invitations, etc.)
+  // Ensure 'city' column exists (if you previously had a table without it)
+  await pool.query(`
+    ALTER TABLE events
+    ADD COLUMN IF NOT EXISTS city TEXT;
+  `)
+
+  // 2️⃣ Registrations table
   await pool.query(`
     CREATE TABLE IF NOT EXISTS registrations (
       event_id INTEGER REFERENCES events(id) ON DELETE CASCADE,
@@ -33,7 +33,9 @@ export async function runMigrations() {
       PRIMARY KEY (event_id, telegram_user_id)
     );
   `)
+  console.log('✅ Registrations table ready.')
 
+  // 3️⃣ Invitations table
   await pool.query(`
     CREATE TABLE IF NOT EXISTS invitations (
       id SERIAL PRIMARY KEY,
@@ -44,14 +46,17 @@ export async function runMigrations() {
       confirmed BOOLEAN DEFAULT false
     );
   `)
+  console.log('✅ Invitations table ready.')
 
+  // 4️⃣ User emails table
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_emails (
       telegram_user_id TEXT PRIMARY KEY,
       email TEXT NOT NULL
     );
   `)
+  console.log('✅ User emails table ready.')
 
-  console.log('Migrations complete.')
+  console.log('All migrations complete. No data has been deleted.')
 }
 
