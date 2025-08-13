@@ -1,30 +1,57 @@
+// telegram-bot/migrations.js
+
 import { pool } from './postgres.js'
 
 export async function runMigrations() {
-  const client = await pool.connect()
+  console.log('Running migrations...')
 
-  try {
-    // Check if the constraint already exists
-    const checkConstraint = await client.query(`
-      SELECT 1 FROM pg_constraint WHERE conname = 'registrations_event_user_unique';
-    `)
+  // 1️⃣ Drop and recreate events table with city column
+  await pool.query(`
+    DROP TABLE IF EXISTS events CASCADE;
+  `)
+  console.log('Dropped old events table.')
 
-    if (checkConstraint.rowCount === 0) {
-      console.log('🔧 Adding UNIQUE constraint (event_id, telegram_user_id)...')
+  await pool.query(`
+    CREATE TABLE events (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      city TEXT,
+      datetime TIMESTAMP,
+      min_attendees INTEGER,
+      is_confirmed BOOLEAN DEFAULT false,
+      group_id BIGINT
+    );
+  `)
+  console.log('Created new events table with city column.')
 
-      await client.query(`
-        ALTER TABLE registrations
-        ADD CONSTRAINT registrations_event_user_unique UNIQUE (event_id, telegram_user_id);
-      `)
+  // 2️⃣ Keep your other migrations here (registrations, invitations, etc.)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS registrations (
+      event_id INTEGER REFERENCES events(id) ON DELETE CASCADE,
+      telegram_user_id TEXT NOT NULL,
+      telegram_username TEXT,
+      PRIMARY KEY (event_id, telegram_user_id)
+    );
+  `)
 
-      console.log('✅ Constraint added successfully.')
-    } else {
-      console.log('✅ Constraint already exists, no action needed.')
-    }
-  } catch (err) {
-    console.error('❌ Migration error:', err.message)
-  } finally {
-    client.release()
-  }
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS invitations (
+      id SERIAL PRIMARY KEY,
+      event_id INTEGER REFERENCES events(id) ON DELETE CASCADE,
+      inviter_id TEXT NOT NULL,
+      invitee_id TEXT,
+      invitee_username TEXT,
+      confirmed BOOLEAN DEFAULT false
+    );
+  `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_emails (
+      telegram_user_id TEXT PRIMARY KEY,
+      email TEXT NOT NULL
+    );
+  `)
+
+  console.log('Migrations complete.')
 }
 

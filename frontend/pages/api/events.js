@@ -1,20 +1,21 @@
 // frontend/pages/api/events.js
+
 import { pool } from '../../lib/postgres.js'
 
 export default async function handler(req, res) {
   const { method, query, body } = req;
 
   if (method === 'POST') {
-    const { typeId, name, datetime, min_attendees } = body;
-    if (!typeId || !name || !datetime || min_attendees == null) {
+    const { typeId, name, city, datetime, min_attendees } = body;
+    if (!typeId || !name || !city || !datetime || min_attendees == null) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
     try {
       const result = await pool.query(
-        `INSERT INTO events (id, name, datetime, min_attendees)
-         VALUES ($1, $2, $3, $4) RETURNING *`,
-        [typeId, name, datetime, min_attendees]
+        `INSERT INTO events (id, name, city, datetime, min_attendees)
+         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        [typeId, name, city, datetime, min_attendees]
       );
       return res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -24,18 +25,18 @@ export default async function handler(req, res) {
   }
 
   if (method === 'PUT') {
-    const { typeId, name, datetime, min_attendees } = body;
-    if (!typeId || !name || !datetime || min_attendees == null) {
+    const { typeId, name, city, datetime, min_attendees } = body;
+    if (!typeId || !name || !city || !datetime || min_attendees == null) {
       return res.status(400).json({ error: 'Missing required fields for update' });
     }
 
     try {
       const result = await pool.query(
         `UPDATE events
-         SET name = $2, datetime = $3, min_attendees = $4
+         SET name = $2, city = $3, datetime = $4, min_attendees = $5
          WHERE id = $1
          RETURNING *`,
-        [typeId, name, datetime, min_attendees]
+        [typeId, name, city, datetime, min_attendees]
       );
 
       if (result.rowCount === 0) {
