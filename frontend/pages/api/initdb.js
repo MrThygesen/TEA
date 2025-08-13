@@ -15,12 +15,13 @@ export default async function handler(req, res) {
   try {
     const client = await pool.connect()
 
+    // 1️⃣ Create events table if not exists
     await client.query(`
       CREATE TABLE IF NOT EXISTS events (
         id SERIAL PRIMARY KEY,
         group_id TEXT,
         name TEXT,
-        city TEXT,  -- ✅ NEW: city support
+        city TEXT,
         datetime TIMESTAMPTZ,
         min_attendees INTEGER DEFAULT 1,
         max_attendees INTEGER DEFAULT 40,
@@ -29,6 +30,19 @@ export default async function handler(req, res) {
       );
     `)
 
+    // 2️⃣ Ensure city column exists
+    await client.query(`
+      ALTER TABLE events
+      ADD COLUMN IF NOT EXISTS city TEXT;
+    `)
+
+    // 3️⃣ Ensure city index exists
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_events_city
+      ON events(LOWER(city));
+    `)
+
+    // 4️⃣ Create registrations table
     await client.query(`
       CREATE TABLE IF NOT EXISTS registrations (
         id SERIAL PRIMARY KEY,
@@ -42,6 +56,7 @@ export default async function handler(req, res) {
       );
     `)
 
+    // 5️⃣ Create invitations table
     await client.query(`
       CREATE TABLE IF NOT EXISTS invitations (
         id SERIAL PRIMARY KEY,
@@ -55,6 +70,7 @@ export default async function handler(req, res) {
       );
     `)
 
+    // 6️⃣ Create user_emails table
     await client.query(`
       CREATE TABLE IF NOT EXISTS user_emails (
         id SERIAL PRIMARY KEY,
