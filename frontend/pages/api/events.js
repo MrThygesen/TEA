@@ -1,5 +1,5 @@
 // frontend/pages/api/events.js
-
+// frontend/pages/api/events.js
 import { pool } from '../../lib/postgres.js'
 
 export default async function handler(req, res) {
@@ -52,12 +52,16 @@ export default async function handler(req, res) {
 
   if (method === 'GET') {
     try {
-      const approvedOnly = query.approvedOnly === 'true';
-      const result = await pool.query(
-        approvedOnly
-          ? 'SELECT * FROM events WHERE is_confirmed = TRUE ORDER BY datetime ASC'
-          : 'SELECT * FROM events ORDER BY datetime ASC'
-      );
+const approvedOnly = query.approvedOnly === 'true';
+const result = await pool.query(
+  approvedOnly
+    ? 'SELECT * FROM events WHERE is_confirmed = TRUE ORDER BY datetime ASC'
+    : 'SELECT * FROM events ORDER BY datetime ASC'
+);
+console.log('[GET] Events fetched:', result.rows);
+
+
+
       return res.status(200).json(result.rows);
     } catch (err) {
       console.error('[GET] Error fetching events:', err);
