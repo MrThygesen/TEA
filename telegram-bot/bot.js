@@ -31,7 +31,7 @@ const bot = new TelegramBot(botToken, { polling: false })
 app.post(`/bot${botToken}`, (req, res) => {
   bot.processUpdate(req.body)
   res.sendStatus(200)
-})
+}) 
 
 async function setWebhook() {
   const webhookUrl = `https://tea-gwwb.onrender.com/bot${botToken}`
