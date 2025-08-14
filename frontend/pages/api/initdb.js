@@ -30,19 +30,13 @@ export default async function handler(req, res) {
       );
     `)
 
-    // 2️⃣ Ensure city column exists
-    await client.query(`
-      ALTER TABLE events
-      ADD COLUMN IF NOT EXISTS city TEXT;
-    `)
-
-    // 3️⃣ Ensure city index exists
+    // 2️⃣ Ensure city index exists
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_events_city
       ON events(LOWER(city));
     `)
 
-    // 4️⃣ Create registrations table
+    // 3️⃣ Create registrations table
     await client.query(`
       CREATE TABLE IF NOT EXISTS registrations (
         id SERIAL PRIMARY KEY,
@@ -51,12 +45,15 @@ export default async function handler(req, res) {
         telegram_username TEXT,
         email TEXT,
         wallet_address TEXT,
+        tier INTEGER DEFAULT 1,
+        ticket_code TEXT UNIQUE,
+        wallet_verified BOOLEAN DEFAULT FALSE,
         timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         UNIQUE (event_id, telegram_user_id)
       );
     `)
 
-    // 5️⃣ Create invitations table
+    // 4️⃣ Create invitations table
     await client.query(`
       CREATE TABLE IF NOT EXISTS invitations (
         id SERIAL PRIMARY KEY,
@@ -70,14 +67,22 @@ export default async function handler(req, res) {
       );
     `)
 
-    // 6️⃣ Create user_emails table
+    // 5️⃣ Create user_emails table
     await client.query(`
       CREATE TABLE IF NOT EXISTS user_emails (
-        id SERIAL PRIMARY KEY,
-        telegram_user_id TEXT UNIQUE,
-        email TEXT NOT NULL
+        telegram_user_id TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
+        subscribed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `)
+
+    // 6️⃣ Generate ticket_code for existing registrations if missing
+    const existing = await client.query(`SELECT id, ticket_code FROM registrations WHERE ticket_code IS NULL`)
+    for (const row of existing.rows) {
+      const code = `TICKET-${row.id.toString().padStart(5, '0')}-${Math.random().toString(36).slice(2,7).toUpperCase()}`
+      await client.query(`UPDATE registrations SET ticket_code=$1 WHERE id=$2`, [code, row.id])
+      console.log(`✅ Set ticket_code for registration id=${row.id}: ${code}`)
+    }
 
     client.release()
     res.status(200).json({ message: '✅ Database initialized/updated successfully' })
