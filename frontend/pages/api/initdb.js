@@ -30,13 +30,13 @@ export default async function handler(req, res) {
       );
     `)
 
-    // 2️⃣ Ensure city index exists
+    // Ensure city index exists
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_events_city
       ON events(LOWER(city));
     `)
 
-    // 3️⃣ Create registrations table
+    // 2️⃣ Create registrations table if not exists
     await client.query(`
       CREATE TABLE IF NOT EXISTS registrations (
         id SERIAL PRIMARY KEY,
@@ -46,14 +46,27 @@ export default async function handler(req, res) {
         email TEXT,
         wallet_address TEXT,
         tier INTEGER DEFAULT 1,
-        ticket_code TEXT UNIQUE,
         wallet_verified BOOLEAN DEFAULT FALSE,
         timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         UNIQUE (event_id, telegram_user_id)
       );
     `)
 
-    // 4️⃣ Create invitations table
+    // Ensure new columns exist for existing tables
+    await client.query(`
+      ALTER TABLE registrations
+      ADD COLUMN IF NOT EXISTS ticket_code TEXT UNIQUE
+    `)
+    await client.query(`
+      ALTER TABLE registrations
+      ADD COLUMN IF NOT EXISTS tier INTEGER DEFAULT 1
+    `)
+    await client.query(`
+      ALTER TABLE registrations
+      ADD COLUMN IF NOT EXISTS wallet_verified BOOLEAN DEFAULT FALSE
+    `)
+
+    // 3️⃣ Create invitations table if not exists
     await client.query(`
       CREATE TABLE IF NOT EXISTS invitations (
         id SERIAL PRIMARY KEY,
@@ -67,7 +80,7 @@ export default async function handler(req, res) {
       );
     `)
 
-    // 5️⃣ Create user_emails table
+    // 4️⃣ Create user_emails table if not exists
     await client.query(`
       CREATE TABLE IF NOT EXISTS user_emails (
         telegram_user_id TEXT PRIMARY KEY,
@@ -76,8 +89,10 @@ export default async function handler(req, res) {
       );
     `)
 
-    // 6️⃣ Generate ticket_code for existing registrations if missing
-    const existing = await client.query(`SELECT id, ticket_code FROM registrations WHERE ticket_code IS NULL`)
+    // 5️⃣ Generate ticket_code for existing registrations if missing
+    const existing = await client.query(`
+      SELECT id, ticket_code FROM registrations WHERE ticket_code IS NULL
+    `)
     for (const row of existing.rows) {
       const code = `TICKET-${row.id.toString().padStart(5, '0')}-${Math.random().toString(36).slice(2,7).toUpperCase()}`
       await client.query(`UPDATE registrations SET ticket_code=$1 WHERE id=$2`, [code, row.id])
