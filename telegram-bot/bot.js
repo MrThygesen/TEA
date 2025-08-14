@@ -1,276 +1,325 @@
-import TelegramBot from 'node-telegram-bot-api'
-import pkg from 'pg'
-import QRCode from 'qrcode'
-import dotenv from 'dotenv'
-dotenv.config()
+import TelegramBot from 'node-telegram-bot-api';
+import { pool } from './postgres.js';
+import dotenv from 'dotenv';
+dotenv.config();
 
-const { Pool } = pkg
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-})
+const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 
-const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true })
-const userStates = {} // temporary session states
+/**
+ * Utility: Validate email & wallet
+ */
+const validateEmail = (email) => /\S+@\S+\.\S+/.test(email);
+const validateWallet = (address) => /^0x[a-fA-F0-9]{40}$/.test(address);
 
-// ====== DB SETUP ======
-async function initTables() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS user_settings (
-      telegram_user_id TEXT PRIMARY KEY,
-      city TEXT DEFAULT 'Copenhagen',
-      updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+/**
+ * HELP command
+ */
+bot.onText(/\/help/, (msg) => {
+  const helpText = `
+🤖 *Event Bot Commands*:
+📍 /city - Change your preferred city
+🎟️ /myevents - View your registered future events
+📝 /edit_user - Update your profile info (tier, email, wallet, city)
+📅 /ticket - Show your ticket for a specific event
+ℹ️ /help - Show this help menu
+
+_Tier 1:_ Email notifications  
+_Tier 2:_ Email + Wallet registration
+  `;
+  bot.sendMessage(msg.chat.id, helpText, { parse_mode: 'Markdown' });
+});
+
+/**
+ * START command (with persistence check)
+ */
+bot.onText(/\/start/, async (msg) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id.toString();
+  const username = msg.from.username || '';
+
+  const res = await pool.query(
+    'SELECT * FROM user_profiles WHERE telegram_user_id=$1',
+    [userId]
+  );
+
+  if (res.rows.length > 0) {
+    bot.sendMessage(chatId, `👋 Welcome back, ${username}! Type /help for commands.`);
+    return;
+  }
+
+  await pool.query(
+    `INSERT INTO user_profiles (telegram_user_id, telegram_username)
+     VALUES ($1, $2) ON CONFLICT (telegram_user_id) DO NOTHING`,
+    [userId, username]
+  );
+
+  bot.sendMessage(chatId, `Welcome, ${username}! Let's set up your profile.`, {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "📍 Select City", callback_data: "set_city" }]
+      ]
+    }
+  });
+});
+
+/**
+ * Inline city selection
+ */
+bot.on('callback_query', async (query) => {
+  const userId = query.from.id.toString();
+  const chatId = query.message.chat.id;
+
+  if (query.data === 'set_city') {
+    const citiesRes = await pool.query(
+      `SELECT DISTINCT city FROM events WHERE datetime > NOW() ORDER BY city`
     );
-  `)
-}
-initTables()
+    const cities = citiesRes.rows.map(r => r.city);
 
-// ====== HELPERS ======
-async function getAvailableCities() {
-  const res = await pool.query(`
-    SELECT DISTINCT city
-    FROM events
-    WHERE datetime > NOW()
-    ORDER BY city ASC
-  `)
-  return res.rows.map(r => r.city)
-}
-
-async function getUserCity(tgId) {
-  const res = await pool.query(`
-    SELECT city FROM user_settings WHERE telegram_user_id = $1
-  `, [tgId])
-  return res.rows.length ? res.rows[0].city : 'Copenhagen'
-}
-
-async function saveUserCity(tgId, city) {
-  await pool.query(`
-    INSERT INTO user_settings (telegram_user_id, city)
-    VALUES ($1, $2)
-    ON CONFLICT (telegram_user_id)
-    DO UPDATE SET city = $2, updated_at = CURRENT_TIMESTAMP
-  `, [tgId, city])
-}
-
-async function getOpenEventsByCity(city) {
-  const res = await pool.query(`
-    SELECT id, name, datetime, min_attendees, is_confirmed
-    FROM events
-    WHERE datetime > NOW()
-      AND LOWER(city) = LOWER($1)
-    ORDER BY datetime ASC
-  `, [city])
-  return res.rows
-}
-
-async function registerUser(eventId, tgId, username, email, wallet) {
-  await pool.query(`
-    INSERT INTO registrations (event_id, telegram_user_id, telegram_username, email, wallet_address)
-    VALUES ($1, $2, $3, $4, $5)
-    ON CONFLICT (event_id, telegram_user_id) DO NOTHING
-  `, [eventId, tgId, username, email, wallet || null])
-
-  const attendeesRes = await pool.query(`SELECT COUNT(*) FROM registrations WHERE event_id = $1`, [eventId])
-  const count = parseInt(attendeesRes.rows[0].count)
-
-  const eventRes = await pool.query(`SELECT name, min_attendees, is_confirmed FROM events WHERE id = $1`, [eventId])
-  const event = eventRes.rows[0]
-
-  if (!event.is_confirmed && count >= event.min_attendees) {
-    await pool.query(`UPDATE events SET is_confirmed = true WHERE id = $1`, [eventId])
-    return { confirmed: true, eventName: event.name }
+    bot.sendMessage(chatId, "Select your city:", {
+      reply_markup: {
+        inline_keyboard: cities.map(c => [{ text: c, callback_data: `city_${c}` }])
+      }
+    });
   }
-  return { confirmed: false }
-}
-
-async function getUserEvents(tgId) {
-  const res = await pool.query(`
-    SELECT e.id, e.name, e.datetime
-    FROM registrations r
-    JOIN events e ON r.event_id = e.id
-    WHERE r.telegram_user_id = $1
-    ORDER BY e.datetime ASC
-  `, [tgId])
-  return res.rows
-}
-
-// ====== HELP COMMAND ======
-bot.onText(/\/help/, msg => {
-  const text = `
-🤖 *Bot Commands*
-/start – Begin registration & choose city
-/city – Change your city
-/myevents – See your events & get QR codes
-/ticket – Get ticket for a specific event
-/help – Show this help message
-
-🎯 *Tiers*
-Tier 1: Email only  
-Tier 2: Email + Wallet (ETH address)
-
-💡 Emails must contain '@'  
-💡 Wallets must start with 0x and have 40 hex chars
-  `
-  bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown' })
-})
-
-// ====== START ======
-bot.onText(/\/start/, async msg => {
-  const chatId = msg.chat.id
-  const savedCity = await getUserCity(chatId)
-  const cities = await getAvailableCities()
-
-  if (!cities.includes(savedCity) && cities.length > 0) {
-    await saveUserCity(chatId, cities[0])
-    userStates[chatId] = { city: cities[0] }
-  } else {
-    userStates[chatId] = { city: savedCity }
-  }
-
-  if (cities.length > 1) {
-    const buttons = cities.map(c => [{ text: c, callback_data: `city_${c}` }])
-    await bot.sendMessage(chatId, `🏙 Your current city is *${savedCity}*. Select a different city:`, {
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: buttons }
-    })
-  } else {
-    await showTierSelection(chatId)
-  }
-})
-
-// ====== CALLBACK HANDLING ======
-bot.on('callback_query', async query => {
-  const chatId = query.message.chat.id
 
   if (query.data.startsWith('city_')) {
-    const city = query.data.replace('city_', '')
-    await saveUserCity(chatId, city)
-    userStates[chatId] = { city }
-    await bot.answerCallbackQuery(query.id, { text: `City set to ${city}` })
-    await showTierSelection(chatId)
+    const city = query.data.replace('city_', '');
+    await pool.query(
+      'UPDATE user_profiles SET city=$1 WHERE telegram_user_id=$2',
+      [city, userId]
+    );
+
+    bot.sendMessage(chatId, `✅ City set to *${city}*`, { parse_mode: 'Markdown' });
+
+    bot.sendMessage(chatId, "Choose your tier:", {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "Tier 1 - Email", callback_data: "tier_1" }],
+          [{ text: "Tier 2 - Email + Wallet", callback_data: "tier_2" }]
+        ]
+      }
+    });
   }
 
-  if (query.data === 'tier1' || query.data === 'tier2') {
-    userStates[chatId].tier = query.data
-    userStates[chatId].step = 'email'
-    bot.sendMessage(chatId, '📧 Please enter your email address:')
-  }
-})
+  if (query.data.startsWith('tier_')) {
+    const tier = parseInt(query.data.replace('tier_', ''));
+    await pool.query(
+      'UPDATE user_profiles SET tier=$1 WHERE telegram_user_id=$2',
+      [tier, userId]
+    );
+    bot.sendMessage(chatId, `✅ Tier ${tier} selected.`);
 
-async function showTierSelection(chatId) {
-  const buttons = [
-    [{ text: '📩 Tier 1 (Email only)', callback_data: 'tier1' }],
-    [{ text: '💼 Tier 2 (Email + Wallet)', callback_data: 'tier2' }]
-  ]
-  await bot.sendMessage(chatId, 'Choose your tier:', {
-    reply_markup: { inline_keyboard: buttons }
-  })
+    bot.sendMessage(chatId, "📧 Please send your email:");
+    bot.once('message', async (msg) => {
+      if (!validateEmail(msg.text)) {
+        bot.sendMessage(chatId, "❌ Invalid email. Please restart with /edit_user");
+        return;
+      }
+      await pool.query(
+        'UPDATE user_profiles SET email=$1 WHERE telegram_user_id=$2',
+        [msg.text, userId]
+      );
+
+      if (tier === 2) {
+        bot.sendMessage(chatId, "💳 Please send your ETH wallet:");
+        bot.once('message', async (msg2) => {
+          if (!validateWallet(msg2.text)) {
+            bot.sendMessage(chatId, "❌ Invalid ETH wallet. Please restart with /edit_user");
+            return;
+          }
+          await pool.query(
+            'UPDATE user_profiles SET wallet_address=$1 WHERE telegram_user_id=$2',
+            [msg2.text, userId]
+          );
+          bot.sendMessage(chatId, "✅ Profile completed!");
+        });
+      } else {
+        bot.sendMessage(chatId, "✅ Profile completed!");
+      }
+    });
+  }
+});
+
+/**
+ * Auto-confirm events when min attendees reached
+ */
+async function checkEventConfirmation(eventId) {
+  const event = await pool.query('SELECT * FROM events WHERE id=$1', [eventId]);
+  if (!event.rows.length) return;
+  const attendees = await pool.query(
+    'SELECT COUNT(*) FROM registrations WHERE event_id=$1',
+    [eventId]
+  );
+  if (parseInt(attendees.rows[0].count) >= event.rows[0].min_attendees && !event.rows[0].is_confirmed) {
+    await pool.query('UPDATE events SET is_confirmed=TRUE WHERE id=$1', [eventId]);
+    const users = await pool.query('SELECT telegram_user_id FROM registrations WHERE event_id=$1', [eventId]);
+    users.rows.forEach(u => {
+      bot.sendMessage(u.telegram_user_id, `🎉 Event "${event.rows[0].name}" confirmed!`);
+    });
+  }
 }
 
-// ====== MESSAGE HANDLING ======
-bot.on('message', async msg => {
-  const chatId = msg.chat.id
-  const state = userStates[chatId]
-  if (!state) return
 
-  if (state.step === 'email') {
-    if (!msg.text.includes('@')) {
-      return bot.sendMessage(chatId, '❌ Invalid email. Please include "@".')
+
+import QRCode from 'qrcode';
+
+/**
+ * /myevents — show user's registered future events
+ */
+bot.onText(/\/myevents/, async (msg) => {
+  const userId = msg.from.id.toString();
+  const chatId = msg.chat.id;
+
+  const res = await pool.query(`
+    SELECT e.id, e.name, e.city, e.datetime
+    FROM registrations r
+    JOIN events e ON e.id = r.event_id
+    WHERE r.telegram_user_id=$1
+      AND e.datetime > NOW()
+    ORDER BY e.datetime ASC
+  `, [userId]);
+
+  if (!res.rows.length) {
+    bot.sendMessage(chatId, "📭 You have no upcoming events registered.");
+    return;
+  }
+
+  for (const ev of res.rows) {
+    const ticketText = `Ticket\nEvent: ${ev.name}\nUser: ${msg.from.username}\nEventID: ${ev.id}`;
+    const qrBuffer = await QRCode.toBuffer(ticketText);
+    bot.sendPhoto(chatId, qrBuffer, {
+      caption: `🎟 ${ev.name}\n📍 ${ev.city}\n🗓 ${new Date(ev.datetime).toLocaleString()}`
+    });
+  }
+});
+
+/**
+ * /ticket <event_id> — show specific ticket
+ */
+bot.onText(/\/ticket (\d+)/, async (msg, match) => {
+  const eventId = match[1];
+  const userId = msg.from.id.toString();
+  const chatId = msg.chat.id;
+
+  const reg = await pool.query(`
+    SELECT e.name
+    FROM registrations r
+    JOIN events e ON e.id = r.event_id
+    WHERE r.telegram_user_id=$1 AND e.id=$2
+  `, [userId, eventId]);
+
+  if (!reg.rows.length) {
+    bot.sendMessage(chatId, "❌ You are not registered for this event.");
+    return;
+  }
+
+  const ticketText = `Ticket\nEvent: ${reg.rows[0].name}\nUser: ${msg.from.username}\nEventID: ${eventId}`;
+  const qrBuffer = await QRCode.toBuffer(ticketText);
+  bot.sendPhoto(chatId, qrBuffer, {
+    caption: `🎟 Ticket for ${reg.rows[0].name}`
+  });
+});
+
+/**
+ * /edit_user — update profile
+ */
+bot.onText(/\/edit_user/, async (msg) => {
+  const chatId = msg.chat.id;
+
+  bot.sendMessage(chatId, "Select what to edit:", {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "📍 City", callback_data: "set_city" }],
+        [{ text: "📊 Tier", callback_data: "edit_tier" }],
+        [{ text: "📧 Email", callback_data: "edit_email" }],
+        [{ text: "💳 Wallet", callback_data: "edit_wallet" }]
+      ]
     }
-    state.email = msg.text
-    if (state.tier === 'tier2') {
-      state.step = 'wallet'
-      bot.sendMessage(chatId, '💳 Please enter your Ethereum wallet address:')
+  });
+});
+
+bot.on('callback_query', async (query) => {
+  const chatId = query.message.chat.id;
+  const userId = query.from.id.toString();
+
+  if (query.data === 'edit_tier') {
+    bot.sendMessage(chatId, "Choose your tier:", {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "Tier 1 - Email", callback_data: "tier_1" }],
+          [{ text: "Tier 2 - Email + Wallet", callback_data: "tier_2" }]
+        ]
+      }
+    });
+  }
+
+  if (query.data === 'edit_email') {
+    bot.sendMessage(chatId, "📧 Enter your new email:");
+    bot.once('message', async (m) => {
+      if (!validateEmail(m.text)) {
+        bot.sendMessage(chatId, "❌ Invalid email.");
+        return;
+      }
+      await pool.query(
+        'UPDATE user_profiles SET email=$1 WHERE telegram_user_id=$2',
+        [m.text, userId]
+      );
+      bot.sendMessage(chatId, "✅ Email updated.");
+    });
+  }
+
+  if (query.data === 'edit_wallet') {
+    bot.sendMessage(chatId, "💳 Enter your new ETH wallet:");
+    bot.once('message', async (m) => {
+      if (!validateWallet(m.text)) {
+        bot.sendMessage(chatId, "❌ Invalid ETH wallet.");
+        return;
+      }
+      await pool.query(
+        'UPDATE user_profiles SET wallet_address=$1 WHERE telegram_user_id=$2',
+        [m.text, userId]
+      );
+      bot.sendMessage(chatId, "✅ Wallet updated.");
+    });
+  }
+});
+
+/**
+ * /register <event_id> — register user
+ */
+bot.onText(/\/register (\d+)/, async (msg, match) => {
+  const eventId = match[1];
+  const userId = msg.from.id.toString();
+  const username = msg.from.username || '';
+  const chatId = msg.chat.id;
+
+  // Get user profile
+  const profileRes = await pool.query(
+    'SELECT * FROM user_profiles WHERE telegram_user_id=$1',
+    [userId]
+  );
+  if (!profileRes.rows.length) {
+    bot.sendMessage(chatId, "❌ Please set up your profile with /start first.");
+    return;
+  }
+  const profile = profileRes.rows[0];
+
+  try {
+    await pool.query(
+      `INSERT INTO registrations (event_id, telegram_user_id, telegram_username, email, wallet_address)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [eventId, userId, username, profile.email, profile.wallet_address]
+    );
+    bot.sendMessage(chatId, `✅ Registered for event ${eventId}`);
+    await checkEventConfirmation(eventId);
+  } catch (err) {
+    if (err.code === '23505') {
+      bot.sendMessage(chatId, "⚠️ You are already registered for this event.");
     } else {
-      state.step = 'event'
-      await showEvents(chatId)
+      console.error(err);
+      bot.sendMessage(chatId, "❌ Error registering.");
     }
   }
+});
 
-  else if (state.step === 'wallet') {
-    if (!/^0x[a-fA-F0-9]{40}$/.test(msg.text)) {
-      return bot.sendMessage(chatId, '❌ Invalid wallet address. Must be 0x followed by 40 hex characters.')
-    }
-    state.wallet = msg.text
-    state.step = 'event'
-    await showEvents(chatId)
-  }
-
-  else if (state.step === 'event') {
-    const choice = parseInt(msg.text)
-    const events = await getOpenEventsByCity(state.city)
-    if (isNaN(choice) || choice < 1 || choice > events.length) {
-      return bot.sendMessage(chatId, '❌ Invalid choice. Please enter a valid event number.')
-    }
-    const selected = events[choice - 1]
-    const { confirmed, eventName } = await registerUser(
-      selected.id,
-      chatId,
-      msg.from.username,
-      state.email,
-      state.wallet
-    )
-    if (confirmed) {
-      bot.sendMessage(chatId, `✅ Event "${eventName}" is now *confirmed*!`, { parse_mode: 'Markdown' })
-    } else {
-      bot.sendMessage(chatId, `🎟 Registered for *${selected.name}*`, { parse_mode: 'Markdown' })
-    }
-    delete userStates[chatId]
-  }
-})
-
-async function showEvents(chatId) {
-  const events = await getOpenEventsByCity(userStates[chatId].city)
-  if (!events.length) {
-    return bot.sendMessage(chatId, '📭 No upcoming events for this city.')
-  }
-  let msg = `🎉 Upcoming events in *${userStates[chatId].city}*:\n`
-  events.forEach((e, i) => {
-    msg += `\n${i + 1}. *${e.name}* — ${new Date(e.datetime).toLocaleString()}`
-  })
-  msg += '\n\nReply with event number to register.'
-  bot.sendMessage(chatId, msg, { parse_mode: 'Markdown' })
-}
-
-// ====== /myevents ======
-bot.onText(/\/myevents/, async msg => {
-  const chatId = msg.chat.id
-  const events = await getUserEvents(chatId)
-  if (!events.length) {
-    return bot.sendMessage(chatId, '📭 You have no registered events.')
-  }
-  for (const e of events) {
-    const qrData = `Event: ${e.name}\nUser: ${msg.from.username}\nTicket: ${e.id}-${chatId}`
-    const qrImage = await QRCode.toBuffer(qrData)
-    await bot.sendPhoto(chatId, qrImage, {
-      caption: `🎟 *${e.name}* — ${new Date(e.datetime).toLocaleString()}`,
-      parse_mode: 'Markdown'
-    })
-  }
-})
-
-// ====== /ticket ======
-bot.onText(/\/ticket/, async msg => {
-  const chatId = msg.chat.id
-  const events = await getUserEvents(chatId)
-  if (!events.length) return bot.sendMessage(chatId, '📭 No tickets found.')
-  let message = '🎟 Your Tickets:\n'
-  events.forEach(e => {
-    message += `\n@${msg.from.username} — Ticket #${e.id}-${chatId} (${e.name})`
-  })
-  bot.sendMessage(chatId, message)
-})
-
-// ====== /city ======
-bot.onText(/\/city/, async msg => {
-  const chatId = msg.chat.id
-  const cities = await getAvailableCities()
-  if (!cities.length) return bot.sendMessage(chatId, '📭 No cities found.')
-  const buttons = cities.map(c => [{ text: c, callback_data: `city_${c}` }])
-  await bot.sendMessage(chatId, '🏙 Choose your city:', {
-    reply_markup: { inline_keyboard: buttons }
-  })
-})
-
-console.log('🤖 Bot is running...')
 

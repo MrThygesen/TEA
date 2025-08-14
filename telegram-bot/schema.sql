@@ -1,9 +1,9 @@
--- Events table
+-- EVENTS table
 CREATE TABLE IF NOT EXISTS events (
   id SERIAL PRIMARY KEY,
   group_id TEXT,
   name TEXT,
-  city TEXT,  -- ✅ Used for city-based filtering
+  city TEXT,
   datetime TIMESTAMPTZ,
   min_attendees INTEGER DEFAULT 1,
   max_attendees INTEGER DEFAULT 40,
@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS events (
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
--- Registrations table
+-- REGISTRATIONS table
 CREATE TABLE IF NOT EXISTS registrations (
   id SERIAL PRIMARY KEY,
   event_id INTEGER NOT NULL REFERENCES events(id),
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS registrations (
   UNIQUE (event_id, telegram_user_id)
 );
 
--- Invitations table
+-- INVITATIONS table
 CREATE TABLE IF NOT EXISTS invitations (
   id SERIAL PRIMARY KEY,
   event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
@@ -35,13 +35,25 @@ CREATE TABLE IF NOT EXISTS invitations (
   timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
--- ✅ Email subscribers for confirmed event alerts
+-- EMAIL subscribers
 CREATE TABLE IF NOT EXISTS user_emails (
   telegram_user_id TEXT PRIMARY KEY,
   email TEXT NOT NULL,
   subscribed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
--- ✅ Optional performance index
+-- USER PROFILES (persistent)
+CREATE TABLE IF NOT EXISTS user_profiles (
+  telegram_user_id TEXT PRIMARY KEY,
+  telegram_username TEXT,
+  tier INTEGER DEFAULT 1 CHECK (tier IN (1, 2)),
+  email TEXT,
+  wallet_address TEXT,
+  city TEXT DEFAULT 'Copenhagen',
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index for city filtering
 CREATE INDEX IF NOT EXISTS idx_events_city ON events(LOWER(city));
 

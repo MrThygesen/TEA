@@ -1,5 +1,5 @@
 // telegram-bot/migrations.js
-import { pool } from './postgres.js'
+import { pool } from './lib/postgres.js'
 
 export async function runMigrations() {
   console.log('Running safe migrations...')
@@ -56,7 +56,22 @@ export async function runMigrations() {
     );
   `)
   console.log('✅ User emails table ready.')
-
   console.log('All migrations complete. No data has been deleted.')
+
+// 5️⃣ User profiles table
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS user_profiles (
+    telegram_user_id TEXT PRIMARY KEY,
+    telegram_username TEXT,
+    city TEXT DEFAULT 'Copenhagen',
+    tier INTEGER DEFAULT 1,
+    email TEXT,
+    wallet_address TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+console.log('✅ User profiles table ready.');
+
 }
 
