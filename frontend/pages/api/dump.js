@@ -1,5 +1,5 @@
 // pages/api/dump.js
-import { pool } from '../../lib/postgres.js'
+import { pool } from '../../../telegram-bot/postgres.js'
 
 export default async function handler(req, res) {
   try {

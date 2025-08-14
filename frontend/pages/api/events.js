@@ -1,6 +1,5 @@
 // frontend/pages/api/events.js
-// frontend/pages/api/events.js
-import { pool } from '../../lib/postgres.js'
+import { pool } from '../../../telegram-bot/postgres.js'
 
 export default async function handler(req, res) {
   const { method, query, body } = req;
