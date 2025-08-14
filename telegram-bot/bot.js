@@ -1,209 +1,276 @@
 import TelegramBot from 'node-telegram-bot-api'
-import { pool } from './lib/postgres.js'
-import dotenv from 'dotenv'
-import express from 'express'
+import pkg from 'pg'
 import QRCode from 'qrcode'
-
+import dotenv from 'dotenv'
 dotenv.config()
 
-const botToken = process.env.TELEGRAM_BOT_TOKEN
-const PORT = process.env.PORT || 4000
-
-if (!botToken) {
-  console.error('❌ Telegram Bot Token missing!')
-  process.exit(1)
-}
-
-// Express setup
-const app = express()
-app.use(express.json())
-app.get('/', (req, res) => res.send('✅ Bot server running'))
-
-// Bot instance, webhook mode
-const bot = new TelegramBot(botToken, { polling: false })
-app.post(`/bot${botToken}`, (req, res) => {
-  bot.processUpdate(req.body)
-  res.sendStatus(200)
+const { Pool } = pkg
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
 })
 
-// Set webhook
-async function setWebhook() {
-  const webhookUrl = `https://tea-gwwb.onrender.com/bot${botToken}`
-  const info = await bot.getWebHookInfo()
-  if (info.url !== webhookUrl) await bot.setWebHook(webhookUrl)
-  console.log(`✅ Webhook set: ${webhookUrl}`)
+const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true })
+const userStates = {} // temporary session states
+
+// ====== DB SETUP ======
+async function initTables() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_settings (
+      telegram_user_id TEXT PRIMARY KEY,
+      city TEXT DEFAULT 'Copenhagen',
+      updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+  `)
+}
+initTables()
+
+// ====== HELPERS ======
+async function getAvailableCities() {
+  const res = await pool.query(`
+    SELECT DISTINCT city
+    FROM events
+    WHERE datetime > NOW()
+    ORDER BY city ASC
+  `)
+  return res.rows.map(r => r.city)
 }
 
-// ----- State -----
-const userStates = {} // chatId -> { step, selectedEvent, tier, email, wallet }
-
-// ----- Helpers -----
-async function getOpenEvents() {
+async function getUserCity(tgId) {
   const res = await pool.query(`
-    SELECT id, name, datetime, min_attendees
+    SELECT city FROM user_settings WHERE telegram_user_id = $1
+  `, [tgId])
+  return res.rows.length ? res.rows[0].city : 'Copenhagen'
+}
+
+async function saveUserCity(tgId, city) {
+  await pool.query(`
+    INSERT INTO user_settings (telegram_user_id, city)
+    VALUES ($1, $2)
+    ON CONFLICT (telegram_user_id)
+    DO UPDATE SET city = $2, updated_at = CURRENT_TIMESTAMP
+  `, [tgId, city])
+}
+
+async function getOpenEventsByCity(city) {
+  const res = await pool.query(`
+    SELECT id, name, datetime, min_attendees, is_confirmed
     FROM events
-    WHERE datetime IS NULL OR datetime > NOW()
+    WHERE datetime > NOW()
+      AND LOWER(city) = LOWER($1)
     ORDER BY datetime ASC
-    LIMIT 10
-  `)
+  `, [city])
   return res.rows
 }
 
-async function getUserTickets(chatId) {
+async function registerUser(eventId, tgId, username, email, wallet) {
+  await pool.query(`
+    INSERT INTO registrations (event_id, telegram_user_id, telegram_username, email, wallet_address)
+    VALUES ($1, $2, $3, $4, $5)
+    ON CONFLICT (event_id, telegram_user_id) DO NOTHING
+  `, [eventId, tgId, username, email, wallet || null])
+
+  const attendeesRes = await pool.query(`SELECT COUNT(*) FROM registrations WHERE event_id = $1`, [eventId])
+  const count = parseInt(attendeesRes.rows[0].count)
+
+  const eventRes = await pool.query(`SELECT name, min_attendees, is_confirmed FROM events WHERE id = $1`, [eventId])
+  const event = eventRes.rows[0]
+
+  if (!event.is_confirmed && count >= event.min_attendees) {
+    await pool.query(`UPDATE events SET is_confirmed = true WHERE id = $1`, [eventId])
+    return { confirmed: true, eventName: event.name }
+  }
+  return { confirmed: false }
+}
+
+async function getUserEvents(tgId) {
   const res = await pool.query(`
-    SELECT r.id AS ticket_id, r.tier, r.wallet_address, e.name AS event_name, e.datetime, e.is_confirmed
+    SELECT e.id, e.name, e.datetime
     FROM registrations r
     JOIN events e ON r.event_id = e.id
-    WHERE r.telegram_user_id = $1 AND (e.datetime IS NULL OR e.datetime > NOW())
+    WHERE r.telegram_user_id = $1
     ORDER BY e.datetime ASC
-  `, [chatId.toString()])
+  `, [tgId])
   return res.rows
 }
 
-async function saveRegistration(chatId, username, email, wallet, eventId, tier) {
-  const finalTier = wallet ? 2 : tier || 1
+// ====== HELP COMMAND ======
+bot.onText(/\/help/, msg => {
+  const text = `
+🤖 *Bot Commands*
+/start – Begin registration & choose city
+/city – Change your city
+/myevents – See your events & get QR codes
+/ticket – Get ticket for a specific event
+/help – Show this help message
 
-  const insertRes = await pool.query(`
-    INSERT INTO registrations (event_id, telegram_user_id, telegram_username, email, wallet_address, tier)
-    VALUES ($1, $2, $3, $4, $5, $6)
-    ON CONFLICT (event_id, telegram_user_id) DO UPDATE
-      SET email = EXCLUDED.email,
-          wallet_address = EXCLUDED.wallet_address,
-          tier = EXCLUDED.tier
-    RETURNING id, tier, wallet_address
-  `, [eventId, chatId.toString(), username, email, wallet, finalTier])
+🎯 *Tiers*
+Tier 1: Email only  
+Tier 2: Email + Wallet (ETH address)
 
-  const ticketId = insertRes.rows[0].id
+💡 Emails must contain '@'  
+💡 Wallets must start with 0x and have 40 hex chars
+  `
+  bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown' })
+})
 
-  // Check min-attendees
-  const countRes = await pool.query(`SELECT COUNT(*) FROM registrations WHERE event_id = $1`, [eventId])
-  const currentCount = parseInt(countRes.rows[0].count, 10)
-  const eventRes = await pool.query(`SELECT name, min_attendees, is_confirmed FROM events WHERE id = $1`, [eventId])
-  const { name, min_attendees, is_confirmed } = eventRes.rows[0]
+// ====== START ======
+bot.onText(/\/start/, async msg => {
+  const chatId = msg.chat.id
+  const savedCity = await getUserCity(chatId)
+  const cities = await getAvailableCities()
 
-  if (!is_confirmed && currentCount >= min_attendees) {
-    await pool.query(`UPDATE events SET is_confirmed = true WHERE id = $1`, [eventId])
-    console.log(`🎉 Event "${name}" confirmed!`)
-    const users = await pool.query(`SELECT telegram_user_id FROM registrations WHERE event_id = $1`, [eventId])
-    for (const u of users.rows) {
-      try { await bot.sendMessage(u.telegram_user_id, `🎉 Event "${name}" is now confirmed!`) } catch {}
-    }
+  if (!cities.includes(savedCity) && cities.length > 0) {
+    await saveUserCity(chatId, cities[0])
+    userStates[chatId] = { city: cities[0] }
+  } else {
+    userStates[chatId] = { city: savedCity }
   }
 
-  return { ticketId, finalTier }
-}
-
-async function generateQR(data) {
-  const url = await QRCode.toDataURL(JSON.stringify(data))
-  return Buffer.from(url.split(',')[1], 'base64')
-}
-
-// ----- Commands -----
-// /start -> choose event
-bot.onText(/\/start/, async (msg) => {
-  const chatId = msg.chat.id
-  const events = await getOpenEvents()
-  if (!events.length) return bot.sendMessage(chatId, '📭 No upcoming events.')
-
-  userStates[chatId] = { step: 'choose_event', events }
-  let msgText = '🎉 Welcome! Choose an event by number:\n'
-  events.forEach((e, i) => { msgText += `\n${i + 1}. *${e.name}* — ${e.datetime || 'TBA'}` })
-  msgText += '\n\nReply with event number.'
-  await bot.sendMessage(chatId, msgText, { parse_mode: 'Markdown' })
-})
-
-// /ticket <event number>
-bot.onText(/\/ticket (\d+)/, async (msg, match) => {
-  const chatId = msg.chat.id
-  const idx = parseInt(match[1], 10) - 1
-  const events = await getOpenEvents()
-  if (idx < 0 || idx >= events.length) return bot.sendMessage(chatId, '❌ Invalid event number.')
-  const event = events[idx]
-
-  const res = await pool.query(`
-    SELECT id AS ticket_id, telegram_username, tier
-    FROM registrations
-    WHERE telegram_user_id = $1 AND event_id = $2
-  `, [chatId.toString(), event.id])
-  const ticket = res.rows[0]
-  if (!ticket) return bot.sendMessage(chatId, '📭 You have no ticket for this event.')
-
-  const qr = await generateQR({ ticketId: ticket.ticket_id, username: ticket.telegram_username })
-  await bot.sendPhoto(chatId, qr, { caption: `🎫 Ticket #${ticket.ticket_id}\nUsername: ${ticket.telegram_username}\nTier: ${ticket.tier}`, parse_mode: 'Markdown' })
-})
-
-// /myevents -> list all tickets (future only)
-bot.onText(/\/myevents/, async (msg) => {
-  const chatId = msg.chat.id
-  const tickets = await getUserTickets(chatId)
-  if (!tickets.length) return bot.sendMessage(chatId, '📭 You have no upcoming events.')
-
-  for (const t of tickets) {
-    const qr = await generateQR({ ticketId: t.ticket_id, username: msg.from.username || '' })
-    const caption = `🎫 Ticket #${t.ticket_id}\nEvent: ${t.event_name}\nDate: ${t.datetime || 'TBA'}\nTier: ${t.tier}\nStatus: ${t.is_confirmed ? '✅ Confirmed' : '⏳ Waiting'}`
-    await bot.sendPhoto(chatId, qr, { caption, parse_mode: 'Markdown' })
+  if (cities.length > 1) {
+    const buttons = cities.map(c => [{ text: c, callback_data: `city_${c}` }])
+    await bot.sendMessage(chatId, `🏙 Your current city is *${savedCity}*. Select a different city:`, {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: buttons }
+    })
+  } else {
+    await showTierSelection(chatId)
   }
 })
 
-// Handle user replies for registration flow
-bot.on('message', async (msg) => {
+// ====== CALLBACK HANDLING ======
+bot.on('callback_query', async query => {
+  const chatId = query.message.chat.id
+
+  if (query.data.startsWith('city_')) {
+    const city = query.data.replace('city_', '')
+    await saveUserCity(chatId, city)
+    userStates[chatId] = { city }
+    await bot.answerCallbackQuery(query.id, { text: `City set to ${city}` })
+    await showTierSelection(chatId)
+  }
+
+  if (query.data === 'tier1' || query.data === 'tier2') {
+    userStates[chatId].tier = query.data
+    userStates[chatId].step = 'email'
+    bot.sendMessage(chatId, '📧 Please enter your email address:')
+  }
+})
+
+async function showTierSelection(chatId) {
+  const buttons = [
+    [{ text: '📩 Tier 1 (Email only)', callback_data: 'tier1' }],
+    [{ text: '💼 Tier 2 (Email + Wallet)', callback_data: 'tier2' }]
+  ]
+  await bot.sendMessage(chatId, 'Choose your tier:', {
+    reply_markup: { inline_keyboard: buttons }
+  })
+}
+
+// ====== MESSAGE HANDLING ======
+bot.on('message', async msg => {
   const chatId = msg.chat.id
-  const text = msg.text.trim()
   const state = userStates[chatId]
   if (!state) return
 
-  try {
-    if (state.step === 'choose_event') {
-      const idx = parseInt(text, 10) - 1
-      if (isNaN(idx) || idx < 0 || idx >= state.events.length)
-        return bot.sendMessage(chatId, '❌ Invalid number. Reply with event number.')
-
-      state.selectedEvent = state.events[idx]
-      state.step = 'choose_tier'
-      return bot.sendMessage(chatId, 'Select tier:\n1️⃣ Tier 1: Email only\n2️⃣ Tier 2: Email + Wallet')
+  if (state.step === 'email') {
+    if (!msg.text.includes('@')) {
+      return bot.sendMessage(chatId, '❌ Invalid email. Please include "@".')
     }
-
-    if (state.step === 'choose_tier') {
-      if (!['1','2'].includes(text)) return bot.sendMessage(chatId, '❌ Reply with 1 or 2.')
-      state.tier = parseInt(text, 10)
-      state.step = 'collect_email'
-      return bot.sendMessage(chatId, '✉️ Please reply with your email.')
+    state.email = msg.text
+    if (state.tier === 'tier2') {
+      state.step = 'wallet'
+      bot.sendMessage(chatId, '💳 Please enter your Ethereum wallet address:')
+    } else {
+      state.step = 'event'
+      await showEvents(chatId)
     }
+  }
 
-    if (state.step === 'collect_email') {
-      state.email = text
-      if (state.tier === 2) {
-        state.step = 'collect_wallet'
-        return bot.sendMessage(chatId, '💼 Please reply with your wallet address.')
-      } else {
-        const { ticketId } = await saveRegistration(chatId, msg.from.username || '', state.email, null, state.selectedEvent.id, state.tier)
-        userStates[chatId] = {}
-        return bot.sendMessage(chatId, `✅ Registered! Ticket ID: ${ticketId}`)
-      }
+  else if (state.step === 'wallet') {
+    if (!/^0x[a-fA-F0-9]{40}$/.test(msg.text)) {
+      return bot.sendMessage(chatId, '❌ Invalid wallet address. Must be 0x followed by 40 hex characters.')
     }
+    state.wallet = msg.text
+    state.step = 'event'
+    await showEvents(chatId)
+  }
 
-    if (state.step === 'collect_wallet') {
-      state.wallet = text
-      const { ticketId } = await saveRegistration(chatId, msg.from.username || '', state.email, state.wallet, state.selectedEvent.id, state.tier)
-      userStates[chatId] = {}
-      return bot.sendMessage(chatId, `✅ Registered! Ticket ID: ${ticketId} (Tier 2)`)
+  else if (state.step === 'event') {
+    const choice = parseInt(msg.text)
+    const events = await getOpenEventsByCity(state.city)
+    if (isNaN(choice) || choice < 1 || choice > events.length) {
+      return bot.sendMessage(chatId, '❌ Invalid choice. Please enter a valid event number.')
     }
-  } catch (err) {
-    console.error('❌ Registration error:', err)
-    await bot.sendMessage(chatId, '❌ Error during registration. Please try again.')
+    const selected = events[choice - 1]
+    const { confirmed, eventName } = await registerUser(
+      selected.id,
+      chatId,
+      msg.from.username,
+      state.email,
+      state.wallet
+    )
+    if (confirmed) {
+      bot.sendMessage(chatId, `✅ Event "${eventName}" is now *confirmed*!`, { parse_mode: 'Markdown' })
+    } else {
+      bot.sendMessage(chatId, `🎟 Registered for *${selected.name}*`, { parse_mode: 'Markdown' })
+    }
+    delete userStates[chatId]
   }
 })
 
-// ----- Init -----
-async function init() {
-  try {
-    await setWebhook()
-    app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`))
-  } catch (err) {
-    console.error('❌ Startup error:', err)
-    process.exit(1)
+async function showEvents(chatId) {
+  const events = await getOpenEventsByCity(userStates[chatId].city)
+  if (!events.length) {
+    return bot.sendMessage(chatId, '📭 No upcoming events for this city.')
   }
+  let msg = `🎉 Upcoming events in *${userStates[chatId].city}*:\n`
+  events.forEach((e, i) => {
+    msg += `\n${i + 1}. *${e.name}* — ${new Date(e.datetime).toLocaleString()}`
+  })
+  msg += '\n\nReply with event number to register.'
+  bot.sendMessage(chatId, msg, { parse_mode: 'Markdown' })
 }
 
-init()
+// ====== /myevents ======
+bot.onText(/\/myevents/, async msg => {
+  const chatId = msg.chat.id
+  const events = await getUserEvents(chatId)
+  if (!events.length) {
+    return bot.sendMessage(chatId, '📭 You have no registered events.')
+  }
+  for (const e of events) {
+    const qrData = `Event: ${e.name}\nUser: ${msg.from.username}\nTicket: ${e.id}-${chatId}`
+    const qrImage = await QRCode.toBuffer(qrData)
+    await bot.sendPhoto(chatId, qrImage, {
+      caption: `🎟 *${e.name}* — ${new Date(e.datetime).toLocaleString()}`,
+      parse_mode: 'Markdown'
+    })
+  }
+})
+
+// ====== /ticket ======
+bot.onText(/\/ticket/, async msg => {
+  const chatId = msg.chat.id
+  const events = await getUserEvents(chatId)
+  if (!events.length) return bot.sendMessage(chatId, '📭 No tickets found.')
+  let message = '🎟 Your Tickets:\n'
+  events.forEach(e => {
+    message += `\n@${msg.from.username} — Ticket #${e.id}-${chatId} (${e.name})`
+  })
+  bot.sendMessage(chatId, message)
+})
+
+// ====== /city ======
+bot.onText(/\/city/, async msg => {
+  const chatId = msg.chat.id
+  const cities = await getAvailableCities()
+  if (!cities.length) return bot.sendMessage(chatId, '📭 No cities found.')
+  const buttons = cities.map(c => [{ text: c, callback_data: `city_${c}` }])
+  await bot.sendMessage(chatId, '🏙 Choose your city:', {
+    reply_markup: { inline_keyboard: buttons }
+  })
+})
+
+console.log('🤖 Bot is running...')
 
