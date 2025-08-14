@@ -1,6 +1,6 @@
 import { runMigrations } from './migrations.js'
 import TelegramBot from 'node-telegram-bot-api'
-import { pool } from '../frontend/lib/postgres.js'
+import { pool } from './lib/postgres.js' // relative path inside bot service
 import dotenv from 'dotenv'
 import fetch from 'node-fetch'
 import express from 'express'
