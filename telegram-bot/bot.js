@@ -1,6 +1,6 @@
 import { runMigrations } from './migrations.js'
 import TelegramBot from 'node-telegram-bot-api'
-import { pool } from './postgres.js'
+import { pool } from '../frontend/lib/postgres.js'
 import dotenv from 'dotenv'
 import fetch from 'node-fetch'
 import express from 'express'
