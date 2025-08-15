@@ -2,7 +2,12 @@ import TelegramBot from 'node-telegram-bot-api';
 import pkg from 'pg';
 import QRCode from 'qrcode';
 import dotenv from 'dotenv';
+import { runMigrations } from './migrations.js';
 dotenv.config();
+// Before initializing bot and webhook
+await runMigrations();
+console.log('✅ Database migrations completed.');
+
 
 const { Pool } = pkg;
 
