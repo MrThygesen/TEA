@@ -41,6 +41,12 @@ app.use(express.json());
 const bot = new TelegramBot(BOT_TOKEN);
 const userStates = {}; // in-memory session
 
+// ====== ESCAPE HELPER ======
+function escapeMarkdown(text) {
+  if (!text) return '';
+  return text.replace(/([_*[\]()~`>#+\-=|{}.!])/g, '\\$1');
+}
+
 // ====== WEBHOOK ======
 async function setWebhook() {
   const webhookUrl = `${PUBLIC_URL}/bot${BOT_TOKEN}`;
@@ -153,9 +159,9 @@ async function getUserEvents(tgId) {
 async function showEvents(chatId, city) {
   const events = await getOpenEventsByCity(city);
   if (!events.length) return bot.sendMessage(chatId, '📭 No upcoming events for this city.');
-  let msg = `🎉 Upcoming events in *${city}*:\n`;
+  let msg = `🎉 Upcoming events in *${escapeMarkdown(city)}*:\n`;
   events.forEach((e, i) => {
-    msg += `\n${i + 1}. *${e.name}* — ${new Date(e.datetime).toLocaleString()}`;
+    msg += `\n${i + 1}. *${escapeMarkdown(e.name)}* — ${new Date(e.datetime).toLocaleString()}`;
   });
   msg += '\n\nReply with event number to register.';
   bot.sendMessage(chatId, msg, { parse_mode: 'Markdown' });
@@ -211,7 +217,7 @@ bot.onText(/\/myevents/, async msg => {
     const qrData = `Event: ${e.name}\nUser: ${msg.from.username}\nTicket: ${e.id}-${chatId}`;
     const qrImage = await QRCode.toBuffer(qrData);
     bot.sendPhoto(chatId, qrImage, {
-      caption: `🎟 *${e.name}* — ${new Date(e.datetime).toLocaleString()}`,
+      caption: `🎟 *${escapeMarkdown(e.name)}* — ${new Date(e.datetime).toLocaleString()}`,
       parse_mode: 'Markdown'
     });
   }
@@ -225,7 +231,7 @@ bot.onText(/\/ticket/, async msg => {
     const qrData = `Event: ${e.name}\nUser: ${msg.from.username}\nTicket: ${e.id}-${chatId}`;
     const qrImage = await QRCode.toBuffer(qrData);
     bot.sendPhoto(chatId, qrImage, {
-      caption: `🎟 Ticket #${e.id}-${chatId} — ${e.name}`,
+      caption: `🎟 Ticket #${e.id}-${chatId} — ${escapeMarkdown(e.name)}`,
       parse_mode: 'Markdown'
     });
   }
@@ -241,7 +247,7 @@ bot.on('callback_query', async query => {
     const cities = await getAvailableCities();
     const defaultCity = cities.includes('Copenhagen') ? 'Copenhagen' : cities[0] || 'Copenhagen';
     const buttons = cities.map(c => [{ text: c, callback_data: `city_${c}` }]);
-    bot.sendMessage(chatId, `🏙 Select your city (default is ${defaultCity}):`, { reply_markup: { inline_keyboard: buttons } });
+    bot.sendMessage(chatId, `🏙 Select your city (default is ${escapeMarkdown(defaultCity)}):`, { reply_markup: { inline_keyboard: buttons } });
   }
 
   if (query.data.startsWith('city_')) {
@@ -280,8 +286,8 @@ bot.on('message', async msg => {
     if (isNaN(choice) || choice < 1 || choice > events.length) return bot.sendMessage(chatId, '❌ Invalid choice.');
     const selected = events[choice - 1];
     const { statusMsg } = await registerUser(selected.id, chatId, msg.from.username, state.email, state.wallet);
-    bot.sendMessage(chatId, `🎟 Registered for *${selected.name}*`, { parse_mode: 'Markdown' });
-    bot.sendMessage(chatId, statusMsg, { parse_mode: 'Markdown' });
+    bot.sendMessage(chatId, `🎟 Registered for *${escapeMarkdown(selected.name)}*`, { parse_mode: 'Markdown' });
+    bot.sendMessage(chatId, escapeMarkdown(statusMsg), { parse_mode: 'Markdown' });
     delete userStates[chatId];
   }
 });
