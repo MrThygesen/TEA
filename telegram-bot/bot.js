@@ -39,7 +39,7 @@ const app = express();
 app.use(express.json());
 
 // ====== TELEGRAM BOT ======
-const bot = new TelegramBot(BOT_TOKEN);
+const bot = new TelegramBot(BOT_TOKEN, { webHook: true });
 const userStates = {};
 
 // ====== ESCAPE HELPER FOR MARKDOWN V2 ======
