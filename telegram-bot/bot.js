@@ -110,7 +110,7 @@ async function getAvailableCities() {
 
 async function getOpenEventsByCity(city) {
   const res = await pool.query(`
-    SELECT id, name, datetime, min_attendees, is_confirmed
+    SELECT id, name, datetime, min_attendees, max_attendees, is_confirmed
     FROM events
     WHERE datetime > NOW()
       AND LOWER(city) = LOWER($1)
@@ -120,19 +120,41 @@ async function getOpenEventsByCity(city) {
 }
 
 async function registerUser(eventId, tgId, username, email, wallet) {
-  await pool.query(`
-    INSERT INTO registrations (event_id, telegram_user_id, telegram_username, email, wallet_address)
-    VALUES ($1, $2, $3, $4, $5)
-    ON CONFLICT (event_id, telegram_user_id) DO NOTHING
-  `, [eventId, tgId, username, email, wallet || null]);
+  // Check if user already registered
+  const regCheck = await pool.query(
+    `SELECT * FROM registrations WHERE event_id=$1 AND telegram_user_id=$2`,
+    [eventId, tgId]
+  );
+  const alreadyRegistered = regCheck.rows.length > 0;
 
-  const countRes = await pool.query(`SELECT COUNT(*)::int AS count FROM registrations WHERE event_id=$1`, [eventId]);
+  // Insert if not registered
+  if (!alreadyRegistered) {
+    await pool.query(`
+      INSERT INTO registrations (event_id, telegram_user_id, telegram_username, email, wallet_address)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (event_id, telegram_user_id) DO NOTHING
+    `, [eventId, tgId, username, email, wallet || null]);
+  }
+
+  // Count total registrations
+  const countRes = await pool.query(
+    `SELECT COUNT(*)::int AS count FROM registrations WHERE event_id=$1`,
+    [eventId]
+  );
   const count = countRes.rows[0]?.count || 0;
 
-  const eventRes = await pool.query(`SELECT name, min_attendees, is_confirmed FROM events WHERE id=$1`, [eventId]);
+  // Get event info
+  const eventRes = await pool.query(
+    `SELECT name, min_attendees, max_attendees, is_confirmed FROM events WHERE id=$1`,
+    [eventId]
+  );
   const event = eventRes.rows[0];
 
+  // Build status message
   let statusMsg = `👥 *${count}* people registered.\n`;
+  if (alreadyRegistered) {
+    statusMsg = `ℹ️ You have already registered the event.\n${statusMsg}`;
+  }
   if (!event.is_confirmed && count >= event.min_attendees) {
     await pool.query(`UPDATE events SET is_confirmed=TRUE WHERE id=$1`, [eventId]);
     statusMsg += `✅ The event is now *confirmed*! You can generate your ticket and show it at the venue.`;
@@ -140,6 +162,10 @@ async function registerUser(eventId, tgId, username, email, wallet) {
     statusMsg += `⌛ We are awaiting confirmation.`;
   } else {
     statusMsg += `✅ This event is already confirmed!`;
+  }
+
+  if (event.max_attendees && count < event.max_attendees) {
+    statusMsg += `\n📢 Please invite friends to come along!`;
   }
 
   return { confirmed: count >= event.min_attendees, eventName: event.name, statusMsg };
@@ -283,11 +309,15 @@ bot.on('message', async msg => {
   } else if (state.step === 'event') {
     const choice = parseInt(msg.text);
     const events = await getOpenEventsByCity(state.city);
-    if (isNaN(choice) || choice < 1 || choice > events.length) return bot.sendMessage(chatId, '❌ Invalid choice.');
+    if (isNaN(choice) || choice < 1 || choice > events.length)
+      return bot.sendMessage(chatId, '❌ Invalid choice.');
+
     const selected = events[choice - 1];
     const { statusMsg } = await registerUser(selected.id, chatId, msg.from.username, state.email, state.wallet);
+
     bot.sendMessage(chatId, `🎟 Registered for *${escapeMarkdown(selected.name)}*`, { parse_mode: 'Markdown' });
     bot.sendMessage(chatId, escapeMarkdown(statusMsg), { parse_mode: 'Markdown' });
+
     delete userStates[chatId];
   }
 });
