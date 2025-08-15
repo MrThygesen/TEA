@@ -115,12 +115,25 @@ async function getOpenEventsByCity(city) {
   return res.rows;
 }
 
+async function getUserEvents(tgId) {
+  const res = await pool.query(
+    `SELECT e.id, e.name, e.datetime
+     FROM registrations r
+     JOIN events e ON r.event_id = e.id
+     WHERE r.telegram_user_id=$1
+     ORDER BY e.datetime ASC`,
+    [tgId]
+  );
+  return res.rows;
+}
+
+// ====== REGISTER USER ======
 async function registerUser(eventId, tgId, username, email, wallet) {
-  const regCheck = await pool.query(
-    'SELECT * FROM registrations WHERE event_id=$1 AND telegram_user_id=$2',
+  const userReg = await pool.query(
+    'SELECT 1 FROM registrations WHERE event_id=$1 AND telegram_user_id=$2',
     [eventId, tgId]
   );
-  const alreadyRegistered = regCheck.rows.length > 0;
+  const alreadyRegistered = userReg.rows.length > 0;
 
   const eventRes = await pool.query(
     'SELECT name, min_attendees, max_attendees, is_confirmed FROM events WHERE id=$1',
@@ -129,7 +142,13 @@ async function registerUser(eventId, tgId, username, email, wallet) {
   const event = eventRes.rows[0];
   if (!event) return { statusMsg: '⚠️ Event not found.', confirmed: false };
 
-  if (event.max_attendees && !alreadyRegistered && regCheck.rows.length >= event.max_attendees) {
+  const countRes = await pool.query(
+    'SELECT COUNT(*)::int AS count FROM registrations WHERE event_id=$1',
+    [eventId]
+  );
+  const totalRegistered = countRes.rows[0]?.count || 0;
+
+  if (event.max_attendees && !alreadyRegistered && totalRegistered >= event.max_attendees) {
     return { statusMsg: '⚠️ Sorry, this event is full.', confirmed: false };
   }
 
@@ -143,11 +162,11 @@ async function registerUser(eventId, tgId, username, email, wallet) {
     );
   }
 
-  const countRes = await pool.query(
+  const updatedCountRes = await pool.query(
     'SELECT COUNT(*)::int AS count FROM registrations WHERE event_id=$1',
     [eventId]
   );
-  const count = countRes.rows[0]?.count || 0;
+  const count = updatedCountRes.rows[0]?.count || 0;
 
   let statusMsg = `👥 *${count}* people registered.\n`;
   if (alreadyRegistered) statusMsg = `ℹ️ You have already registered for this event.\n${statusMsg}`;
@@ -167,19 +186,7 @@ async function registerUser(eventId, tgId, username, email, wallet) {
   };
 }
 
-async function getUserEvents(tgId) {
-  const res = await pool.query(
-    `SELECT e.id, e.name, e.datetime
-     FROM registrations r
-     JOIN events e ON r.event_id = e.id
-     WHERE r.telegram_user_id=$1
-     ORDER BY e.datetime ASC`,
-    [tgId]
-  );
-  return res.rows;
-}
-
-// ====== Ticket helper ======
+// ====== TICKET HELPER ======
 async function sendTicket(chatId, tgId, eventId, eventName) {
   const qrData = JSON.stringify({ eventId, tgId });
   const qrImage = await QRCode.toBuffer(qrData);
@@ -189,15 +196,12 @@ async function sendTicket(chatId, tgId, eventId, eventName) {
   });
 }
 
-// ====== Show events with buttons ======
+
+// ====== SHOW EVENTS ======
 async function showEvents(chatId, city) {
   const events = await getOpenEventsByCity(city);
   if (!events.length) {
-    return bot.sendMessage(
-      chatId,
-      escapeMarkdownV2('📭 No upcoming events for this city.'),
-      { parse_mode: 'MarkdownV2' }
-    );
+    return bot.sendMessage(chatId, escapeMarkdownV2('📭 No upcoming events for this city.'), { parse_mode: 'MarkdownV2' });
   }
 
   let text = `🎉 Upcoming events in *${escapeMarkdownV2(city)}*:\n`;
@@ -205,17 +209,19 @@ async function showEvents(chatId, city) {
 
   events.forEach((e, i) => {
     const dateStr = new Date(e.datetime).toLocaleString();
-    text += `\n${i + 1}. *${escapeMarkdownV2(e.name)}* — ${escapeMarkdownV2(dateStr)}`;
+    const name = escapeMarkdownV2(e.name);
+    const date = escapeMarkdownV2(dateStr);
+    text += `\n${i + 1}. *${name}* — ${date}`;
     opts.reply_markup.inline_keyboard.push([
       { text: '📝 Register', callback_data: `register_${e.id}` },
       { text: 'ℹ️ Details', callback_data: `details_${e.id}` },
     ]);
   });
 
-  bot.sendMessage(chatId, text, { parse_mode: 'MarkdownV2', ...opts });
+  await bot.sendMessage(chatId, text, { parse_mode: 'MarkdownV2', ...opts });
 }
 
-// ====== Bot commands ======
+// ====== BOT COMMANDS ======
 bot.onText(/\/help/, (msg) => {
   const text = [
     '🤖 *Bot Commands*',
@@ -234,7 +240,6 @@ bot.onText(/\/help/, (msg) => {
   bot.sendMessage(msg.chat.id, escapeMarkdownV2(text), { parse_mode: 'MarkdownV2' });
 });
 
-// ====== /start command ======
 bot.onText(/\/start/, async (msg) => {
   const tgId = String(msg.from.id);
   const cities = await getAvailableCities();
@@ -249,7 +254,6 @@ bot.onText(/\/start/, async (msg) => {
   bot.sendMessage(msg.chat.id, escapeMarkdownV2('🌍 Please choose your city:'), { parse_mode: 'MarkdownV2', ...opts });
 });
 
-// ====== /events command ======
 bot.onText(/\/events/, async (msg) => {
   const tgId = String(msg.from.id);
   const profile = await getUserProfile(tgId);
@@ -257,7 +261,6 @@ bot.onText(/\/events/, async (msg) => {
   await showEvents(msg.chat.id, profile.city);
 });
 
-// ====== /user_edit command ======
 bot.onText(/\/user_edit/, async (msg) => {
   const tgId = String(msg.from.id);
   const profile = await getUserProfile(tgId);
@@ -275,17 +278,10 @@ bot.onText(/\/user_edit/, async (msg) => {
   bot.sendMessage(msg.chat.id, escapeMarkdownV2('🛠 Choose a field to edit:'), { parse_mode: 'MarkdownV2', ...opts });
 });
 
-// ====== /myevents & /ticket ======
 bot.onText(/\/myevents/, async (msg) => {
   const tgId = String(msg.from.id);
   const events = await getUserEvents(tgId);
-  if (!events.length) {
-    return bot.sendMessage(
-      msg.chat.id,
-      escapeMarkdownV2('📭 You are not registered for any events yet.'),
-      { parse_mode: 'MarkdownV2' }
-    );
-  }
+  if (!events.length) return bot.sendMessage(msg.chat.id, escapeMarkdownV2('📭 You are not registered for any events yet.'), { parse_mode: 'MarkdownV2' });
 
   let text = '📅 *Your upcoming events*:\n';
   const opts = { reply_markup: { inline_keyboard: [] } };
@@ -313,7 +309,6 @@ bot.on('callback_query', async (query) => {
   const state = userStates[tgId];
   const data = decodeURIComponent(query.data);
 
-  // Handle /start city selection
   if (state?.step === 'choosingStartCity' && data.startsWith('setstartcity_')) {
     const city = data.replace('setstartcity_', '');
     await saveUserProfile(tgId, { city });
@@ -321,14 +316,12 @@ bot.on('callback_query', async (query) => {
     return bot.sendMessage(query.message.chat.id, escapeMarkdownV2(`✅ City set to ${city}. You can now use /events to browse events.`), { parse_mode: 'MarkdownV2' });
   }
 
-  // Handle /user_edit field selection
   if (data.startsWith('edit_')) {
     const field = data.replace('edit_', '');
     userStates[tgId] = { editField: field };
     return bot.sendMessage(query.message.chat.id, escapeMarkdownV2(`✏️ Please type your new ${field}:`), { parse_mode: 'MarkdownV2' });
   }
 
-  // Handle event registration
   if (data.startsWith('register_')) {
     const eventId = parseInt(data.replace('register_', ''), 10);
     const profile = await getUserProfile(tgId);
@@ -337,7 +330,6 @@ bot.on('callback_query', async (query) => {
     return bot.sendMessage(query.message.chat.id, escapeMarkdownV2(result.statusMsg), { parse_mode: 'MarkdownV2' });
   }
 
-  // Handle event details
   if (data.startsWith('details_')) {
     const eventId = parseInt(data.replace('details_', ''), 10);
     const res = await pool.query('SELECT * FROM events WHERE id=$1', [eventId]);
@@ -353,7 +345,6 @@ bot.on('callback_query', async (query) => {
     return bot.sendMessage(query.message.chat.id, detailsMsg, { parse_mode: 'MarkdownV2' });
   }
 
-  // Handle ticket button
   if (data.startsWith('ticket_')) {
     const eventId = parseInt(data.replace('ticket_', ''), 10);
     const eventRes = await pool.query('SELECT name FROM events WHERE id=$1', [eventId]);
@@ -364,7 +355,7 @@ bot.on('callback_query', async (query) => {
   bot.answerCallbackQuery(query.id);
 });
 
-// ====== Handle text input for profile edits ======
+// ====== TEXT INPUT FOR PROFILE EDITS ======
 bot.on('message', async (msg) => {
   const tgId = String(msg.from.id);
   const state = userStates[tgId];
@@ -377,7 +368,7 @@ bot.on('message', async (msg) => {
   bot.sendMessage(msg.chat.id, escapeMarkdownV2(`✅ ${state.editField} updated.`), { parse_mode: 'MarkdownV2' });
 });
 
-// ====== Start HTTP server ======
+// ====== START HTTP SERVER ======
 app.listen(PORT, async () => {
   console.log(`🌐 HTTP server on port ${PORT}`);
   await setWebhook();
