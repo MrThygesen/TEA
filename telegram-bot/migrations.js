@@ -15,22 +15,41 @@ export async function runMigrations() {
       min_attendees INTEGER DEFAULT 1,
       max_attendees INTEGER DEFAULT 40,
       is_confirmed BOOLEAN DEFAULT FALSE,
-      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      description TEXT,
+      venue TEXT,
+      basic_perk TEXT,
+      advanced_perk TEXT,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
   `)
   console.log('✅ Events table ready.')
 
-  // Ensure columns exist (for existing tables)
+  // Ensure columns exist (for upgrades)
   await pool.query(`
     ALTER TABLE events
-    ADD COLUMN IF NOT EXISTS group_id TEXT,
-    ADD COLUMN IF NOT EXISTS name TEXT,
-    ADD COLUMN IF NOT EXISTS city TEXT,
-    ADD COLUMN IF NOT EXISTS datetime TIMESTAMPTZ,
-    ADD COLUMN IF NOT EXISTS min_attendees INTEGER DEFAULT 1,
-    ADD COLUMN IF NOT EXISTS max_attendees INTEGER DEFAULT 40,
-    ADD COLUMN IF NOT EXISTS is_confirmed BOOLEAN DEFAULT FALSE,
-    ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+    ADD COLUMN IF NOT EXISTS description TEXT,
+    ADD COLUMN IF NOT EXISTS venue TEXT,
+    ADD COLUMN IF NOT EXISTS basic_perk TEXT,
+    ADD COLUMN IF NOT EXISTS advanced_perk TEXT,
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+  `)
+
+  // Trigger for updated_at
+  await pool.query(`
+    CREATE OR REPLACE FUNCTION update_updated_at_column()
+    RETURNS TRIGGER AS $$
+    BEGIN
+      NEW.updated_at = CURRENT_TIMESTAMP;
+      RETURN NEW;
+    END;
+    $$ language 'plpgsql';
+
+    DROP TRIGGER IF EXISTS set_updated_at ON events;
+    CREATE TRIGGER set_updated_at
+    BEFORE UPDATE ON events
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
   `)
 
   // Index for city filtering
@@ -42,7 +61,7 @@ export async function runMigrations() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS registrations (
       id SERIAL PRIMARY KEY,
-      event_id INTEGER NOT NULL REFERENCES events(id),
+      event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
       telegram_user_id TEXT NOT NULL,
       telegram_username TEXT,
       email TEXT,

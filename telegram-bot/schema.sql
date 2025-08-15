@@ -8,13 +8,33 @@ CREATE TABLE IF NOT EXISTS events (
   min_attendees INTEGER DEFAULT 1,
   max_attendees INTEGER DEFAULT 40,
   is_confirmed BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+  description TEXT,
+  venue TEXT,
+  basic_perk TEXT,
+  advanced_perk TEXT,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Trigger function for updated_at
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = CURRENT_TIMESTAMP;
+  RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+DROP TRIGGER IF EXISTS set_updated_at ON events;
+CREATE TRIGGER set_updated_at
+BEFORE UPDATE ON events
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
 
 -- REGISTRATIONS table
 CREATE TABLE IF NOT EXISTS registrations (
   id SERIAL PRIMARY KEY,
-  event_id INTEGER NOT NULL REFERENCES events(id),
+  event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
   telegram_user_id TEXT NOT NULL,
   telegram_username TEXT,
   email TEXT,
