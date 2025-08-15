@@ -41,10 +41,10 @@ app.use(express.json());
 const bot = new TelegramBot(BOT_TOKEN);
 const userStates = {}; // in-memory session
 
-// ====== ESCAPE HELPER ======
-function escapeMarkdown(text) {
+// ====== ESCAPE HELPER FOR MARKDOWN V2 ======
+function escapeMarkdownV2(text) {
   if (!text) return '';
-  return text.replace(/([_*[\]()~`>#+\-=|{}.!])/g, '\\$1');
+  return text.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
 }
 
 // ====== WEBHOOK ======
@@ -120,14 +120,12 @@ async function getOpenEventsByCity(city) {
 }
 
 async function registerUser(eventId, tgId, username, email, wallet) {
-  // Check if user already registered
   const regCheck = await pool.query(
     `SELECT * FROM registrations WHERE event_id=$1 AND telegram_user_id=$2`,
     [eventId, tgId]
   );
   const alreadyRegistered = regCheck.rows.length > 0;
 
-  // Insert if not registered
   if (!alreadyRegistered) {
     await pool.query(`
       INSERT INTO registrations (event_id, telegram_user_id, telegram_username, email, wallet_address)
@@ -136,21 +134,18 @@ async function registerUser(eventId, tgId, username, email, wallet) {
     `, [eventId, tgId, username, email, wallet || null]);
   }
 
-  // Count total registrations
   const countRes = await pool.query(
     `SELECT COUNT(*)::int AS count FROM registrations WHERE event_id=$1`,
     [eventId]
   );
   const count = countRes.rows[0]?.count || 0;
 
-  // Get event info
   const eventRes = await pool.query(
     `SELECT name, min_attendees, max_attendees, is_confirmed FROM events WHERE id=$1`,
     [eventId]
   );
   const event = eventRes.rows[0];
 
-  // Build status message
   let statusMsg = `👥 *${count}* people registered.\n`;
   if (alreadyRegistered) {
     statusMsg = `ℹ️ You have already registered the event.\n${statusMsg}`;
@@ -185,106 +180,18 @@ async function getUserEvents(tgId) {
 async function showEvents(chatId, city) {
   const events = await getOpenEventsByCity(city);
   if (!events.length) return bot.sendMessage(chatId, '📭 No upcoming events for this city.');
-  let msg = `🎉 Upcoming events in *${escapeMarkdown(city)}*:\n`;
+  
+  let msg = `🎉 Upcoming events in *${escapeMarkdownV2(city)}*:\n`;
   events.forEach((e, i) => {
-    msg += `\n${i + 1}. *${escapeMarkdown(e.name)}* — ${new Date(e.datetime).toLocaleString()}`;
+    msg += `\n${i + 1}. *${escapeMarkdownV2(e.name)}* — ${escapeMarkdownV2(new Date(e.datetime).toLocaleString())}`;
   });
   msg += '\n\nReply with event number to register.';
-  bot.sendMessage(chatId, msg, { parse_mode: 'Markdown' });
+  bot.sendMessage(chatId, msg, { parse_mode: 'MarkdownV2' });
 }
 
-// ====== COMMANDS & CALLBACKS ======
-bot.onText(/\/help/, msg => {
-  const text = `
-🤖 *Bot Commands*
-/start – Register & choose city
-/myevents – See your events & get QR codes
-/ticket – Get ticket for a specific event
-/user_edit – Edit your profile
-/help – Show this help message
+// ====== COMMANDS ======
 
-🎯 *Tiers*
-1️⃣ Networking & perks (Email only)
-2️⃣ Networking & more perks (Email + Wallet)
-  `;
-  bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown' });
-});
-
-bot.onText(/\/start/, async msg => {
-  const chatId = msg.chat.id;
-  const profile = await getUserProfile(chatId);
-  if (profile && profile.city && profile.email && (profile.tier === 1 || (profile.tier === 2 && profile.wallet_address))) {
-    await showEvents(chatId, profile.city);
-    return;
-  }
-  userStates[chatId] = { step: 'tier' };
-  const buttons = [
-    [{ text: '📩 Tier 1 (Email only)', callback_data: 'tier1' }],
-    [{ text: '💼 Tier 2 (Email + Wallet)', callback_data: 'tier2' }]
-  ];
-  bot.sendMessage(chatId, 'Choose your package:', { reply_markup: { inline_keyboard: buttons } });
-});
-
-bot.onText(/\/user_edit/, async msg => {
-  const chatId = msg.chat.id;
-  userStates[chatId] = { step: 'tier' };
-  const buttons = [
-    [{ text: '📩 Tier 1 (Email only)', callback_data: 'tier1' }],
-    [{ text: '💼 Tier 2 (Email + Wallet)', callback_data: 'tier2' }]
-  ];
-  bot.sendMessage(chatId, 'Update your package selection:', { reply_markup: { inline_keyboard: buttons } });
-});
-
-bot.onText(/\/myevents/, async msg => {
-  const chatId = msg.chat.id;
-  const events = await getUserEvents(chatId);
-  if (!events.length) return bot.sendMessage(chatId, '📭 You have no registered events.');
-  for (const e of events) {
-    const qrData = `Event: ${e.name}\nUser: ${msg.from.username}\nTicket: ${e.id}-${chatId}`;
-    const qrImage = await QRCode.toBuffer(qrData);
-    bot.sendPhoto(chatId, qrImage, {
-      caption: `🎟 *${escapeMarkdown(e.name)}* — ${new Date(e.datetime).toLocaleString()}`,
-      parse_mode: 'Markdown'
-    });
-  }
-});
-
-bot.onText(/\/ticket/, async msg => {
-  const chatId = msg.chat.id;
-  const events = await getUserEvents(chatId);
-  if (!events.length) return bot.sendMessage(chatId, '📭 No tickets found.');
-  for (const e of events) {
-    const qrData = `Event: ${e.name}\nUser: ${msg.from.username}\nTicket: ${e.id}-${chatId}`;
-    const qrImage = await QRCode.toBuffer(qrData);
-    bot.sendPhoto(chatId, qrImage, {
-      caption: `🎟 Ticket #${e.id}-${chatId} — ${escapeMarkdown(e.name)}`,
-      parse_mode: 'Markdown'
-    });
-  }
-});
-
-bot.on('callback_query', async query => {
-  const chatId = query.message.chat.id;
-  if (!userStates[chatId]) userStates[chatId] = {};
-
-  if (query.data === 'tier1' || query.data === 'tier2') {
-    userStates[chatId].tier = query.data === 'tier1' ? 1 : 2;
-    userStates[chatId].step = 'city';
-    const cities = await getAvailableCities();
-    const defaultCity = cities.includes('Copenhagen') ? 'Copenhagen' : cities[0] || 'Copenhagen';
-    const buttons = cities.map(c => [{ text: c, callback_data: `city_${c}` }]);
-    bot.sendMessage(chatId, `🏙 Select your city (default is ${escapeMarkdown(defaultCity)}):`, { reply_markup: { inline_keyboard: buttons } });
-  }
-
-  if (query.data.startsWith('city_')) {
-    const city = query.data.replace('city_', '');
-    userStates[chatId].city = city;
-    userStates[chatId].step = 'email';
-    bot.sendMessage(chatId, '📧 Please enter your email address:');
-  }
-});
-
-// /help command (safe Markdown)
+// /help
 bot.onText(/\/help/, msg => {
   const text = `
 🤖 *Bot Commands*
@@ -302,38 +209,114 @@ bot.onText(/\/help/, msg => {
   bot.sendMessage(msg.chat.id, text, { parse_mode: 'MarkdownV2' });
 });
 
-// /city-event command
+// /start
+bot.onText(/\/start/, async msg => {
+  const chatId = msg.chat.id;
+  const profile = await getUserProfile(chatId);
+  if (profile && profile.city && profile.email && (profile.tier === 1 || (profile.tier === 2 && profile.wallet_address))) {
+    await showEvents(chatId, profile.city);
+    return;
+  }
+  userStates[chatId] = { step: 'tier' };
+  const buttons = [
+    [{ text: '📩 Tier 1 (Email only)', callback_data: 'tier1' }],
+    [{ text: '💼 Tier 2 (Email + Wallet)', callback_data: 'tier2' }]
+  ];
+  bot.sendMessage(chatId, 'Choose your package:', { reply_markup: { inline_keyboard: buttons } });
+});
+
+// /user_edit
+bot.onText(/\/user_edit/, async msg => {
+  const chatId = msg.chat.id;
+  userStates[chatId] = { step: 'tier' };
+  const buttons = [
+    [{ text: '📩 Tier 1 (Email only)', callback_data: 'tier1' }],
+    [{ text: '💼 Tier 2 (Email + Wallet)', callback_data: 'tier2' }]
+  ];
+  bot.sendMessage(chatId, 'Update your package selection:', { reply_markup: { inline_keyboard: buttons } });
+});
+
+// /myevents
+bot.onText(/\/myevents/, async msg => {
+  const chatId = msg.chat.id;
+  const events = await getUserEvents(chatId);
+  if (!events.length) return bot.sendMessage(chatId, '📭 You have no registered events.');
+
+  for (const e of events) {
+    const qrData = `Event: ${e.name}\nUser: ${msg.from.username}\nTicket: ${e.id}-${chatId}`;
+    const qrImage = await QRCode.toBuffer(qrData);
+    bot.sendPhoto(chatId, qrImage, {
+      caption: `🎟 *${escapeMarkdownV2(e.name)}* — ${escapeMarkdownV2(new Date(e.datetime).toLocaleString())}`,
+      parse_mode: 'MarkdownV2'
+    });
+  }
+});
+
+// /ticket
+bot.onText(/\/ticket/, async msg => {
+  const chatId = msg.chat.id;
+  const events = await getUserEvents(chatId);
+  if (!events.length) return bot.sendMessage(chatId, '📭 No tickets found.');
+
+  for (const e of events) {
+    const qrData = `Event: ${e.name}\nUser: ${msg.from.username}\nTicket: ${e.id}-${chatId}`;
+    const qrImage = await QRCode.toBuffer(qrData);
+    bot.sendPhoto(chatId, qrImage, {
+      caption: `🎟 Ticket #${e.id}-${chatId} — ${escapeMarkdownV2(e.name)}`,
+      parse_mode: 'MarkdownV2'
+    });
+  }
+});
+
+// /city-event
 bot.onText(/\/city-event/, async msg => {
   const chatId = msg.chat.id;
   const cities = await getAvailableCities();
   if (!cities.length) return bot.sendMessage(chatId, '📭 No cities with upcoming events.');
-  
-  // Build inline buttons for each city
-  const buttons = cities.map(c => [{ text: c, callback_data: `viewcity_${c}` }]);
+
+  const buttons = cities.map(c => [{ text: escapeMarkdownV2(c), callback_data: `viewcity_${c}` }]);
   bot.sendMessage(chatId, '🏙 Select a city to see upcoming events:', { reply_markup: { inline_keyboard: buttons } });
 });
 
-// Handle city-event clicks
+// CALLBACKS
 bot.on('callback_query', async query => {
   const chatId = query.message.chat.id;
+  if (!userStates[chatId]) userStates[chatId] = {};
 
-  // City-event callback
+  // Tier selection
+  if (query.data === 'tier1' || query.data === 'tier2') {
+    userStates[chatId].tier = query.data === 'tier1' ? 1 : 2;
+    userStates[chatId].step = 'city';
+    const cities = await getAvailableCities();
+    const defaultCity = cities.includes('Copenhagen') ? 'Copenhagen' : cities[0] || 'Copenhagen';
+    const buttons = cities.map(c => [{ text: escapeMarkdownV2(c), callback_data: `city_${c}` }]);
+    bot.sendMessage(chatId, `🏙 Select your city (default is ${escapeMarkdownV2(defaultCity)}):`, { reply_markup: { inline_keyboard: buttons } });
+  }
+
+  // City selection during registration
+  if (query.data.startsWith('city_')) {
+    const city = query.data.replace('city_', '');
+    userStates[chatId].city = city;
+    userStates[chatId].step = 'email';
+    bot.sendMessage(chatId, '📧 Please enter your email address:');
+  }
+
+  // City-event selection
   if (query.data.startsWith('viewcity_')) {
     const city = query.data.replace('viewcity_', '');
     const events = await getOpenEventsByCity(city);
-    if (!events.length) return bot.sendMessage(chatId, `📭 No upcoming events in ${escapeMarkdown(city)}`);
+    if (!events.length) return bot.sendMessage(chatId, `📭 No upcoming events in ${escapeMarkdownV2(city)}`);
 
-    let msgText = `🎉 Upcoming events in *${escapeMarkdown(city)}*:\n`;
+    let msgText = `🎉 Upcoming events in *${escapeMarkdownV2(city)}*:\n`;
     events.forEach((e, i) => {
-      msgText += `\n${i + 1}. *${escapeMarkdown(e.name)}* — ${new Date(e.datetime).toLocaleString()}`;
+      msgText += `\n${i + 1}. *${escapeMarkdownV2(e.name)}* — ${escapeMarkdownV2(new Date(e.datetime).toLocaleString())}`;
     });
 
     bot.sendMessage(chatId, msgText, { parse_mode: 'MarkdownV2' });
   }
-
 });
- 
 
+// MESSAGE HANDLER
 bot.on('message', async msg => {
   const chatId = msg.chat.id;
   const state = userStates[chatId];
@@ -365,13 +348,11 @@ bot.on('message', async msg => {
     const selected = events[choice - 1];
     const { statusMsg } = await registerUser(selected.id, chatId, msg.from.username, state.email, state.wallet);
 
-    bot.sendMessage(chatId, `🎟 Registered for *${escapeMarkdown(selected.name)}*`, { parse_mode: 'Markdown' });
-    bot.sendMessage(chatId, escapeMarkdown(statusMsg), { parse_mode: 'Markdown' });
+    bot.sendMessage(chatId, `🎟 Registered for *${escapeMarkdownV2(selected.name)}*`, { parse_mode: 'MarkdownV2' });
+    bot.sendMessage(chatId, escapeMarkdownV2(statusMsg), { parse_mode: 'MarkdownV2' });
 
     delete userStates[chatId];
-  } 
-
-
+  }
 });
 
 // ====== START SERVER ======
