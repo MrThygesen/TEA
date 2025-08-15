@@ -284,6 +284,56 @@ bot.on('callback_query', async query => {
   }
 });
 
+// /help command (safe Markdown)
+bot.onText(/\/help/, msg => {
+  const text = `
+🤖 *Bot Commands*
+/start – Register & choose city
+/myevents – See your events & get QR codes
+/ticket – Get ticket for a specific event
+/user_edit – Edit your profile
+/city-event – Browse events by city
+/help – Show this help message
+
+🎯 *Tiers*
+1️⃣ Networking & perks (Email only)
+2️⃣ Networking & more perks (Email + Wallet)
+  `;
+  bot.sendMessage(msg.chat.id, text, { parse_mode: 'MarkdownV2' });
+});
+
+// /city-event command
+bot.onText(/\/city-event/, async msg => {
+  const chatId = msg.chat.id;
+  const cities = await getAvailableCities();
+  if (!cities.length) return bot.sendMessage(chatId, '📭 No cities with upcoming events.');
+  
+  // Build inline buttons for each city
+  const buttons = cities.map(c => [{ text: c, callback_data: `viewcity_${c}` }]);
+  bot.sendMessage(chatId, '🏙 Select a city to see upcoming events:', { reply_markup: { inline_keyboard: buttons } });
+});
+
+// Handle city-event clicks
+bot.on('callback_query', async query => {
+  const chatId = query.message.chat.id;
+
+  // City-event callback
+  if (query.data.startsWith('viewcity_')) {
+    const city = query.data.replace('viewcity_', '');
+    const events = await getOpenEventsByCity(city);
+    if (!events.length) return bot.sendMessage(chatId, `📭 No upcoming events in ${escapeMarkdown(city)}`);
+
+    let msgText = `🎉 Upcoming events in *${escapeMarkdown(city)}*:\n`;
+    events.forEach((e, i) => {
+      msgText += `\n${i + 1}. *${escapeMarkdown(e.name)}* — ${new Date(e.datetime).toLocaleString()}`;
+    });
+
+    bot.sendMessage(chatId, msgText, { parse_mode: 'MarkdownV2' });
+  }
+
+});
+ 
+
 bot.on('message', async msg => {
   const chatId = msg.chat.id;
   const state = userStates[chatId];
@@ -319,7 +369,9 @@ bot.on('message', async msg => {
     bot.sendMessage(chatId, escapeMarkdown(statusMsg), { parse_mode: 'Markdown' });
 
     delete userStates[chatId];
-  }
+  } 
+
+
 });
 
 // ====== START SERVER ======
