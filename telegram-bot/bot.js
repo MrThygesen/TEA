@@ -45,7 +45,6 @@ const userStates = {};
 // ====== ESCAPE HELPER ======
 function escapeMarkdownV2(text) {
   if (!text) return '';
-  // Escape all MarkdownV2 special characters
   return text.toString().replace(/([_*\[\]()~>#+\-=|{}.!\\:])/g, '\\$1');
 }
 
@@ -235,6 +234,48 @@ bot.onText(/\/help/, (msg) => {
   bot.sendMessage(msg.chat.id, escapeMarkdownV2(text), { parse_mode: 'MarkdownV2' });
 });
 
+// ====== /start command ======
+bot.onText(/\/start/, async (msg) => {
+  const tgId = String(msg.from.id);
+  const cities = await getAvailableCities();
+  if (!cities.length) return bot.sendMessage(msg.chat.id, escapeMarkdownV2('📭 No cities available.'), { parse_mode: 'MarkdownV2' });
+
+  const opts = {
+    reply_markup: {
+      inline_keyboard: cities.map(city => [{ text: city, callback_data: `setstartcity_${encodeURIComponent(city)}` }])
+    }
+  };
+  userStates[tgId] = { step: 'choosingStartCity' };
+  bot.sendMessage(msg.chat.id, escapeMarkdownV2('🌍 Please choose your city:'), { parse_mode: 'MarkdownV2', ...opts });
+});
+
+// ====== /events command ======
+bot.onText(/\/events/, async (msg) => {
+  const tgId = String(msg.from.id);
+  const profile = await getUserProfile(tgId);
+  if (!profile?.city) return bot.sendMessage(msg.chat.id, escapeMarkdownV2('⚠️ Please use /start first to select your city.'), { parse_mode: 'MarkdownV2' });
+  await showEvents(msg.chat.id, profile.city);
+});
+
+// ====== /user_edit command ======
+bot.onText(/\/user_edit/, async (msg) => {
+  const tgId = String(msg.from.id);
+  const profile = await getUserProfile(tgId);
+  if (!profile) return bot.sendMessage(msg.chat.id, escapeMarkdownV2('⚠️ Please use /start first.'), { parse_mode: 'MarkdownV2' });
+
+  const opts = {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '✉️ Edit Email', callback_data: 'edit_email' }],
+        [{ text: '💰 Edit Wallet', callback_data: 'edit_wallet' }],
+        [{ text: '🎯 Edit Tier', callback_data: 'edit_tier' }]
+      ]
+    }
+  };
+  bot.sendMessage(msg.chat.id, escapeMarkdownV2('🛠 Choose a field to edit:'), { parse_mode: 'MarkdownV2', ...opts });
+});
+
+// ====== /myevents & /ticket ======
 bot.onText(/\/myevents/, async (msg) => {
   const tgId = String(msg.from.id);
   const events = await getUserEvents(tgId);
@@ -266,7 +307,7 @@ bot.onText(/\/ticket/, async (msg) => {
   return bot.sendMessage(msg.chat.id, escapeMarkdownV2('Please use /myevents to select a ticket.'), { parse_mode: 'MarkdownV2' });
 });
 
-// ====== /start inline city selection & /user_edit handled in callback_query ======
+// ====== CALLBACK QUERY ======
 bot.on('callback_query', async (query) => {
   const tgId = String(query.from.id);
   const state = userStates[tgId];
@@ -278,6 +319,13 @@ bot.on('callback_query', async (query) => {
     await saveUserProfile(tgId, { city });
     delete userStates[tgId];
     return bot.sendMessage(query.message.chat.id, escapeMarkdownV2(`✅ City set to ${city}. You can now use /events to browse events.`), { parse_mode: 'MarkdownV2' });
+  }
+
+  // Handle /user_edit field selection
+  if (data.startsWith('edit_')) {
+    const field = data.replace('edit_', '');
+    userStates[tgId] = { editField: field };
+    return bot.sendMessage(query.message.chat.id, escapeMarkdownV2(`✏️ Please type your new ${field}:`), { parse_mode: 'MarkdownV2' });
   }
 
   // Handle event registration
