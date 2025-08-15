@@ -1,54 +1,85 @@
+// bot.js
 import TelegramBot from 'node-telegram-bot-api';
 import pkg from 'pg';
 import QRCode from 'qrcode';
 import dotenv from 'dotenv';
+import express from 'express';
 import { runMigrations } from './migrations.js';
 dotenv.config();
-// Before initializing bot and webhook
-await runMigrations();
-console.log('✅ Database migrations completed.');
-
 
 const { Pool } = pkg;
 
-// 🔹 Check environment variables
-if (!process.env.TELEGRAM_BOT_TOKEN) {
-  console.error('❌ TELEGRAM_BOT_TOKEN not found in environment variables');
+// ====== ENV CHECKS ======
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+if (!BOT_TOKEN) {
+  console.error('❌ TELEGRAM_BOT_TOKEN missing');
   process.exit(1);
 }
 if (!process.env.DATABASE_URL) {
-  console.error('❌ DATABASE_URL not found in environment variables');
+  console.error('❌ DATABASE_URL missing');
   process.exit(1);
 }
 
-// 🔹 DB Pool
+const PORT = process.env.PORT || 3000;
+const PUBLIC_URL = process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL || 'https://example.onrender.com';
+
+// ====== DB POOL ======
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
 
-// 🔹 Bot
-const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
-const userStates = {}; // in-memory temp session state
+// Run migrations before bot starts
+await runMigrations();
+console.log('✅ Database migrations complete.');
 
-// ====== HELPERS ======
-async function getAvailableCities() {
-  const res = await pool.query(`
-    SELECT DISTINCT city
-    FROM events
-    WHERE datetime > NOW()
-    ORDER BY city ASC
-  `);
-  return res.rows.map(r => r.city);
+// ====== EXPRESS APP ======
+const app = express();
+app.use(express.json());
+
+// ====== TELEGRAM BOT ======
+const bot = new TelegramBot(BOT_TOKEN);
+const userStates = {}; // in-memory session
+
+// ====== WEBHOOK ======
+async function setWebhook() {
+  const webhookUrl = `${PUBLIC_URL}/bot${BOT_TOKEN}`;
+  try {
+    const info = await bot.getWebHookInfo();
+    if (info.url !== webhookUrl) {
+      await bot.setWebHook(webhookUrl);
+      console.log(`✅ Webhook set to ${webhookUrl}`);
+    } else {
+      console.log(`ℹ️ Webhook already set to ${webhookUrl}`);
+    }
+  } catch (err) {
+    if (err.response && err.response.statusCode === 429) {
+      const retryAfter = err.response.headers['retry-after'] || 1;
+      console.warn(`⚠️ Telegram rate limited. Retry after ${retryAfter}s`);
+    } else {
+      throw err;
+    }
+  }
 }
 
+// Webhook endpoint
+app.post(`/bot${BOT_TOKEN}`, (req, res) => {
+  bot.processUpdate(req.body);
+  res.sendStatus(200);
+});
+
+// Health check
+app.get('/', (_req, res) => res.send('✅ Telegram bot service is running'));
+
+// ====== DB HELPERS ======
 async function getUserProfile(tgId) {
   const res = await pool.query(`SELECT * FROM user_profiles WHERE telegram_user_id=$1`, [tgId]);
-  return res.rows.length ? res.rows[0] : null;
+  return res.rows[0] || null;
 }
 
-async function saveUserProfile(tgId, data) {
+async function saveUserProfile(tgId, data = {}) {
   const keys = Object.keys(data);
+  if (!keys.length) return;
   const values = Object.values(data);
   const setClause = keys.map((k, i) => `${k}=$${i + 2}`).join(', ');
 
@@ -59,6 +90,16 @@ async function saveUserProfile(tgId, data) {
      SET ${setClause}, updated_at=CURRENT_TIMESTAMP`,
     [tgId, ...values]
   );
+}
+
+async function getAvailableCities() {
+  const res = await pool.query(`
+    SELECT DISTINCT city
+    FROM events
+    WHERE datetime > NOW()
+    ORDER BY city ASC
+  `);
+  return res.rows.map(r => r.city);
 }
 
 async function getOpenEventsByCity(city) {
@@ -79,8 +120,8 @@ async function registerUser(eventId, tgId, username, email, wallet) {
     ON CONFLICT (event_id, telegram_user_id) DO NOTHING
   `, [eventId, tgId, username, email, wallet || null]);
 
-  const countRes = await pool.query(`SELECT COUNT(*) FROM registrations WHERE event_id=$1`, [eventId]);
-  const count = parseInt(countRes.rows[0].count);
+  const countRes = await pool.query(`SELECT COUNT(*)::int AS count FROM registrations WHERE event_id=$1`, [eventId]);
+  const count = countRes.rows[0]?.count || 0;
 
   const eventRes = await pool.query(`SELECT name, min_attendees, is_confirmed FROM events WHERE id=$1`, [eventId]);
   const event = eventRes.rows[0];
@@ -120,7 +161,7 @@ async function showEvents(chatId, city) {
   bot.sendMessage(chatId, msg, { parse_mode: 'Markdown' });
 }
 
-// ====== COMMANDS ======
+// ====== COMMANDS & CALLBACKS ======
 bot.onText(/\/help/, msg => {
   const text = `
 🤖 *Bot Commands*
@@ -139,14 +180,11 @@ bot.onText(/\/help/, msg => {
 
 bot.onText(/\/start/, async msg => {
   const chatId = msg.chat.id;
-  let profile = await getUserProfile(chatId);
-
+  const profile = await getUserProfile(chatId);
   if (profile && profile.city && profile.email && (profile.tier === 1 || (profile.tier === 2 && profile.wallet_address))) {
-    // Already registered → show events
     await showEvents(chatId, profile.city);
     return;
   }
-
   userStates[chatId] = { step: 'tier' };
   const buttons = [
     [{ text: '📩 Tier 1 (Email only)', callback_data: 'tier1' }],
@@ -169,7 +207,6 @@ bot.onText(/\/myevents/, async msg => {
   const chatId = msg.chat.id;
   const events = await getUserEvents(chatId);
   if (!events.length) return bot.sendMessage(chatId, '📭 You have no registered events.');
-
   for (const e of events) {
     const qrData = `Event: ${e.name}\nUser: ${msg.from.username}\nTicket: ${e.id}-${chatId}`;
     const qrImage = await QRCode.toBuffer(qrData);
@@ -194,7 +231,6 @@ bot.onText(/\/ticket/, async msg => {
   }
 });
 
-// ====== CALLBACK HANDLING ======
 bot.on('callback_query', async query => {
   const chatId = query.message.chat.id;
   if (!userStates[chatId]) userStates[chatId] = {};
@@ -205,9 +241,7 @@ bot.on('callback_query', async query => {
     const cities = await getAvailableCities();
     const defaultCity = cities.includes('Copenhagen') ? 'Copenhagen' : cities[0] || 'Copenhagen';
     const buttons = cities.map(c => [{ text: c, callback_data: `city_${c}` }]);
-    bot.sendMessage(chatId, `🏙 Select your city (default is ${defaultCity}):`, {
-      reply_markup: { inline_keyboard: buttons }
-    });
+    bot.sendMessage(chatId, `🏙 Select your city (default is ${defaultCity}):`, { reply_markup: { inline_keyboard: buttons } });
   }
 
   if (query.data.startsWith('city_')) {
@@ -218,7 +252,6 @@ bot.on('callback_query', async query => {
   }
 });
 
-// ====== MESSAGE HANDLING ======
 bot.on('message', async msg => {
   const chatId = msg.chat.id;
   const state = userStates[chatId];
@@ -231,30 +264,20 @@ bot.on('message', async msg => {
       state.step = 'wallet';
       bot.sendMessage(chatId, '💳 Enter your Ethereum wallet address:');
     } else {
-      await saveUserProfile(chatId, {
-        tier: state.tier,
-        city: state.city,
-        email: state.email
-      });
+      await saveUserProfile(chatId, { tier: state.tier, city: state.city, email: state.email });
       state.step = 'event';
       await showEvents(chatId, state.city);
     }
   } else if (state.step === 'wallet') {
     if (!/^0x[a-fA-F0-9]{40}$/.test(msg.text)) return bot.sendMessage(chatId, '❌ Invalid wallet address.');
     state.wallet = msg.text;
-    await saveUserProfile(chatId, {
-      tier: state.tier,
-      city: state.city,
-      email: state.email,
-      wallet_address: state.wallet
-    });
+    await saveUserProfile(chatId, { tier: state.tier, city: state.city, email: state.email, wallet_address: state.wallet });
     state.step = 'event';
     await showEvents(chatId, state.city);
   } else if (state.step === 'event') {
     const choice = parseInt(msg.text);
     const events = await getOpenEventsByCity(state.city);
     if (isNaN(choice) || choice < 1 || choice > events.length) return bot.sendMessage(chatId, '❌ Invalid choice.');
-
     const selected = events[choice - 1];
     const { statusMsg } = await registerUser(selected.id, chatId, msg.from.username, state.email, state.wallet);
     bot.sendMessage(chatId, `🎟 Registered for *${selected.name}*`, { parse_mode: 'Markdown' });
@@ -263,5 +286,10 @@ bot.on('message', async msg => {
   }
 });
 
-console.log('🤖 Bot is running...');
+// ====== START SERVER ======
+app.listen(PORT, async () => {
+  console.log(`🌐 HTTP server on port ${PORT}`);
+  await setWebhook();
+  console.log('🤖 Bot running with webhook mode...');
+});
 
