@@ -206,7 +206,7 @@ bot.onText(/\/help/, (msg) => {
     '/myevents – See your events & get QR codes',
     '/ticket – Get ticket for a specific event',
     '/user_edit – Edit your profile',
-    '/city-event – Browse events by city',
+    '/events – Browse events by city',
     '/help – Show this help message',
     '',
     '🎯 *Tiers*',
@@ -226,7 +226,7 @@ bot.onText(/\/start/, async (msg) => {
   if (profile) {
     return bot.sendMessage(
       msg.chat.id,
-      escapeMarkdownV2(`👋 Welcome back, ${username || 'friend'}! Use /myevents or /city-event to see what's on.`),
+      escapeMarkdownV2(`👋 Welcome back, ${username || 'friend'}! Use /myevents or /events to see what's on.`),
       { parse_mode: 'MarkdownV2' }
     );
   }
@@ -308,8 +308,8 @@ bot.onText(/\/user_edit/, async (msg) => {
   bot.sendMessage(msg.chat.id, escapeMarkdownV2('What do you want to edit?'), { parse_mode: 'MarkdownV2', ...opts });
 });
 
-// ====== /city-event ======
-bot.onText(/\/city-event/, async (msg) => {
+// ====== /events ======
+bot.onText(/\/events/, async (msg) => {
   const tgId = String(msg.from.id);
   const cities = await getAvailableCities();
   if (!cities.length) {
@@ -333,7 +333,7 @@ bot.on('message', async (msg) => {
   if (state.step === 'choosingCity') {
     await saveUserProfile(tgId, { city: text });
     delete userStates[tgId];
-    return bot.sendMessage(msg.chat.id, escapeMarkdownV2(`✅ City set to ${text}. You can now use /city-event to browse events.`), { parse_mode: 'MarkdownV2' });
+    return bot.sendMessage(msg.chat.id, escapeMarkdownV2(`✅ City set to ${text}. You can now use /events to browse events.`), { parse_mode: 'MarkdownV2' });
   }
 
   // Choosing ticket event
@@ -361,7 +361,7 @@ bot.on('message', async (msg) => {
     return bot.sendMessage(msg.chat.id, escapeMarkdownV2(`✅ ${state.editField} updated.`), { parse_mode: 'MarkdownV2' });
   }
 
-  // Choosing city for /city-event
+  // Choosing city for /events
   if (state.step === 'choosingCityEvents') {
     delete userStates[tgId];
     return showEvents(msg.chat.id, text);
