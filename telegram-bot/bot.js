@@ -109,7 +109,7 @@ async function getAvailableCities() {
 
 async function getOpenEventsByCity(city) {
   const res = await pool.query(
-    `SELECT id, name, datetime, min_attendees, max_attendees, is_confirmed
+    `SELECT id, name, datetime, city, venue, min_attendees, max_attendees, is_confirmed
      FROM events
      WHERE datetime > NOW() AND LOWER(city) = LOWER($1)
      ORDER BY datetime ASC`,
@@ -169,7 +169,7 @@ async function registerUser(eventId, tgId, username, email, wallet) {
 
 async function getUserEvents(tgId) {
   const res = await pool.query(
-    `SELECT e.id, e.name, e.datetime
+    `SELECT e.id, e.name, e.datetime, e.city, e.venue, e.host
      FROM registrations r
      JOIN events e ON r.event_id = e.id
      WHERE r.telegram_user_id=$1
@@ -193,18 +193,14 @@ async function sendTicket(chatId, tgId, eventId, eventName) {
 async function showEvents(chatId, city) {
   const events = await getOpenEventsByCity(city);
   if (!events.length) {
-    return bot.sendMessage(
-      chatId,
-      escapeMarkdownV2('📭 No upcoming events for this city.'),
-      { parse_mode: 'MarkdownV2' }
-    );
+    return bot.sendMessage(chatId, escapeMarkdownV2('📭 No upcoming events for this city.'), { parse_mode: 'MarkdownV2' });
   }
 
   let text = `🎉 Upcoming events in *${escapeMarkdownV2(city)}*:\n`;
   const opts = { reply_markup: { inline_keyboard: [] } };
 
   events.forEach((e, i) => {
-    text += `\n${i + 1}. *${escapeMarkdownV2(e.name)}* — ${escapeMarkdownV2(new Date(e.datetime).toLocaleString())}`;
+    text += `\n${i + 1}. *${escapeMarkdownV2(e.name)}* — ${escapeMarkdownV2(e.venue || e.city)} — ${escapeMarkdownV2(new Date(e.datetime).toLocaleString())}`;
     opts.reply_markup.inline_keyboard.push([
       { text: '📝 Register', callback_data: `register_${e.id}` },
       { text: 'ℹ️ Details', callback_data: `details_${e.id}` }
@@ -237,15 +233,13 @@ bot.onText(/\/help/, (msg) => {
 bot.onText(/\/myevents/, async (msg) => {
   const tgId = String(msg.from.id);
   const events = await getUserEvents(tgId);
-  if (!events.length) {
-    return bot.sendMessage(msg.chat.id, escapeMarkdownV2('📭 You are not registered for any events yet.'), { parse_mode: 'MarkdownV2' });
-  }
+  if (!events.length) return bot.sendMessage(msg.chat.id, escapeMarkdownV2('📭 You are not registered for any events yet.'), { parse_mode: 'MarkdownV2' });
 
   let text = '📅 *Your upcoming events*:\n';
   const opts = { reply_markup: { inline_keyboard: [] } };
 
   events.forEach((e) => {
-    text += `\n• *${escapeMarkdownV2(e.name)}* — ${escapeMarkdownV2(new Date(e.datetime).toLocaleString())}`;
+    text += `\n• *${escapeMarkdownV2(e.name)}* — ${escapeMarkdownV2(e.venue || e.city)} — ${escapeMarkdownV2(new Date(e.datetime).toLocaleString())}`;
     opts.reply_markup.inline_keyboard.push([
       { text: `🎟 Get Ticket`, callback_data: `ticket_${e.id}` }
     ]);
@@ -258,13 +252,9 @@ bot.onText(/\/myevents/, async (msg) => {
 bot.onText(/\/ticket/, async (msg) => {
   const tgId = String(msg.from.id);
   const events = await getUserEvents(tgId);
-  if (!events.length) {
-    return bot.sendMessage(msg.chat.id, escapeMarkdownV2('📭 You have no tickets available.'), { parse_mode: 'MarkdownV2' });
-  }
-  if (events.length === 1) {
-    return sendTicket(msg.chat.id, tgId, events[0].id, events[0].name);
-  }
-  // If multiple events, use inline buttons in /myevents instead
+  if (!events.length) return bot.sendMessage(msg.chat.id, escapeMarkdownV2('📭 You have no tickets available.'), { parse_mode: 'MarkdownV2' });
+  if (events.length === 1) return sendTicket(msg.chat.id, tgId, events[0].id, events[0].name);
+
   return bot.sendMessage(msg.chat.id, escapeMarkdownV2('Please use /myevents to select a ticket.'), { parse_mode: 'MarkdownV2' });
 });
 
@@ -274,35 +264,41 @@ bot.onText(/\/start/, async (msg) => {
   const username = msg.from.username || '';
   const profile = await getUserProfile(tgId);
 
-  if (profile) {
-    return bot.sendMessage(msg.chat.id, escapeMarkdownV2(`👋 Welcome back, ${username || 'friend'}! Use /myevents or /events to see what's on.`), { parse_mode: 'MarkdownV2' });
-  }
+  if (profile) return bot.sendMessage(msg.chat.id, escapeMarkdownV2(`👋 Welcome back, ${username || 'friend'}! Use /myevents or /events to see what's on.`), { parse_mode: 'MarkdownV2' });
 
   await saveUserProfile(tgId, { telegram_username: username });
   const cities = await getAvailableCities();
-  if (!cities.length) {
-    return bot.sendMessage(msg.chat.id, escapeMarkdownV2('No cities available yet. Please check back later.'), { parse_mode: 'MarkdownV2' });
-  }
+  if (!cities.length) return bot.sendMessage(msg.chat.id, escapeMarkdownV2('No cities available yet. Please check back later.'), { parse_mode: 'MarkdownV2' });
 
-  const opts = {
-    reply_markup: { inline_keyboard: cities.map(c => [{ text: c, callback_data: `setstartcity_${c}` }]) }
-  };
+  const opts = { reply_markup: { inline_keyboard: cities.map(c => [{ text: c, callback_data: `setstartcity_${c}` }]) } } };
   userStates[tgId] = { step: 'choosingStartCity' };
   bot.sendMessage(msg.chat.id, escapeMarkdownV2('🌍 Please choose your city:'), { parse_mode: 'MarkdownV2', ...opts });
+});
+
+// ====== /events ======
+bot.onText(/\/events/, async (msg) => {
+  const tgId = String(msg.from.id);
+  const profile = await getUserProfile(tgId);
+
+  if (!profile || !profile.city) {
+    const cities = await getAvailableCities();
+    if (!cities.length) return bot.sendMessage(msg.chat.id, escapeMarkdownV2('No cities available yet.'), { parse_mode: 'MarkdownV2' });
+    const opts = { reply_markup: { inline_keyboard: cities.map(c => [{ text: c, callback_data: `choose_event_city_${c}` }]) } };
+    userStates[tgId] = { step: 'choosingEventCity' };
+    return bot.sendMessage(msg.chat.id, escapeMarkdownV2('🌍 Choose a city to see events:'), { parse_mode: 'MarkdownV2', ...opts });
+  }
+
+  return showEvents(msg.chat.id, profile.city);
 });
 
 // ====== /user_edit with inline buttons ======
 bot.onText(/\/user_edit/, async (msg) => {
   const tgId = String(msg.from.id);
   const profile = await getUserProfile(tgId);
-  if (!profile) {
-    return bot.sendMessage(msg.chat.id, escapeMarkdownV2('⚠️ You do not have a profile yet. Use /start first.'), { parse_mode: 'MarkdownV2' });
-  }
+  if (!profile) return bot.sendMessage(msg.chat.id, escapeMarkdownV2('⚠️ You do not have a profile yet. Use /start first.'), { parse_mode: 'MarkdownV2' });
 
   const fields = ['Tier', 'Email', 'Wallet', 'City'];
-  const opts = {
-    reply_markup: { inline_keyboard: fields.map(f => [{ text: f, callback_data: `edit_${f.toLowerCase()}` }]) }
-  };
+  const opts = { reply_markup: { inline_keyboard: fields.map(f => [{ text: f, callback_data: `edit_${f.toLowerCase()}` }]) } };
 
   userStates[tgId] = { step: 'editingProfile' };
   bot.sendMessage(msg.chat.id, escapeMarkdownV2('What do you want to edit?'), { parse_mode: 'MarkdownV2', ...opts });
@@ -314,7 +310,7 @@ bot.on('callback_query', async (query) => {
   const state = userStates[tgId];
   const data = query.data;
 
-  // Handle /start city selection
+  // /start city selection
   if (state?.step === 'choosingStartCity' && data.startsWith('setstartcity_')) {
     const city = data.split('_')[1];
     await saveUserProfile(tgId, { city });
@@ -322,7 +318,14 @@ bot.on('callback_query', async (query) => {
     return bot.sendMessage(query.message.chat.id, escapeMarkdownV2(`✅ City set to ${city}. You can now use /events to browse events.`), { parse_mode: 'MarkdownV2' });
   }
 
-  // Handle /user_edit field selection
+  // /events city selection
+  if (data.startsWith('choose_event_city_')) {
+    const city = data.replace('choose_event_city_', '');
+    delete userStates[tgId];
+    return showEvents(query.message.chat.id, city);
+  }
+
+  // /user_edit field selection
   if (state?.step === 'editingProfile' && data.startsWith('edit_')) {
     const field = data.split('_')[1];
     if (field === 'city') {
@@ -336,7 +339,7 @@ bot.on('callback_query', async (query) => {
     }
   }
 
-  // Handle /user_edit city update
+  // /user_edit city update
   if (state?.editField === 'city' && data.startsWith('setcity_')) {
     const city = data.split('_')[1];
     await saveUserProfile(tgId, { city });
@@ -344,7 +347,7 @@ bot.on('callback_query', async (query) => {
     return bot.sendMessage(query.message.chat.id, escapeMarkdownV2(`✅ City updated to ${city}.`), { parse_mode: 'MarkdownV2' });
   }
 
-  // Handle event buttons (Register / Details / Ticket)
+  // Event buttons
   if (data.startsWith('register_')) {
     const eventId = parseInt(data.split('_')[1], 10);
     const profile = await getUserProfile(tgId);
@@ -361,6 +364,8 @@ bot.on('callback_query', async (query) => {
     let detailsMsg = `ℹ️ *Event Details*\n`;
     detailsMsg += `*Name:* ${escapeMarkdownV2(e.name)}\n`;
     detailsMsg += `*City:* ${escapeMarkdownV2(e.city)}\n`;
+    detailsMsg += `*Venue:* ${escapeMarkdownV2(e.venue || 'N/A')}\n`;
+    detailsMsg += `*Host:* ${escapeMarkdownV2(e.host || 'N/A')}\n`;
     detailsMsg += `*Date/Time:* ${escapeMarkdownV2(new Date(e.datetime).toLocaleString())}\n`;
     detailsMsg += `*Min attendees:* ${e.min_attendees}\n`;
     detailsMsg += `*Max attendees:* ${e.max_attendees || 'No limit'}\n`;
