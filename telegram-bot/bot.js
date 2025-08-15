@@ -22,7 +22,7 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
-
+ 
 // ====== BOT ======
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
 const userStates = {}; // in-memory session
@@ -30,7 +30,7 @@ const userStates = {}; // in-memory session
 // ====== KEEP ALIVE FOR RENDER ======
 const app = express();
 app.get('/', (req, res) => res.send('✅ Bot service is running'));
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🌐 HTTP server running on port ${PORT}`));
 
 // ====== INIT TABLES ======
