@@ -271,7 +271,8 @@ bot.onText(/\/start/, async (msg) => {
   const cities = await getAvailableCities();
   if (!cities.length) return bot.sendMessage(msg.chat.id, escapeMarkdownV2('No cities available yet. Please check back later.'), { parse_mode: 'MarkdownV2' });
 
-  const opts = { reply_markup: { inline_keyboard: cities.map(c => [{ text: c, callback_data: `setstartcity_${c}` }]) } } };
+const opts = { reply_markup: { inline_keyboard: cities.map(c => [{ text: c, callback_data: `setstartcity_${c}` }]) } };
+
   userStates[tgId] = { step: 'choosingStartCity' };
   bot.sendMessage(msg.chat.id, escapeMarkdownV2('🌍 Please choose your city:'), { parse_mode: 'MarkdownV2', ...opts });
 });
