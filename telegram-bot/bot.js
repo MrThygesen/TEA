@@ -1,4 +1,4 @@
-
+// bot.js - updated to match your schema.sql
 import TelegramBot from 'node-telegram-bot-api';
 import pkg from 'pg';
 import QRCode from 'qrcode';
@@ -41,12 +41,32 @@ app.use(express.json());
 
 // ====== TELEGRAM BOT ======
 const bot = new TelegramBot(BOT_TOKEN, { webHook: true });
-const userStates = {};
+const userStates = {}; // ephemeral per-run state
 
-// ====== ESCAPE HELPER ======
+// ====== HELPERS ======
 function escapeMarkdownV2(text) {
-  if (!text) return '';
-  return text.replace(/([_*\[\]()~>#+\-=|{}.!\\])/g, '\\$1');
+  if (!text && text !== 0) return '';
+  // ensure string
+  const s = String(text);
+  return s.replace(/([_*\[\]()~>#+\-=|{}.!\\])/g, '\\$1');
+}
+
+function makePayload(prefix, value) {
+  // format: prefix|encodedValue
+  return `${prefix}|${encodeURIComponent(String(value))}`;
+}
+
+function parsePayload(data) {
+  if (typeof data !== 'string') return { prefix: null, value: null };
+  const idx = data.indexOf('|');
+  if (idx === -1) return { prefix: data, value: null };
+  const prefix = data.slice(0, idx);
+  const encoded = data.slice(idx + 1);
+  try {
+    return { prefix, value: decodeURIComponent(encoded) };
+  } catch (err) {
+    return { prefix, value: encoded };
+  }
 }
 
 // ====== WEBHOOK ======
@@ -61,7 +81,7 @@ async function setWebhook() {
       console.log(`ℹ️ Webhook already set to ${webhookUrl}`);
     }
   } catch (err) {
-    if (err.response && err.response.statusCode === 429) {
+    if (err?.response && err.response.statusCode === 429) {
       const retryAfter = err.response.headers['retry-after'] || 1;
       console.warn(`⚠️ Telegram rate limited. Retry after ${retryAfter}s`);
     } else {
@@ -70,7 +90,7 @@ async function setWebhook() {
   }
 }
 
-// Webhook endpoint
+// Webhook endpoint (unchanged)
 app.post(`/bot${BOT_TOKEN}`, (req, res) => {
   bot.processUpdate(req.body);
   res.sendStatus(200);
@@ -79,7 +99,7 @@ app.post(`/bot${BOT_TOKEN}`, (req, res) => {
 // Health check
 app.get('/', (_req, res) => res.send('✅ Telegram bot service is running'));
 
-// ====== DB HELPERS ======
+// ====== DB HELPERS (match schema.sql) ======
 async function getUserProfile(tgId) {
   const res = await pool.query(
     'SELECT * FROM user_profiles WHERE telegram_user_id=$1',
@@ -105,12 +125,14 @@ async function getAvailableCities() {
   const res = await pool.query(
     'SELECT DISTINCT city FROM events WHERE datetime > NOW() ORDER BY city ASC'
   );
-  return res.rows.map((r) => r.city);
+  // filter nulls and trim
+  return res.rows.map((r) => (r.city ? r.city.trim() : r.city)).filter(Boolean);
 }
 
+// Note: schema.sql does not include venue/host columns. Use group_id if present.
 async function getOpenEventsByCity(city) {
   const res = await pool.query(
-    `SELECT id, name, datetime, city, venue, min_attendees, max_attendees, is_confirmed
+    `SELECT id, name, datetime, city, group_id, min_attendees, max_attendees, is_confirmed
      FROM events
      WHERE datetime > NOW() AND LOWER(city) = LOWER($1)
      ORDER BY datetime ASC`,
@@ -131,7 +153,7 @@ async function registerUser(eventId, tgId, username, email, wallet) {
        (event_id, telegram_user_id, telegram_username, email, wallet_address)
        VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (event_id, telegram_user_id) DO NOTHING`,
-      [eventId, tgId, username, email, wallet || null]
+      [eventId, tgId, username || null, email || null, wallet || null]
     );
   }
 
@@ -149,7 +171,7 @@ async function registerUser(eventId, tgId, username, email, wallet) {
 
   let statusMsg = `👥 *${count}* people registered.\n`;
   if (alreadyRegistered) statusMsg = `ℹ️ You have already registered the event.\n${statusMsg}`;
-  if (!event.is_confirmed && count >= event.min_attendees) {
+  if (!event.is_confirmed && count >= (event.min_attendees || 1)) {
     await pool.query('UPDATE events SET is_confirmed=TRUE WHERE id=$1', [eventId]);
     statusMsg += '✅ The event is now *confirmed*! You can generate your ticket.';
   } else if (!event.is_confirmed) {
@@ -162,15 +184,16 @@ async function registerUser(eventId, tgId, username, email, wallet) {
   }
 
   return {
-    confirmed: count >= event.min_attendees,
+    confirmed: count >= (event.min_attendees || 1),
     eventName: event.name,
     statusMsg,
   };
 }
 
 async function getUserEvents(tgId) {
+  // Match schema: events has no venue/host columns, but has group_id and city
   const res = await pool.query(
-    `SELECT e.id, e.name, e.datetime, e.city, e.venue, e.host
+    `SELECT e.id, e.name, e.datetime, e.city, e.group_id
      FROM registrations r
      JOIN events e ON r.event_id = e.id
      WHERE r.telegram_user_id=$1
@@ -184,13 +207,13 @@ async function getUserEvents(tgId) {
 async function sendTicket(chatId, tgId, eventId, eventName) {
   const qrData = JSON.stringify({ eventId, tgId });
   const qrImage = await QRCode.toBuffer(qrData);
-  bot.sendPhoto(chatId, qrImage, {
+  await bot.sendPhoto(chatId, qrImage, {
     caption: escapeMarkdownV2(`🎟 Ticket for ${eventName}`),
     parse_mode: 'MarkdownV2'
   });
 }
 
-// ====== showEvents with buttons ======
+// ====== showEvents with buttons (uses group_id as host if present) ======
 async function showEvents(chatId, city) {
   const events = await getOpenEventsByCity(city);
   if (!events.length) {
@@ -201,17 +224,20 @@ async function showEvents(chatId, city) {
   const opts = { reply_markup: { inline_keyboard: [] } };
 
   events.forEach((e, i) => {
-    text += `\n${i + 1}. *${escapeMarkdownV2(e.name)}* — ${escapeMarkdownV2(e.venue || e.city)} — ${escapeMarkdownV2(new Date(e.datetime).toLocaleString())}`;
+    const host = e.group_id || '';
+    text += `\n${i + 1}. *${escapeMarkdownV2(e.name)}*${host ? ` — ${escapeMarkdownV2(host)}` : ''} — ${escapeMarkdownV2(new Date(e.datetime).toLocaleString())}`;
     opts.reply_markup.inline_keyboard.push([
-      { text: '📝 Register', callback_data: `register_${e.id}` },
-      { text: 'ℹ️ Details', callback_data: `details_${e.id}` }
+      { text: '📝 Register', callback_data: makePayload('register', String(e.id)) },
+      { text: 'ℹ️ Details', callback_data: makePayload('details', String(e.id)) }
     ]);
   });
 
-  bot.sendMessage(chatId, text, { parse_mode: 'MarkdownV2', ...opts });
+  await bot.sendMessage(chatId, text, { parse_mode: 'MarkdownV2', ...opts });
 }
 
-// ====== /help ======
+// ====== Commands ======
+
+// /help
 bot.onText(/\/help/, (msg) => {
   const text = [
     '🤖 *Bot Commands*',
@@ -230,7 +256,7 @@ bot.onText(/\/help/, (msg) => {
   bot.sendMessage(msg.chat.id, escapeMarkdownV2(text), { parse_mode: 'MarkdownV2' });
 });
 
-// ====== /myevents ======
+// /myevents
 bot.onText(/\/myevents/, async (msg) => {
   const tgId = String(msg.from.id);
   const events = await getUserEvents(tgId);
@@ -240,44 +266,49 @@ bot.onText(/\/myevents/, async (msg) => {
   const opts = { reply_markup: { inline_keyboard: [] } };
 
   events.forEach((e) => {
-    text += `\n• *${escapeMarkdownV2(e.name)}* — ${escapeMarkdownV2(e.venue || e.city)} — ${escapeMarkdownV2(new Date(e.datetime).toLocaleString())}`;
+    // show group_id if present, otherwise city
+    const hostOrCity = e.group_id || e.city || 'N/A';
+    text += `\n• *${escapeMarkdownV2(e.name)}* — ${escapeMarkdownV2(hostOrCity)} — ${escapeMarkdownV2(new Date(e.datetime).toLocaleString())}`;
     opts.reply_markup.inline_keyboard.push([
-      { text: `🎟 Get Ticket`, callback_data: `ticket_${e.id}` }
+      { text: `🎟 Get Ticket`, callback_data: makePayload('ticket', String(e.id)) }
     ]);
   });
 
-  bot.sendMessage(msg.chat.id, text, { parse_mode: 'MarkdownV2', ...opts });
+  await bot.sendMessage(msg.chat.id, text, { parse_mode: 'MarkdownV2', ...opts });
 });
 
-// ====== /ticket ======
+// /ticket
 bot.onText(/\/ticket/, async (msg) => {
   const tgId = String(msg.from.id);
   const events = await getUserEvents(tgId);
   if (!events.length) return bot.sendMessage(msg.chat.id, escapeMarkdownV2('📭 You have no tickets available.'), { parse_mode: 'MarkdownV2' });
   if (events.length === 1) return sendTicket(msg.chat.id, tgId, events[0].id, events[0].name);
-
   return bot.sendMessage(msg.chat.id, escapeMarkdownV2('Please use /myevents to select a ticket.'), { parse_mode: 'MarkdownV2' });
 });
 
-// ====== /start with inline city buttons ======
+// /start with inline city buttons
 bot.onText(/\/start/, async (msg) => {
   const tgId = String(msg.from.id);
-  const username = msg.from.username || '';
+  const username = msg.from?.username || '';
   const profile = await getUserProfile(tgId);
 
-  if (profile) return bot.sendMessage(msg.chat.id, escapeMarkdownV2(`👋 Welcome back, ${username || 'friend'}! Use /myevents or /events to see what's on.`), { parse_mode: 'MarkdownV2' });
+  if (profile) {
+    return bot.sendMessage(msg.chat.id, escapeMarkdownV2(`👋 Welcome back, ${username || 'friend'}! Use /myevents or /events to see what's on.`), { parse_mode: 'MarkdownV2' });
+  }
 
   await saveUserProfile(tgId, { telegram_username: username });
   const cities = await getAvailableCities();
   if (!cities.length) return bot.sendMessage(msg.chat.id, escapeMarkdownV2('No cities available yet. Please check back later.'), { parse_mode: 'MarkdownV2' });
 
-const opts = { reply_markup: { inline_keyboard: cities.map(c => [{ text: c, callback_data: `setstartcity_${c}` }]) } };
+  const opts = {
+    reply_markup: { inline_keyboard: cities.map(c => [{ text: c, callback_data: makePayload('setstartcity', c) }]) }
+  };
 
   userStates[tgId] = { step: 'choosingStartCity' };
-  bot.sendMessage(msg.chat.id, escapeMarkdownV2('🌍 Please choose your city:'), { parse_mode: 'MarkdownV2', ...opts });
+  await bot.sendMessage(msg.chat.id, escapeMarkdownV2('🌍 Please choose your city:'), { parse_mode: 'MarkdownV2', ...opts });
 });
 
-// ====== /events ======
+// /events
 bot.onText(/\/events/, async (msg) => {
   const tgId = String(msg.from.id);
   const profile = await getUserProfile(tgId);
@@ -285,7 +316,7 @@ bot.onText(/\/events/, async (msg) => {
   if (!profile || !profile.city) {
     const cities = await getAvailableCities();
     if (!cities.length) return bot.sendMessage(msg.chat.id, escapeMarkdownV2('No cities available yet.'), { parse_mode: 'MarkdownV2' });
-    const opts = { reply_markup: { inline_keyboard: cities.map(c => [{ text: c, callback_data: `choose_event_city_${c}` }]) } };
+    const opts = { reply_markup: { inline_keyboard: cities.map(c => [{ text: c, callback_data: makePayload('choose_event_city', c) }]) } };
     userStates[tgId] = { step: 'choosingEventCity' };
     return bot.sendMessage(msg.chat.id, escapeMarkdownV2('🌍 Choose a city to see events:'), { parse_mode: 'MarkdownV2', ...opts });
   }
@@ -293,96 +324,111 @@ bot.onText(/\/events/, async (msg) => {
   return showEvents(msg.chat.id, profile.city);
 });
 
-// ====== /user_edit with inline buttons ======
+// /user_edit
 bot.onText(/\/user_edit/, async (msg) => {
   const tgId = String(msg.from.id);
   const profile = await getUserProfile(tgId);
   if (!profile) return bot.sendMessage(msg.chat.id, escapeMarkdownV2('⚠️ You do not have a profile yet. Use /start first.'), { parse_mode: 'MarkdownV2' });
 
   const fields = ['Tier', 'Email', 'Wallet', 'City'];
-  const opts = { reply_markup: { inline_keyboard: fields.map(f => [{ text: f, callback_data: `edit_${f.toLowerCase()}` }]) } };
+  const opts = { reply_markup: { inline_keyboard: fields.map(f => [{ text: f, callback_data: makePayload('edit', f.toLowerCase()) }]) } };
 
   userStates[tgId] = { step: 'editingProfile' };
-  bot.sendMessage(msg.chat.id, escapeMarkdownV2('What do you want to edit?'), { parse_mode: 'MarkdownV2', ...opts });
+  return bot.sendMessage(msg.chat.id, escapeMarkdownV2('What do you want to edit?'), { parse_mode: 'MarkdownV2', ...opts });
 });
 
-// ====== Handle inline button presses ======
+// ====== unified callback_query handler ======
 bot.on('callback_query', async (query) => {
-  const tgId = String(query.from.id);
-  const state = userStates[tgId];
-  const data = query.data;
+  try {
+    const tgId = String(query.from.id);
+    const data = query.data;
+    const { prefix, value } = parsePayload(data);
+    const state = userStates[tgId];
 
-  // /start city selection
-  if (state?.step === 'choosingStartCity' && data.startsWith('setstartcity_')) {
-    const city = data.split('_')[1];
-    await saveUserProfile(tgId, { city });
-    delete userStates[tgId];
-    return bot.sendMessage(query.message.chat.id, escapeMarkdownV2(`✅ City set to ${city}. You can now use /events to browse events.`), { parse_mode: 'MarkdownV2' });
-  }
+    // Always acknowledge to Telegram quickly
+    // We'll answer at the end too if needed, but ensure it doesn't timeout
+    await bot.answerCallbackQuery(query.id).catch(() => {});
 
-  // /events city selection
-  if (data.startsWith('choose_event_city_')) {
-    const city = data.replace('choose_event_city_', '');
-    delete userStates[tgId];
-    return showEvents(query.message.chat.id, city);
-  }
-
-  // /user_edit field selection
-  if (state?.step === 'editingProfile' && data.startsWith('edit_')) {
-    const field = data.split('_')[1];
-    if (field === 'city') {
-      const cities = await getAvailableCities();
-      const opts = { reply_markup: { inline_keyboard: cities.map(c => [{ text: c, callback_data: `setcity_${c}` }]) } };
-      userStates[tgId].editField = 'city';
-      return bot.sendMessage(query.message.chat.id, escapeMarkdownV2('Select a city:'), { parse_mode: 'MarkdownV2', ...opts });
-    } else {
-      userStates[tgId].editField = field;
-      return bot.sendMessage(query.message.chat.id, escapeMarkdownV2(`Enter new value for ${field}:`), { parse_mode: 'MarkdownV2' });
+    // /start city selection
+    if (state?.step === 'choosingStartCity' && prefix === 'setstartcity' && value) {
+      await saveUserProfile(tgId, { city: value });
+      delete userStates[tgId];
+      return bot.sendMessage(query.message.chat.id, escapeMarkdownV2(`✅ City set to ${value}. You can now use /events to browse events.`), { parse_mode: 'MarkdownV2' });
     }
-  }
 
-  // /user_edit city update
-  if (state?.editField === 'city' && data.startsWith('setcity_')) {
-    const city = data.split('_')[1];
-    await saveUserProfile(tgId, { city });
-    delete userStates[tgId];
-    return bot.sendMessage(query.message.chat.id, escapeMarkdownV2(`✅ City updated to ${city}.`), { parse_mode: 'MarkdownV2' });
-  }
+    // /events city selection
+    if (prefix === 'choose_event_city' && value) {
+      delete userStates[tgId];
+      return showEvents(query.message.chat.id, value);
+    }
 
-  // Event buttons
-  if (data.startsWith('register_')) {
-    const eventId = parseInt(data.split('_')[1], 10);
-    const profile = await getUserProfile(tgId);
-    if (!profile) return bot.sendMessage(query.message.chat.id, escapeMarkdownV2('⚠️ Please use /start first.'), { parse_mode: 'MarkdownV2' });
-    const result = await registerUser(eventId, tgId, profile.telegram_username, profile.email, profile.wallet_address);
-    return bot.sendMessage(query.message.chat.id, escapeMarkdownV2(result.statusMsg), { parse_mode: 'MarkdownV2' });
-  }
+    // /user_edit -> field selection
+    if (state?.step === 'editingProfile' && prefix === 'edit' && value) {
+      const field = value; // 'tier'|'email'|'wallet'|'city'
+      if (field === 'city') {
+        const cities = await getAvailableCities();
+        const opts = { reply_markup: { inline_keyboard: cities.map(c => [{ text: c, callback_data: makePayload('setcity', c) }]) } };
+        userStates[tgId].editField = 'city';
+        return bot.sendMessage(query.message.chat.id, escapeMarkdownV2('Select a city:'), { parse_mode: 'MarkdownV2', ...opts });
+      } else {
+        userStates[tgId].editField = field;
+        return bot.sendMessage(query.message.chat.id, escapeMarkdownV2(`Enter new value for ${field}:`), { parse_mode: 'MarkdownV2' });
+      }
+    }
 
-  if (data.startsWith('details_')) {
-    const eventId = parseInt(data.split('_')[1], 10);
-    const res = await pool.query('SELECT * FROM events WHERE id=$1', [eventId]);
-    const e = res.rows[0];
-    if (!e) return;
-    let detailsMsg = `ℹ️ *Event Details*\n`;
-    detailsMsg += `*Name:* ${escapeMarkdownV2(e.name)}\n`;
-    detailsMsg += `*City:* ${escapeMarkdownV2(e.city)}\n`;
-    detailsMsg += `*Venue:* ${escapeMarkdownV2(e.venue || 'N/A')}\n`;
-    detailsMsg += `*Host:* ${escapeMarkdownV2(e.host || 'N/A')}\n`;
-    detailsMsg += `*Date/Time:* ${escapeMarkdownV2(new Date(e.datetime).toLocaleString())}\n`;
-    detailsMsg += `*Min attendees:* ${e.min_attendees}\n`;
-    detailsMsg += `*Max attendees:* ${e.max_attendees || 'No limit'}\n`;
-    detailsMsg += `*Confirmed:* ${e.is_confirmed ? '✅ Yes' : '⌛ No'}`;
-    return bot.sendMessage(query.message.chat.id, detailsMsg, { parse_mode: 'MarkdownV2' });
-  }
+    // /user_edit set city
+    if (state?.editField === 'city' && prefix === 'setcity' && value) {
+      await saveUserProfile(tgId, { city: value });
+      delete userStates[tgId];
+      return bot.sendMessage(query.message.chat.id, escapeMarkdownV2(`✅ City updated to ${value}.`), { parse_mode: 'MarkdownV2' });
+    }
 
-  if (data.startsWith('ticket_')) {
-    const eventId = parseInt(data.split('_')[1], 10);
-    const eventRes = await pool.query('SELECT name FROM events WHERE id=$1', [eventId]);
-    const eventName = eventRes.rows[0]?.name || 'Event';
-    return sendTicket(query.message.chat.id, tgId, eventId, eventName);
-  }
+    // Event actions (register/details/ticket)
+    if (prefix === 'register' && value) {
+      const eventId = parseInt(value, 10);
+      const profile = await getUserProfile(tgId);
+      if (!profile) return bot.sendMessage(query.message.chat.id, escapeMarkdownV2('⚠️ Please use /start first.'), { parse_mode: 'MarkdownV2' });
+      const result = await registerUser(eventId, tgId, profile.telegram_username, profile.email, profile.wallet_address);
+      return bot.sendMessage(query.message.chat.id, escapeMarkdownV2(result.statusMsg), { parse_mode: 'MarkdownV2' });
+    }
 
-  bot.answerCallbackQuery(query.id);
+    if (prefix === 'details' && value) {
+      const eventId = parseInt(value, 10);
+      const res = await pool.query('SELECT id, name, city, group_id, datetime, min_attendees, max_attendees, is_confirmed, created_at FROM events WHERE id=$1', [eventId]);
+      const e = res.rows[0];
+      if (!e) return bot.sendMessage(query.message.chat.id, escapeMarkdownV2('Event not found'), { parse_mode: 'MarkdownV2' });
+
+      let detailsMsg = `ℹ️ *Event Details*\n`;
+      detailsMsg += `*Name:* ${escapeMarkdownV2(e.name)}\n`;
+      detailsMsg += `*City:* ${escapeMarkdownV2(e.city || 'N/A')}\n`;
+      detailsMsg += `*Group / Host:* ${escapeMarkdownV2(e.group_id || 'N/A')}\n`;
+      detailsMsg += `*Date/Time:* ${escapeMarkdownV2(new Date(e.datetime).toLocaleString())}\n`;
+      detailsMsg += `*Min attendees:* ${e.min_attendees ?? 'N/A'}\n`;
+      detailsMsg += `*Max attendees:* ${e.max_attendees ?? 'No limit'}\n`;
+      detailsMsg += `*Confirmed:* ${e.is_confirmed ? '✅ Yes' : '⌛ No'}\n`;
+      detailsMsg += `*Created:* ${escapeMarkdownV2(new Date(e.created_at).toLocaleString())}\n`;
+
+      return bot.sendMessage(query.message.chat.id, detailsMsg, { parse_mode: 'MarkdownV2' });
+    }
+
+    if (prefix === 'ticket' && value) {
+      const eventId = parseInt(value, 10);
+      const eventRes = await pool.query('SELECT name FROM events WHERE id=$1', [eventId]);
+      const eventName = eventRes.rows[0]?.name || 'Event';
+      return sendTicket(query.message.chat.id, tgId, eventId, eventName);
+    }
+
+    // No matching action
+    return bot.sendMessage(query.message.chat.id, escapeMarkdownV2('⚠️ Unknown action.'), { parse_mode: 'MarkdownV2' });
+  } catch (err) {
+    console.error('callback_query handler error:', err);
+    // attempt to notify user gracefully
+    try {
+      if (query?.message?.chat?.id) {
+        await bot.sendMessage(query.message.chat.id, escapeMarkdownV2('⚠️ An error occurred while processing your request.'), { parse_mode: 'MarkdownV2' });
+      }
+    } catch (_) {}
+  }
 });
 
 // ====== Start HTTP server ======
@@ -392,16 +438,19 @@ app.listen(PORT, async () => {
   console.log('🤖 Bot running with webhook mode...');
 });
 
-// ====== Handle text input for inline-free fields ======
+// ====== Handle free-text responses for edit fields (email/wallet/tier) ======
 bot.on('message', async (msg) => {
   const tgId = String(msg.from.id);
   const state = userStates[tgId];
+  // Only handle if we are expecting a free-text edit value
   if (!state || !state.editField) return;
+  // protect against accidental triggers (make sure message has text)
+  if (!msg.text) return;
 
   const fieldMap = { wallet: 'wallet_address', tier: 'tier', email: 'email' };
   const column = fieldMap[state.editField] || state.editField;
   await saveUserProfile(tgId, { [column]: msg.text });
   delete userStates[tgId];
-  bot.sendMessage(msg.chat.id, escapeMarkdownV2(`✅ ${state.editField} updated.`), { parse_mode: 'MarkdownV2' });
+  await bot.sendMessage(msg.chat.id, escapeMarkdownV2(`✅ ${state.editField} updated.`), { parse_mode: 'MarkdownV2' });
 });
 
