@@ -4,6 +4,7 @@ import QRCode from 'qrcode';
 import dotenv from 'dotenv';
 import express from 'express';
 import { runMigrations } from './migrations.js';
+import fetch from 'node-fetch';
 
 dotenv.config();
 const { Pool } = pkg;
@@ -46,6 +47,40 @@ const userStates = {};
 function escapeMarkdownV1(text) {
   if (!text) return '';
   return text.toString().replace(/([\\_*[\]()~`>#+\-=|{}.!])/g, '\\$1');
+}
+
+// ====== EVENT CONFIRMATION EMAIL HELPER ======
+async function notifyEventConfirmedViaApi(eventId, eventName, eventCity, eventDateTime) {
+  try {
+    const regRes = await pool.query(
+      'SELECT email, wallet_address, telegram_username FROM registrations WHERE event_id=$1 AND email IS NOT NULL',
+      [eventId]
+    );
+    const attendees = regRes.rows;
+
+    for (const attendee of attendees) {
+      await fetch(`${process.env.FRONTEND_BASE_URL}/api/email-optin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: attendee.email,
+          wallet: attendee.wallet_address || '',
+          firstname: attendee.telegram_username || '',
+          lastname: '',
+          city: '',
+          country: '',
+          zip: '',
+          eventName,
+          eventCity,
+          eventDateTime
+        })
+      });
+    }
+
+    console.log(`📧 Event confirmation sent to ${attendees.length} attendees`);
+  } catch (err) {
+    console.error('❌ Failed to send event confirmation via API', err);
+  }
 }
 
 // ====== WEBHOOK ======
@@ -160,6 +195,18 @@ async function registerUser(eventId, tgId, username, email, wallet) {
   if (!event.is_confirmed && newCount >= event.min_attendees) {
     await pool.query('UPDATE events SET is_confirmed=TRUE WHERE id=$1', [eventId]);
     statusMsg += '✅ The event is now confirmed! You can generate your ticket.';
+
+    // Get full event info for email
+    const eventDetailsRes = await pool.query(
+      'SELECT name, city, datetime FROM events WHERE id=$1',
+      [eventId]
+    );
+    const details = eventDetailsRes.rows[0];
+    const eventDateTime = details ? new Date(details.datetime).toLocaleString() : '';
+
+    // Send email notifications via Vercel API
+    await notifyEventConfirmedViaApi(eventId, event.name, details?.city, eventDateTime);
+
   } else if (!event.is_confirmed) {
     statusMsg += '⌛ We are awaiting confirmation.';
   } else {
