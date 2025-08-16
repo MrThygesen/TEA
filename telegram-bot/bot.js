@@ -19,6 +19,10 @@ if (!process.env.DATABASE_URL) {
   console.error('❌ DATABASE_URL missing');
   process.exit(1);
 }
+if (!process.env.FRONTEND_BASE_URL) {
+  console.warn('⚠️ FRONTEND_BASE_URL missing, email notifications may fail');
+}
+
 const PORT = process.env.PORT || 3000;
 const PUBLIC_URL =
   process.env.RENDER_EXTERNAL_URL ||
@@ -49,7 +53,9 @@ function escapeMarkdownV1(text) {
   return text.toString().replace(/([\\_*[\]()~`>#+\-=|{}.!])/g, '\\$1');
 }
 
-// ====== EVENT CONFIRMATION EMAIL HELPER ======
+
+
+// ====== EVENT CONFIRMATION EMAIL HELPER (parallel) ======
 async function notifyEventConfirmedViaApi(eventId, eventName, eventCity, eventDateTime) {
   try {
     const regRes = await pool.query(
@@ -58,8 +64,9 @@ async function notifyEventConfirmedViaApi(eventId, eventName, eventCity, eventDa
     );
     const attendees = regRes.rows;
 
-    for (const attendee of attendees) {
-      await fetch(`${process.env.FRONTEND_BASE_URL}/api/email-optin`, {
+    // Send emails in parallel using Promise.all
+    await Promise.all(attendees.map(attendee =>
+      fetch(`${process.env.FRONTEND_BASE_URL}/api/email-optin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -74,14 +81,15 @@ async function notifyEventConfirmedViaApi(eventId, eventName, eventCity, eventDa
           eventCity,
           eventDateTime
         })
-      });
-    }
+      })
+    ));
 
     console.log(`📧 Event confirmation sent to ${attendees.length} attendees`);
   } catch (err) {
     console.error('❌ Failed to send event confirmation via API', err);
   }
 }
+
 
 // ====== WEBHOOK ======
 async function setWebhook() {
@@ -99,7 +107,7 @@ async function setWebhook() {
       const retryAfter = err.response.headers['retry-after'] || 1;
       console.warn(`⚠️ Telegram rate limited. Retry after ${retryAfter}s`);
     } else {
-      throw err;
+      console.error('❌ Webhook setup failed:', err.message);
     }
   }
 }
@@ -192,11 +200,11 @@ async function registerUser(eventId, tgId, username, email, wallet) {
 
   let statusMsg = `👥 ${newCount} people registered.\n`;
   if (alreadyRegistered) statusMsg = `ℹ️ You have already registered for this event.\n${statusMsg}`;
+
   if (!event.is_confirmed && newCount >= event.min_attendees) {
     await pool.query('UPDATE events SET is_confirmed=TRUE WHERE id=$1', [eventId]);
     statusMsg += '✅ The event is now confirmed! You can generate your ticket.';
 
-    // Get full event info for email
     const eventDetailsRes = await pool.query(
       'SELECT name, city, datetime FROM events WHERE id=$1',
       [eventId]
@@ -204,7 +212,7 @@ async function registerUser(eventId, tgId, username, email, wallet) {
     const details = eventDetailsRes.rows[0];
     const eventDateTime = details ? new Date(details.datetime).toLocaleString() : '';
 
-    // Send email notifications via Vercel API
+    // Send email notifications
     await notifyEventConfirmedViaApi(eventId, event.name, details?.city, eventDateTime);
 
   } else if (!event.is_confirmed) {
@@ -423,6 +431,7 @@ bot.on('message', async (msg) => {
   delete userStates[tgId];
   bot.sendMessage(msg.chat.id, `✅ ${escapeMarkdownV1(state.editField)} updated.`, { parse_mode: 'Markdown' });
 });
+
 
 // ====== START SERVER ======
 app.listen(PORT, async () => {
