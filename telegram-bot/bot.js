@@ -91,12 +91,6 @@ async function notifyEventConfirmedViaApi(eventId, eventName, eventCity, eventDa
 }
 
 
-    console.log(`📧 Event confirmation sent to ${attendees.length} attendees`);
-  } catch (err) {
-    console.error('❌ Failed to send event confirmation via API', err);
-  }
-}
-
 
 // ====== WEBHOOK ======
 async function setWebhook() {
