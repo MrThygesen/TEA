@@ -6,10 +6,14 @@ import express from 'express';
 import { runMigrations } from './migrations.js';
 import fetch from 'node-fetch';
 
+import sgMail from '@sendgrid/mail';
+
+
 dotenv.config();
 const { Pool } = pkg;
 
 // ====== ENV CHECKS ======
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 if (!BOT_TOKEN) {
   console.error('❌ TELEGRAM_BOT_TOKEN missing');
@@ -64,31 +68,34 @@ async function notifyEventConfirmedViaApi(eventId, eventName, eventCity, eventDa
     );
     const attendees = regRes.rows;
 
-    // Send emails in parallel using Promise.all
-    await Promise.all(attendees.map(attendee =>
-      fetch(`${process.env.FRONTEND_BASE_URL}/api/email-optin`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: attendee.email,
-          wallet: attendee.wallet_address || 'N/A', // <--- default if missing
-          firstname: attendee.telegram_username || '',
-          lastname: '',
-          city: '',
-          country: '',
-          zip: '',
-          eventName,
-          eventCity,
-          eventDateTime
-        })
-      })
-    ));
+    if (!attendees.length) {
+      console.log('ℹ️ No attendees with emails for this event.');
+      return;
+    }
+
+    // Send emails in parallel
+    await Promise.all(attendees.map(async (attendee) => {
+      const msg = {
+        to: attendee.email,
+        from: 'no-reply@teanet.xyz', // Replace with a verified SendGrid sender
+        subject: `Event Confirmed: ${eventName}`,
+        html: `
+          <p>Hi ${attendee.telegram_username || ''},</p>
+          <p>Your event <strong>${eventName}</strong> is now confirmed! 🎉</p>
+          <p><strong>Date/Time:</strong> ${eventDateTime || 'TBA'}</p>
+          <p><strong>City:</strong> ${eventCity || 'TBA'}</p>
+          <p>We look forward to seeing you there.</p>
+        `
+      };
+      await sgMail.send(msg);
+    }));
 
     console.log(`📧 Event confirmation sent to ${attendees.length} attendees`);
   } catch (err) {
-    console.error('❌ Failed to send event confirmation via API', err);
+    console.error('❌ Failed to send event confirmation via SendGrid', err);
   }
 }
+
 
 
 
