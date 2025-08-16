@@ -14,26 +14,25 @@ export default async function handler(req, res) {
     'Authorization': `Bearer ${API_TOKEN}`
   };
 
-  if (method === 'POST') {
-    const {
-      email,
-      wallet,
-      firstname,
-      lastname,
-      zip,
-      country,
-      city,
-      eventName,
-      eventCity,
-      eventDateTime
-    } = req.body;
+  try {
+    // ================= POST =================
+    if (method === 'POST') {
+      const {
+        email,
+        wallet,
+        firstname,
+        lastname,
+        zip,
+        country,
+        city,
+        eventName,
+        eventCity,
+        eventDateTime
+      } = req.body;
 
-    if (!email) {
-      return res.status(400).json({ error: 'Missing email' });
-    }
+      if (!email) return res.status(400).json({ error: 'Missing email' });
 
-    try {
-      // If eventName is provided → send event confirmation email only
+      // Event confirmation email
       if (eventName) {
         const emailResp = await fetch(`${BASE_URL}/campaigns`, {
           method: 'POST',
@@ -64,40 +63,38 @@ export default async function handler(req, res) {
         return res.status(200).json({ message: 'Event confirmation email sent' });
       }
 
-      // Otherwise → Save subscriber in mailing list
-      const response = await fetch(`${BASE_URL}/subscribers`, {
+      // Save subscriber
+      const subResp = await fetch(`${BASE_URL}/subscribers`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
           email,
-          fields: { wallet, firstname, lastname, zip, country, city }
-        }),
+          fields: {
+            wallet: wallet || '',
+            firstname: firstname || '',
+            lastname: lastname || '',
+            zip: zip || '',
+            country: country || '',
+            city: city || ''
+          }
+        })
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
+      if (!subResp.ok) {
+        const errorData = await subResp.json();
         throw new Error(errorData.message || 'Failed to save subscriber');
       }
 
       return res.status(200).json({ message: 'Saved to MailerLite' });
-    } catch (err) {
-      return res.status(500).json({ error: 'Failed', details: err.message });
-    }
-  }
-
-  if (method === 'GET') {
-    const { wallet } = req.query;
-    if (!wallet) {
-      return res.status(400).json({ error: 'Missing wallet' });
     }
 
-    try {
+    // ================= GET =================
+    if (method === 'GET') {
+      const { wallet } = req.query;
+      if (!wallet) return res.status(400).json({ error: 'Missing wallet' });
+
       const response = await fetch(`${BASE_URL}/subscribers?limit=1000`, { headers });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch subscribers');
-      }
+      if (!response.ok) throw new Error('Failed to fetch subscribers');
 
       const data = await response.json();
       const subscribers = data.data || [];
@@ -117,18 +114,13 @@ export default async function handler(req, res) {
         country: match.fields.country || '',
         city: match.fields.city || '',
       });
-    } catch (err) {
-      return res.status(500).json({ error: 'Failed to fetch', details: err.message });
-    }
-  }
-
-  if (method === 'DELETE') {
-    const { wallet } = req.query;
-    if (!wallet) {
-      return res.status(400).json({ error: 'Missing wallet' });
     }
 
-    try {
+    // ================= DELETE =================
+    if (method === 'DELETE') {
+      const { wallet } = req.query;
+      if (!wallet) return res.status(400).json({ error: 'Missing wallet' });
+
       const response = await fetch(`${BASE_URL}/subscribers?limit=1000`, { headers });
       if (!response.ok) throw new Error('Failed to fetch subscribers');
 
@@ -141,17 +133,19 @@ export default async function handler(req, res) {
 
       const delResp = await fetch(`${BASE_URL}/subscribers/${match.id}`, {
         method: 'DELETE',
-        headers,
+        headers
       });
       if (!delResp.ok) throw new Error('Failed to delete subscriber');
 
       return res.status(200).json({ message: 'Deleted' });
-    } catch (err) {
-      return res.status(500).json({ error: 'Failed to delete', details: err.message });
     }
-  }
 
-  res.setHeader('Allow', ['GET', 'POST', 'DELETE']);
-  res.status(405).end(`Method ${method} Not Allowed`);
+    // ================= DEFAULT =================
+    res.setHeader('Allow', ['GET', 'POST', 'DELETE']);
+    return res.status(405).end(`Method ${method} Not Allowed`);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
 }
 

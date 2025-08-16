@@ -71,7 +71,7 @@ async function notifyEventConfirmedViaApi(eventId, eventName, eventCity, eventDa
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: attendee.email,
-          wallet: attendee.wallet_address || '',
+          wallet: attendee.wallet_address || 'N/A', // <--- default if missing
           firstname: attendee.telegram_username || '',
           lastname: '',
           city: '',
@@ -83,6 +83,13 @@ async function notifyEventConfirmedViaApi(eventId, eventName, eventCity, eventDa
         })
       })
     ));
+
+    console.log(`📧 Event confirmation sent to ${attendees.length} attendees`);
+  } catch (err) {
+    console.error('❌ Failed to send event confirmation via API', err);
+  }
+}
+
 
     console.log(`📧 Event confirmation sent to ${attendees.length} attendees`);
   } catch (err) {
