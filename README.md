@@ -1,13 +1,11 @@
 # TEA — Web3 Trust, Identity & Loyalty Platform
   
-**Project TEA** is an innovative Web3 platform designed to revolutionize trust and identity by combining decentralized meetings, loyalty programs, smart legal contracts, and social agreements — all powered by blockchain technology.
-
-Deployed on the Polygon Amoy Testnet, TEA leverages Soulbound Tokens (SBTs) to provide verified identity and loyalty perks for individual and group interactions, alongside admin tools for creating enforceable agreements and future-proof escrow solutions.
-
+*TEA Ecosystem** is an innovative web2 / Web3 platform designed to revolutionize trust and identity by combining decentralized meetings, loyalty programs, smart legal contracts, and social agreements — all powered by bot and blockchain technology. The project has developed a new approach to event registration for a higher level of meeting atteendence and perks. TEA Ecosystem leverages telegram and Soulbound Tokens (SBTs) on the polygon testnet to provide verified identity and high grade loyalty perks for groups and individuals. 
 
 # TEA — Product demo on Polygon Amoy Testnet
 
-Product demo is out now on https://tea-dn40fh6q8-metaheads-projects-5a43a03e.vercel.app/
+More information is available on https://tea-liart.vercel.app/ 
+Please get in touch for claiiming SBTs and try out of Amoy testnet. 
 
 ---
 
@@ -110,12 +108,13 @@ BUT> In some testnets, SBTs/NFTs are not shown directly in wallets and must be i
 
 ## Roadmap & Future Plans
 
-| Phase                      | Goals & Deliverables                                        | Timeline       |
-|----------------------------|------------------------------------------------------------|----------------|
-| **Phase 1: Demo**           | Deploy core contracts and frontend; admin SBT issuance     | Completed      |
-| **Phase 2: Mainnet**        | Launch SBT and core ERC contracts on Polygon mainnet; integrate NDA/legal contract support | Q3–Q4 2025     |
-| **Phase 3: DAO**            | Launch governance DAO for community-led proposals          | Q4 2025        |
-| **Phase 4: Discounts & Escrow** | Develop discount programs and escrow/no-show penalty services | Q1 2026        |
+| Phase                      | Goals & Deliverables                                       | Timeline                |
+|----------------------------|------------------------------------------------------------|-------------------------|
+| **Phase 1: Demo**          | Deploy core contracts and frontend; admin SBT issuance     | Completed               |
+| **Phase 2: MVP**           | Deploy Telegram Bot for User Onboarding and QR-code scan   | Close to complete       |
+| **Phase 4: Mainnet**        | Launch SBT and core ERC contracts on Polygon mainnet; integrate NDA/legal contract support | Q3–Q4 2025     |
+| **Phase 5: DAO**            | Launch governance DAO for community-led proposals          | Q4 2025        |
+| **Phase 6: Discounts & Escrow** | Develop discount programs and escrow/no-show penalty services | Q1 2026        |
 
 ---
 
