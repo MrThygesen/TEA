@@ -320,7 +320,7 @@ Come alone or bring a few friends as part of the network, its all open.</p>
             <div className="mt-6 text-sm space-y-4 text-gray-300">
               {[
                 {
-                  title: 'Q2 2025',
+                  title: 'Q2 2025 - Initial R&D',
                   items: [
                     'Initial blockchain architecture planning for Soul Bound Token (SBT).',
                     'Develop smart contracts and JavaScript for SBT interactions.',
@@ -329,16 +329,16 @@ Come alone or bring a few friends as part of the network, its all open.</p>
                   ]
                 },
                 {
-                  title: 'Q3 2025',
+                  title: 'Q3 2025 - Alpa Trial / MVP',
                   items: [
-                    'Design and develop the Telegram registration bot.',
-                    'MVP development and SBT deployment on Polygon Amoy Testnet.',
+                    'SBT deployment on Polygon Amoy Testnet.',
+                    'Design and develop the Telegram registration/QR-ticket bot.',                  
                     'Gather user feedback and refine features.',
-                    'Prepare for full mainnet deployment.'
+                    'invite incentives / prepare for full mainnet deployment.'
                   ]
                 },
                 {
-                  title: 'Q4 2025',
+                  title: 'Q4 2025 - Exchanges',
                   items: [
                     'Deploy core smart contracts on Polygon mainnet.',
                     'Conduct security audits & smart contract reviews.',
@@ -347,20 +347,21 @@ Come alone or bring a few friends as part of the network, its all open.</p>
                   ]
                 },
                 {
-                  title: 'Q1 2026',
+                  title: 'Q1 2026 -  ' ,
                   items: [
-                    'Launch community growth initiatives (tutorials, AMA sessions, rewards).',
-                    'Implement DAO or incentive mechanisms.',
-                    'Run marketing and outreach campaigns.'
+                    'Implement DAO',  
+                    'incentive mechanisms.',
+                    'Integrate payment gateways and loyalty reward systems.',
+                    'Finalize testing & QA, prepare for full rollout.'                
+
                   ]
                 },
                 {
                   title: 'Q2 2026',
                   items: [
-                    'Integrate payment gateways and loyalty reward systems.',
+                    'Launch community growth initiatives (tutorials, AMA sessions, rewards).',
                     'Develop and test mobile app versions.',
-                    'Expand social features.',
-                    'Finalize testing & QA, prepare for full rollout.'
+                    'Run marketing and outreach campaigns.'
                   ]
                 }
               ].map(({ title, items }, idx) => (
