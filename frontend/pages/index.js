@@ -304,7 +304,6 @@ Come alone or bring a few friends as part of the network, its all open.</p>
             <li>Q4 2025: Mainnet deployment & audits</li>
             <li>Q1 2026: Partner onboarding & growth</li>
             <li>Q2 2026: Loyalty rewards integration</li>
-            <li>Q3 2026: Mobile app + expanded features</li>
           </ul>
 
           <div className="text-center mt-4">
@@ -347,17 +346,17 @@ Come alone or bring a few friends as part of the network, its all open.</p>
                   ]
                 },
                 {
-                  title: 'Q1 2026 -  ' ,
+                  title: 'Q1 2026 - DAO and Organization',
                   items: [
-                    'Implement DAO',  
-                    'incentive mechanisms.',
-                    'Integrate payment gateways and loyalty reward systems.',
+                    'Implement DAO and Incentive mechanisms. ',  
+                    'Implement extended ambassador program',
+                    'Integrate payment gateways and POS integration.',
                     'Finalize testing & QA, prepare for full rollout.'                
 
                   ]
                 },
                 {
-                  title: 'Q2 2026',
+                  title: 'Q2 2026 - Commnuity Growth',
                   items: [
                     'Launch community growth initiatives (tutorials, AMA sessions, rewards).',
                     'Develop and test mobile app versions.',
