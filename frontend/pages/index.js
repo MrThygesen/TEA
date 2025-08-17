@@ -166,10 +166,12 @@ export default function Home() {
 
 <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg transition-colors duration-300">
             <h2 className="text-2xl font-semibold mb-4 text-blue-400 text-center">
-              We use our own Telegram-bot for onboarding to each event.</h2>
+
+              We use our own Telegram-bot for onboarding to each event. 
+</h2>
 
 <p className="text-left text-gray-400 mb-6">  
-Register that you are joining the specific event through our Telegram-Bot (select below according to your preference). 
+Register that you are joining the specific event through our Telegram-Bot (select below) and wait for the bot to confirm the event. 
 </p> 
 </section>
 
@@ -229,7 +231,7 @@ Register that you are joining the specific event through our Telegram-Bot (selec
             {/* Telegram Register Button */}
             <div className="mt-8 flex justify-center">
               <a
-                href="https://t.me/TeaIsHereBotPro"
+                href="https://t.me/TeaIsHereBot"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition"
