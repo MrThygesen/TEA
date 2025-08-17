@@ -110,11 +110,11 @@ BUT> In some testnets, SBTs/NFTs are not shown directly in wallets and must be i
 
 | Phase                      | Goals & Deliverables                                       | Timeline                |
 |----------------------------|------------------------------------------------------------|-------------------------|
-| **Phase 1: Demo**          | Deploy core contracts and frontend; admin SBT issuance     | Completed               |
-| **Phase 2: MVP**           | Deploy Telegram Bot for User Onboarding and QR-code scan   | Close to complete       |
-| **Phase 4: Mainnet**        | Launch SBT and core ERC contracts on Polygon mainnet; integrate NDA/legal contract support | Q3–Q4 2025     |
-| **Phase 5: DAO**            | Launch governance DAO for community-led proposals          | Q4 2025        |
-| **Phase 6: Discounts & Escrow** | Develop discount programs and escrow/no-show penalty services | Q1 2026        |
+| **Phase 1: Demo**          | Deploy core contracts and frontend; admin SBT issuance     | Q2 2025 (complete)              |
+| **Phase 2: MVP**           | Deploy Telegram Bot for User Onboarding and QR-code scan   | Q3 2025 (alpha trial about to start)     |
+| **Phase 3: Mainnet**        | Launch SBT and core ERC contracts on Polygon mainnet; integrate NDA/legal contract support | Q4 2025     |
+| **Phase 4: DAO**            | Launch governance DAO for community-lead expansion          | Q4 2025        |
+| **Phase 5: Discounts & Escrow** | business services TBA | Q1 2026        |
 
 ---
 
