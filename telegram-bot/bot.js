@@ -303,28 +303,52 @@ bot.onText(/\/help/, (msg) => {
   bot.sendMessage(msg.chat.id, escapeMarkdownV1(text), { parse_mode: 'Markdown' });
 });
 
+
 // ====== /start ======
 bot.onText(/\/start/, async (msg) => {
   const tgId = String(msg.from.id);
-  const cities = await getAvailableCities();
-  if (!cities.length) return bot.sendMessage(msg.chat.id, '📭 No cities available.', { parse_mode: 'Markdown' });
+  const username = msg.from.username; // Telegram username
+  const chatId = msg.chat.id;
 
-  const opts = {
-    reply_markup: {
-      inline_keyboard: cities.map(city => [{ text: city, callback_data: `setstartcity_${encodeURIComponent(city)}` }])
+  // 1️⃣ Upsert user profile in DB (fill telegram_user_id)
+  if (username) {
+    try {
+      await pool.query(
+        `INSERT INTO user_profiles (telegram_user_id, telegram_username)
+         VALUES ($1, $2)
+         ON CONFLICT (telegram_username) DO UPDATE
+         SET telegram_user_id = EXCLUDED.telegram_user_id,
+             telegram_username = EXCLUDED.telegram_username,
+             updated_at = NOW()`,
+        [tgId, username]
+      );
+    } catch (err) {
+      console.error('Error upserting user profile on /start:', err);
+      bot.sendMessage(chatId, '⚠️ There was an error linking your account.');
     }
-  };
-  userStates[tgId] = { step: 'choosingStartCity' };
-  bot.sendMessage(msg.chat.id, '🌍 Please choose your city:', { parse_mode: 'Markdown', ...opts });
+  } else {
+    bot.sendMessage(chatId, '⚠️ Please set a Telegram username in your Telegram settings to use this bot.');
+    return; // stop further execution if no username
+  }
+
+  // 2️⃣ Continue with your existing city selection flow
+  try {
+    const cities = await getAvailableCities();
+    if (!cities.length) return bot.sendMessage(chatId, '📭 No cities available.', { parse_mode: 'Markdown' });
+
+    const opts = {
+      reply_markup: {
+        inline_keyboard: cities.map(city => [{ text: city, callback_data: `setstartcity_${encodeURIComponent(city)}` }])
+      }
+    };
+    userStates[tgId] = { step: 'choosingStartCity' };
+    bot.sendMessage(chatId, '🌍 Please choose your city:', { parse_mode: 'Markdown', ...opts });
+  } catch (err) {
+    console.error('Error fetching cities on /start:', err);
+    bot.sendMessage(chatId, '⚠️ There was an error fetching available cities.');
+  }
 });
 
-// ====== /events ======
-bot.onText(/\/events/, async (msg) => {
-  const tgId = String(msg.from.id);
-  const profile = await getUserProfile(tgId);
-  if (!profile?.city) return bot.sendMessage(msg.chat.id, '⚠️ Please use /start first to select your city.', { parse_mode: 'Markdown' });
-  await showEvents(msg.chat.id, profile.city);
-});
 
 // ====== /user_edit ======
 bot.onText(/\/user_edit/, async (msg) => {
