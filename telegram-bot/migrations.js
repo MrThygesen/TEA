@@ -67,10 +67,19 @@ export async function runMigrations() {
       email TEXT,
       wallet_address TEXT,
       timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      has_arrived BOOLEAN DEFAULT FALSE,
+      voucher_applied BOOLEAN DEFAULT FALSE,
       UNIQUE (event_id, telegram_user_id)
     );
   `)
   console.log('✅ Registrations table ready.')
+
+  // Ensure new columns exist for upgrades
+  await pool.query(`
+    ALTER TABLE registrations
+    ADD COLUMN IF NOT EXISTS has_arrived BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS voucher_applied BOOLEAN DEFAULT FALSE;
+  `)
 
   // 3️⃣ Invitations table
   await pool.query(`
@@ -106,12 +115,19 @@ export async function runMigrations() {
       email TEXT,
       wallet_address TEXT,
       city TEXT DEFAULT 'Copenhagen',
+      role TEXT DEFAULT 'user',        -- Added role field
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
   `)
-  console.log('✅ User profiles table ready.')
 
+  // Ensure role column exists for upgrades
+  await pool.query(`
+    ALTER TABLE user_profiles
+    ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user';
+  `)
+
+  console.log('✅ User profiles table ready.')
   console.log('All migrations complete. No data has been deleted.')
 }
 
