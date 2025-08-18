@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS registrations (
   email TEXT,
   wallet_address TEXT,
   timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  has_arrived BOOLEAN DEFAULT FALSE,       
+  voucher_applied BOOLEAN DEFAULT FALSE,   
   UNIQUE (event_id, telegram_user_id)
 );
 
@@ -64,15 +66,17 @@ CREATE TABLE IF NOT EXISTS user_emails (
 
 -- USER PROFILES (persistent)
 CREATE TABLE IF NOT EXISTS user_profiles (
-  telegram_user_id TEXT PRIMARY KEY,
-  telegram_username TEXT,
+  telegram_user_id TEXT UNIQUE,                  -- optional at first
+  telegram_username TEXT UNIQUE,                 -- you can insert organizers by username only
   tier INTEGER DEFAULT 1 CHECK (tier IN (1, 2)),
   email TEXT,
   wallet_address TEXT,
   city TEXT DEFAULT 'Copenhagen',
+  role TEXT DEFAULT 'user',
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
 
 -- Index for city filtering
 CREATE INDEX IF NOT EXISTS idx_events_city ON events(LOWER(city));

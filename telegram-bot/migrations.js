@@ -109,23 +109,24 @@ export async function runMigrations() {
   // 5️⃣ User profiles table
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_profiles (
-      telegram_user_id TEXT PRIMARY KEY,
-      telegram_username TEXT,
+      telegram_user_id TEXT UNIQUE,
+      telegram_username TEXT UNIQUE,
       tier INTEGER DEFAULT 1 CHECK (tier IN (1, 2)),
       email TEXT,
       wallet_address TEXT,
       city TEXT DEFAULT 'Copenhagen',
-      role TEXT DEFAULT 'user',        -- Added role field
+      role TEXT DEFAULT 'user',
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
-  `)
+  `);
 
   // Ensure role column exists for upgrades
-  await pool.query(`
-    ALTER TABLE user_profiles
-    ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user';
-  `)
+  await pool.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user';`);
+
+  // Ensure username is unique
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_profiles_username ON user_profiles(telegram_username);`);
+
 
   console.log('✅ User profiles table ready.')
   console.log('All migrations complete. No data has been deleted.')
