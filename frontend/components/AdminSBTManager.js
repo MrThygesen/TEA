@@ -358,25 +358,34 @@ function DbDump() {
 
 function SetRoleForm() {
   const [telegramUsername, setTelegramUsername] = useState('')
+  const [telegramUserId, setTelegramUserId] = useState('')
   const [role, setRole] = useState('organizer')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
   const handleSetRole = async () => {
-    if (!telegramUsername || !role) {
-      setMessage('Username and role are required')
+    if (!role || (!telegramUsername && !telegramUserId)) {
+      setMessage('Telegram username or user ID and role are required')
       return
     }
+
     setLoading(true)
     try {
+      const body = { role }
+      if (telegramUsername) body.telegram_username = telegramUsername
+      if (telegramUserId) body.telegram_user_id = telegramUserId
+
       const res = await fetch('/api/setRole', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ telegram_username: telegramUsername, role }),
+        body: JSON.stringify(body),
       })
+
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error setting role')
-      setMessage(`✅ Role "${role}" assigned to ${telegramUsername}`)
+
+      const target = telegramUserId ? `ID ${telegramUserId}` : `@${telegramUsername}`
+      setMessage(`✅ Role "${role}" assigned to ${target}`)
     } catch (err) {
       setMessage('❌ ' + err.message)
     } finally {
@@ -386,17 +395,41 @@ function SetRoleForm() {
 
   return (
     <div className="space-y-2">
-      <input type="text" placeholder="Telegram username" value={telegramUsername} onChange={(e) => setTelegramUsername(e.target.value)} className="w-full p-2 border rounded" />
-      <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full p-2 border rounded">
+      <input
+        type="text"
+        placeholder="Telegram username (optional)"
+        value={telegramUsername}
+        onChange={(e) => setTelegramUsername(e.target.value)}
+        className="w-full p-2 border rounded"
+      />
+      <input
+        type="text"
+        placeholder="Telegram user ID (optional)"
+        value={telegramUserId}
+        onChange={(e) => setTelegramUserId(e.target.value)}
+        className="w-full p-2 border rounded"
+      />
+      <select
+        value={role}
+        onChange={(e) => setRole(e.target.value)}
+        className="w-full p-2 border rounded"
+      >
         <option value="organizer">Organizer</option>
         <option value="admin">Admin</option>
         <option value="user">User</option>
       </select>
-      <button onClick={handleSetRole} disabled={loading} className={`px-4 py-2 rounded text-white ${loading ? 'bg-blue-300' : 'bg-blue-600'}`}>{loading ? 'Assigning...' : 'Assign Role'}</button>
+      <button
+        onClick={handleSetRole}
+        disabled={loading}
+        className={`px-4 py-2 rounded text-white ${loading ? 'bg-blue-300' : 'bg-blue-600'}`}
+      >
+        {loading ? 'Assigning...' : 'Assign Role'}
+      </button>
       {message && <p className="mt-2 text-sm">{message}</p>}
     </div>
   )
 }
+
 
 function EventCreator() {
   const [typeId, setTypeId] = useState('')
