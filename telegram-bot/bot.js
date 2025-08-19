@@ -337,6 +337,20 @@ bot.onText(/\/help/, async (msg) => {
 `, { parse_mode: 'Markdown' });
 });
 
+// /events
+bot.onText(/\/events/, async (msg) => {
+  const chatId = msg.chat.id;
+  const cities = await getAvailableCities();
+  if (!cities.length) return bot.sendMessage(chatId, '📭 No upcoming events available.');
+
+  const opts = {
+    reply_markup: {
+      inline_keyboard: cities.map(city => [{ text: city, callback_data: `city_${city}` }])
+    }
+  };
+  bot.sendMessage(chatId, '📍 Select your city to see upcoming events:', opts);
+});
+
 // /user_edit
 bot.onText(/\/user_edit/, async (msg) => {
   const tgId = String(msg.from.id);
@@ -374,12 +388,10 @@ bot.onText(/\/ticket/, async (msg) => {
 bot.onText(/\/myevents/, async (msg) => {
   const tgId = String(msg.from.id);
   const events = await getUserEvents(tgId);
-
   if (!events.length) return bot.sendMessage(msg.chat.id, '📭 You are not registered for any events yet.');
 
   const opts = { reply_markup: { inline_keyboard: [] } };
   let text = '📅 *Your upcoming events*:\n';
-
   events.forEach((e, i) => {
     const dateStr = new Date(e.datetime).toLocaleString();
     text += `\n• *${escapeMarkdownV1(e.name)}* — ${escapeMarkdownV1(dateStr)}`;
@@ -402,6 +414,14 @@ bot.on('callback_query', async (query) => {
   const tgId = String(query.from.id);
   const data = query.data;
 
+  // City selection
+  if (data.startsWith('city_')) {
+    const city = data.split('_')[1];
+    await showEvents(query.message.chat.id, city);
+    return bot.answerCallbackQuery(query.id);
+  }
+
+  // Ticket
   if (data.startsWith('ticket_')) {
     const eventId = parseInt(data.split('_')[1], 10);
     const events = await getUserEvents(tgId);
@@ -411,6 +431,7 @@ bot.on('callback_query', async (query) => {
     return bot.answerCallbackQuery(query.id);
   }
 
+  // Register
   if (data.startsWith('register_')) {
     const eventId = parseInt(data.split('_')[1], 10);
     const profile = await getUserProfile(tgId);
@@ -423,6 +444,7 @@ bot.on('callback_query', async (query) => {
     return;
   }
 
+  // Details
   if (data.startsWith('details_')) {
     const eventId = parseInt(data.split('_')[1], 10);
     const eventRes = await pool.query('SELECT * FROM events WHERE id=$1', [eventId]);
@@ -439,6 +461,7 @@ bot.on('callback_query', async (query) => {
     bot.answerCallbackQuery(query.id);
   }
 
+  // Edit profile
   if (data.startsWith('edit_')) {
     const field = data.split('_')[1];
     userStates[tgId] = { step: 'editingProfile', field };
@@ -451,7 +474,6 @@ bot.on('callback_query', async (query) => {
 bot.on('message', async (msg) => {
   const tgId = String(msg.from.id);
   const state = userStates[tgId];
-
   if (!state) return;
 
   // Scanning QR
