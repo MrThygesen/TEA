@@ -6,7 +6,7 @@ import express from 'express';
 import { runMigrations } from './migrations.js';
 import sgMail from '@sendgrid/mail';
 import axios from 'axios'; 
-import  * as Jimp from 'jimp';
+import * as Jimp from 'jimp';
 import QrCode from 'qrcode-reader';
 
 dotenv.config();
@@ -36,12 +36,6 @@ app.use(express.json());
 // Telegram bot
 const bot = new TelegramBot(BOT_TOKEN, { webHook: true });
 const userStates = {};
-
-// Markdown V1 escape
-function escapeMarkdownV1(text) {
-  if (!text) return '';
-  return text.toString().replace(/([\\_*[\]()~`>#+\-=|{}.!])/g, '\\$1');
-}
 
 // DB helpers
 async function getUserProfile(tgId) {
@@ -99,12 +93,7 @@ async function notifyEventConfirmedViaApi(eventId, eventName, eventCity, eventDa
         to: attendee.email,
         from: 'no-reply@teanet.xyz',
         subject: `Event Confirmed: ${eventName}`,
-        html: `
-          <p>Hi ${attendee.telegram_username || ''},</p>
-          <p>Your event <strong>${eventName}</strong> is now confirmed! 🎉</p>
-          <p><strong>Date/Time:</strong> ${eventDateTime || 'TBA'}</p>
-          <p><strong>City:</strong> ${eventCity || 'TBA'}</p>
-        `
+        text: `Hi ${attendee.telegram_username || ''},\n\nYour event "${eventName}" is now confirmed! 🎉\nDate/Time: ${eventDateTime || 'TBA'}\nCity: ${eventCity || 'TBA'}`
       };
       await sgMail.send(msg);
     }));
@@ -163,7 +152,7 @@ async function sendTicket(chatId,tgId,eventId,eventName){
 
   const qrData = JSON.stringify({eventId,tgId});
   const qrImage = await QRCode.toBuffer(qrData);
-  bot.sendPhoto(chatId, qrImage, { caption:`🎟 Ticket for ${escapeMarkdownV1(eventName)}`, parse_mode:'Markdown' });
+  bot.sendPhoto(chatId, qrImage, { caption:`🎟 Ticket for ${eventName}` });
 }
 
 // Ticket validation
@@ -190,21 +179,29 @@ async function validateTicket(scannedByTgId, scannedTicketData){
   }
 }
 
-// QR scan helper
+// QR scan helpers
 async function downloadFile(fileId){
   const file = await bot.getFile(fileId);
   const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
   const resp = await axios.get(url,{responseType:'arraybuffer'});
   return Buffer.from(resp.data);
 }
-async function scanQrFromTelegramPhoto(fileId){
-  const buffer = await downloadFile(fileId);
-  try {
-    const result = await QRCode.decode(buffer);
-    return result;
-  } catch(err){
-    throw new Error('❌ Failed to decode QR code.');
-  }
+
+// Show events
+async function showEvents(chatId, city){
+  const events = await getOpenEventsByCity(city);
+  if(!events.length) return bot.sendMessage(chatId,'📭 No upcoming events for this city.');
+  const opts = { reply_markup:{ inline_keyboard:[] } };
+  let text = `🎉 Upcoming events in ${city}:\n`;
+  events.forEach((e,i)=>{
+    const dateStr = new Date(e.datetime).toLocaleString();
+    text += `\n${i+1}. ${e.name} — ${dateStr}`;
+    opts.reply_markup.inline_keyboard.push([
+      { text:'Register', callback_data:`register_${e.id}` },
+      { text:'Details', callback_data:`details_${e.id}` }
+    ]);
+  });
+  bot.sendMessage(chatId,text,opts);
 }
 
 // Start scanning
@@ -216,54 +213,33 @@ async function startScan(tgId, chatId){
   bot.sendMessage(chatId,'📸 Send QR code text or photo to validate ticket.');
 }
 
-// Show events
-async function showEvents(chatId, city){
-  const events = await getOpenEventsByCity(city);
-  if(!events.length) return bot.sendMessage(chatId,'📭 No upcoming events for this city.');
-  const opts = { reply_markup:{ inline_keyboard:[] } };
-  let text = `🎉 Upcoming events in *${escapeMarkdownV1(city)}*:\n`;
-  events.forEach((e,i)=>{
-    const dateStr = new Date(e.datetime).toLocaleString();
-    text += `\n${i+1}. *${escapeMarkdownV1(e.name)}* — ${escapeMarkdownV1(dateStr)}`;
-    opts.reply_markup.inline_keyboard.push([
-      { text:'📝 Register', callback_data:`register_${e.id}` },
-      { text:'ℹ️ Details', callback_data:`details_${e.id}` }
-    ]);
-  });
-  bot.sendMessage(chatId,text,{ parse_mode:'Markdown', ...opts });
-}
-
-// ===== BOT COMMANDS =====
-
-// /start
-bot.onText(/\/start/, async (msg) => {
+// ===== COMMANDS =====
+bot.onText(/\/start/, async (msg)=>{
   const tgId = String(msg.from.id);
   const username = msg.from.username || '';
   const profile = await getUserProfile(tgId);
   if(!profile) await saveUserProfile(tgId,{ telegram_username:username });
-  bot.sendMessage(msg.chat.id, `👋 Welcome ${escapeMarkdownV1(username)}! Use /events to see events, /myevents for your registrations, /user_edit to add email, /help for commands.`, { parse_mode:'Markdown' });
+  bot.sendMessage(msg.chat.id, `👋 Welcome ${username}! Use /events to see events, /myevents for your registrations, /user_edit to add email, /help for commands.`);
 });
 
-// /help
 bot.onText(/\/help/, async (msg)=>{
   bot.sendMessage(msg.chat.id,
-    `ℹ️ *Commands*:
-/start - Welcome message
-/help - This message
-/events - List events by city
-/myevents - Your registered events
-/ticket - Get ticket for event
-/user_edit - Add/update email
-/scan - Scan QR code (organizers)
-/myid - Show your Telegram ID
-`, { parse_mode:'Markdown' });
+`ℹ️ Commands:
+- /start - Welcome message
+- /help - This message
+- /events - List events by city
+- /myevents - Your registered events
+- /ticket - Get ticket for event
+- /user_edit - Add/update email
+- /scan - Scan QR code (organizers)
+- /myid - Show your Telegram ID
+`);
 });
 
-// /myid
 bot.onText(/\/myid/, async (msg)=>{
   const tgId = String(msg.from.id);
   const username = msg.from.username || '';
-  bot.sendMessage(msg.chat.id, `🆔 Your Telegram ID: ${tgId}\nUsername: @${escapeMarkdownV1(username)}`, { parse_mode:'Markdown' });
+  bot.sendMessage(msg.chat.id, `🆔 Your Telegram ID: ${tgId}\nUsername: @${username}`);
 });
 
 // /events
@@ -309,13 +285,13 @@ bot.onText(/\/myevents/, async (msg)=>{
   const events = await getUserEvents(tgId);
   if(!events.length) return bot.sendMessage(msg.chat.id,'📭 No registered events.');
   const opts = { reply_markup:{ inline_keyboard: [] } };
-  let text = '📅 *Your upcoming events*:\n';
+  let text = '📅 Your upcoming events:\n';
   events.forEach(e=>{
     const dateStr = new Date(e.datetime).toLocaleString();
-    text += `\n• ${escapeMarkdownV1(e.name)} — ${escapeMarkdownV1(dateStr)}`;
+    text += `\n• ${e.name} — ${dateStr}`;
     opts.reply_markup.inline_keyboard.push([{ text:'🎟 Ticket', callback_data:`ticket_${e.id}` }]);
   });
-  bot.sendMessage(msg.chat.id,text,{ parse_mode:'Markdown', ...opts });
+  bot.sendMessage(msg.chat.id,text,opts);
 });
 
 // /scan
@@ -341,7 +317,7 @@ bot.on('callback_query', async (query)=>{
     const eventId = parseInt(data.split('_')[1],10);
     const events = await getUserEvents(tgId);
     const event = events.find(e=>e.id===eventId);
-    if(!event) return bot.answerCallbackQuery(query.id,{ text:'⚠️ Not registered.' });
+    if(!event) return bot.answerCallbackQuery(query.id,'⚠️ Not registered.');
     await sendTicket(query.message.chat.id,tgId,eventId,event.name);
     return bot.answerCallbackQuery(query.id);
   }
@@ -350,87 +326,30 @@ bot.on('callback_query', async (query)=>{
   if(data.startsWith('register_')){
     const eventId = parseInt(data.split('_')[1],10);
     const profile = await getUserProfile(tgId);
-    const username = profile?.telegram_username||'';
-    const email = profile?.email||null;
-    const wallet = profile?.wallet_address||null;
-
-    const res = await registerUser(eventId,tgId,username,email,wallet);
-    bot.answerCallbackQuery(query.id,{ text:res.statusMsg });
-    return;
+    const result = await registerUser(eventId,tgId,profile?.telegram_username||'',profile?.email||'');
+    bot.sendMessage(query.message.chat.id,result.statusMsg);
+    return bot.answerCallbackQuery(query.id);
   }
 
   // Details
   if(data.startsWith('details_')){
     const eventId = parseInt(data.split('_')[1],10);
     const res = await pool.query('SELECT * FROM events WHERE id=$1',[eventId]);
-    const e = res.rows[0];
-    if(!e) return bot.answerCallbackQuery(query.id,{ text:'⚠️ Event not found.' });
-    const text = `*${escapeMarkdownV1(e.name)}*\n📍 ${escapeMarkdownV1(e.city)}\n🕒 ${new Date(e.datetime).toLocaleString()}\nℹ️ ${escapeMarkdownV1(e.description||'No description')}`;
-    bot.sendMessage(query.message.chat.id,text,{ parse_mode:'Markdown' });
+    const event = res.rows[0];
+    if(!event) return bot.answerCallbackQuery(query.id,'⚠️ Event not found.');
+    const dateStr = new Date(event.datetime).toLocaleString();
+    let text = `📌 Event: ${event.name}\nCity: ${event.city}\nDate/Time: ${dateStr}\nMin/Max attendees: ${event.min_attendees}/${event.max_attendees}\nConfirmed: ${event.is_confirmed ? '✅' : '⌛'}\nDescription: ${event.description || 'N/A'}\nVenue: ${event.venue || 'N/A'}\nPerk: ${event.basic_perk || 'N/A'}`;
+    bot.sendMessage(query.message.chat.id,text);
     return bot.answerCallbackQuery(query.id);
   }
+
+  bot.answerCallbackQuery(query.id);
 });
 
-// ===== MESSAGE HANDLER =====
-bot.on('message', async (msg)=>{
-  const tgId = String(msg.from.id);
-  const state = userStates[tgId];
-  if(!state) return;
-
-  // Profile edit
-  if(state.step==='editingProfile'){
-    const field = state.field;
-    const email = msg.text.trim();
-    if(!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)){
-      return bot.sendMessage(msg.chat.id,'⚠️ Please send a valid email.');
-    }
-    await saveUserProfile(tgId,{ [field]:email });
-    bot.sendMessage(msg.chat.id,`✅ ${field} updated to ${email}`);
-    delete userStates[tgId];
-  }
-
-// Scanning
-if(state.step==='scanningTicket'){
-  try{
-    let qrData = msg.text;
-
-    if(msg.photo?.length){
-      const fileId = msg.photo[msg.photo.length-1].file_id;
-      const buffer = await downloadFile(fileId);
-
-      // Use Jimp to read image
-      const image = await Jimp.read(buffer);
-      const qr = new QrCode();
-      qrData = await new Promise((resolve,reject)=>{
-        qr.callback = function(err,value){
-          if(err) return reject(err);
-          resolve(value.result);
-        };
-        qr.decode(image.bitmap);
-      });
-    }
-
-    const res = await validateTicket(tgId,qrData);
-    bot.sendMessage(msg.chat.id,res.msg);
-    delete userStates[tgId];
-  } catch(err){
-    console.error(err);
-    bot.sendMessage(msg.chat.id,'❌ Failed to scan ticket. Send text or clear photo.');
-  }
-}
-});// Webhook
+// ===== WEBHOOK =====
 bot.setWebHook(`${PUBLIC_URL}/bot${BOT_TOKEN}`);
-app.post(`/bot${BOT_TOKEN}`, (req,res)=>{
-  bot.processUpdate(req.body);
-  res.sendStatus(200);
-});
+app.post(`/bot${BOT_TOKEN}`, (req,res)=>{ bot.processUpdate(req.body); res.sendStatus(200); });
 
 // Start server
 app.listen(PORT,()=>console.log(`🚀 Bot listening on port ${PORT}`));
-
-
-
-
-
-
 
