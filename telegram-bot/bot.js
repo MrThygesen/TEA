@@ -1,13 +1,10 @@
 import TelegramBot from 'node-telegram-bot-api';
 import pkg from 'pg';
-import QRCode from 'qrcode';
 import dotenv from 'dotenv';
 import express from 'express';
 import { runMigrations } from './migrations.js';
 import sgMail from '@sendgrid/mail';
-import axios from 'axios'; 
-import * as Jimp from 'jimp';
-import QrCode from 'qrcode-reader';
+import crypto from 'crypto';
 
 dotenv.config();
 const { Pool } = pkg;
@@ -144,82 +141,90 @@ async function registerUser(eventId, tgId, username, email, wallet) {
   return { confirmed:newCount>=event.min_attendees, eventName:event.name, statusMsg };
 }
 
-// Ticket generation
-async function sendTicket(chatId,tgId,eventId,eventName){
+// Deep link token generation
+function generateTicketToken(eventId, tgId, guestUsername) {
+  const ts = Date.now();
+  const secret = process.env.TICKET_SECRET;
+  const sig = crypto
+    .createHmac('sha256', secret)
+    .update(`${tgId}|${eventId}|${ts}`)
+    .digest('hex');
+  const payload = { guest_id: tgId, guest_username: guestUsername, eventId, ts, sig };
+  return Buffer.from(JSON.stringify(payload)).toString('base64url');
+}
+
+// Ticket send (deep link)
+async function sendTicket(chatId, tgId, eventId, eventName, guestUsername) {
   const events = await getUserEvents(tgId);
   const isRegistered = events.some(e=>e.id===eventId);
   if(!isRegistered) return bot.sendMessage(chatId,'⚠️ You are not registered for this event.');
 
-  const qrData = JSON.stringify({eventId,tgId});
-  const qrImage = await QRCode.toBuffer(qrData);
-  bot.sendPhoto(chatId, qrImage, { caption:`🎟 Ticket for ${eventName}` });
+  const token = generateTicketToken(eventId, tgId, guestUsername);
+  const link = `https://t.me/${process.env.BOT_USERNAME}?start=${token}`;
+
+  bot.sendMessage(chatId, `🎟 Ticket for ${eventName}\nClick to verify: ${link}`);
 }
 
-// Ticket validation
-async function validateTicket(scannedByTgId, scannedTicketData){
+// Deep link verifier
+async function verifyDeepLinkToken(token, scannerTgId) {
+  let payload;
   try {
-    const {eventId,tgId} = JSON.parse(scannedTicketData);
-    const regRes = await pool.query('SELECT * FROM registrations WHERE telegram_user_id=$1 AND event_id=$2',[tgId,eventId]);
-    const registration = regRes.rows[0];
-    if(!registration) return { success:false, msg:'⚠️ Ticket not found or user not registered.' };
-    if(registration.ticket_validated) return { success:false, msg:'ℹ️ Ticket already validated.' };
-
-    const profileRes = await pool.query('SELECT role,telegram_username FROM user_profiles WHERE telegram_user_id=$1',[scannedByTgId]);
-    const scannerProfile = profileRes.rows[0];
-    if(!scannerProfile || scannerProfile.role!=='organizer') return { success:false, msg:'❌ Not authorized.' };
-
-    await pool.query('UPDATE registrations SET ticket_validated=TRUE,validated_by=$1,validated_at=NOW() WHERE telegram_user_id=$2 AND event_id=$3',
-      [scannedByTgId,tgId,eventId]);
-
-    await bot.sendMessage(tgId, `✅ Your ticket for event ID ${eventId} validated by @${scannerProfile.telegram_username||'organizer'}.`);
-    return { success:true, msg:'✅ Ticket validated.' };
-  } catch(err){
-    console.error('❌ Error validating ticket', err);
-    return { success:false, msg:'❌ Error validating ticket.' };
+    payload = JSON.parse(Buffer.from(token, 'base64url').toString('utf8'));
+  } catch {
+    return { success: false, msg: 'Invalid token format' };
   }
-}
 
-// QR scan helpers
-async function downloadFile(fileId){
-  const file = await bot.getFile(fileId);
-  const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
-  const resp = await axios.get(url,{responseType:'arraybuffer'});
-  return Buffer.from(resp.data);
-}
+  const secret = process.env.TICKET_SECRET;
+  const expectedSig = crypto
+    .createHmac('sha256', secret)
+    .update(`${payload.guest_id}|${payload.eventId}|${payload.ts}`)
+    .digest('hex');
+  if (expectedSig !== payload.sig) return { success: false, msg: 'Bad signature' };
 
-// Show events
-async function showEvents(chatId, city){
-  const events = await getOpenEventsByCity(city);
-  if(!events.length) return bot.sendMessage(chatId,'📭 No upcoming events for this city.');
-  const opts = { reply_markup:{ inline_keyboard:[] } };
-  let text = `🎉 Upcoming events in ${city}:\n`;
-  events.forEach((e,i)=>{
-    const dateStr = new Date(e.datetime).toLocaleString();
-    text += `\n${i+1}. ${e.name} — ${dateStr}`;
-    opts.reply_markup.inline_keyboard.push([
-      { text:'Register', callback_data:`register_${e.id}` },
-      { text:'Details', callback_data:`details_${e.id}` }
-    ]);
-  });
-  bot.sendMessage(chatId,text,opts);
-}
+  if (Date.now() - payload.ts > 10 * 60 * 1000) return { success: false, msg: 'Token expired' };
 
-// Start scanning
-async function startScan(tgId, chatId){
-  const profileRes = await pool.query('SELECT role,telegram_username FROM user_profiles WHERE telegram_user_id=$1',[tgId]);
-  const profile = profileRes.rows[0];
-  if(!profile || profile.role!=='organizer') return bot.sendMessage(chatId,'❌ Not authorized to scan tickets.');
-  userStates[tgId] = { step:'scanningTicket' };
-  bot.sendMessage(chatId,'📸 Send QR code text or photo to validate ticket.');
+  const regRes = await pool.query(
+    'SELECT r.*, e.name as event_name FROM registrations r JOIN events e ON r.event_id=e.id WHERE r.telegram_user_id=$1 AND r.event_id=$2',
+    [payload.guest_id, payload.eventId]
+  );
+  const registration = regRes.rows[0];
+  if (!registration) return { success: false, msg: 'No registration found' };
+  if (registration.ticket_validated) return { success: false, msg: 'Ticket already used' };
+
+  await pool.query(
+    'UPDATE registrations SET ticket_validated=TRUE, validated_by=$1, validated_at=NOW() WHERE telegram_user_id=$2 AND event_id=$3',
+    [scannerTgId, payload.guest_id, payload.eventId]
+  );
+
+  return { success: true, guest_username: payload.guest_username, eventName: registration.event_name };
 }
 
 // ===== COMMANDS =====
-bot.onText(/\/start/, async (msg)=>{
+bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
   const tgId = String(msg.from.id);
   const username = msg.from.username || '';
+  const payload = match[1];
+
   const profile = await getUserProfile(tgId);
-  if(!profile) await saveUserProfile(tgId,{ telegram_username:username });
-  bot.sendMessage(msg.chat.id, `👋 Welcome ${username}! Use /events to see events, /myevents for your registrations, /user_edit to add email, /help for commands.`);
+  if (!profile) await saveUserProfile(tgId,{ telegram_username:username });
+
+  if (!payload) {
+    return bot.sendMessage(msg.chat.id,
+      `👋 Welcome ${username}! Use /events to see events, /myevents for your registrations, /user_edit to add email, /help for commands.`);
+  }
+
+  try {
+    const result = await verifyDeepLinkToken(payload, tgId);
+    if (result.success) {
+      bot.sendMessage(msg.chat.id,
+        `✅ Welcome @${result.guest_username}!\n🎟 Ticket for "${result.eventName}" verified.`);
+    } else {
+      bot.sendMessage(msg.chat.id, `❌ Verification failed: ${result.msg}`);
+    }
+  } catch (err) {
+    console.error('Deep link verification error', err);
+    bot.sendMessage(msg.chat.id, '❌ Internal error verifying ticket.');
+  }
 });
 
 bot.onText(/\/help/, async (msg)=>{
@@ -231,7 +236,6 @@ bot.onText(/\/help/, async (msg)=>{
 - /myevents - Your registered events
 - /ticket - Get ticket for event
 - /user_edit - Add/update email
-- /scan - Scan QR code (organizers)
 - /myid - Show your Telegram ID
 `);
 });
@@ -242,7 +246,6 @@ bot.onText(/\/myid/, async (msg)=>{
   bot.sendMessage(msg.chat.id, `🆔 Your Telegram ID: ${tgId}\nUsername: @${username}`);
 });
 
-// /events
 bot.onText(/\/events/, async (msg)=>{
   const chatId = msg.chat.id;
   const cities = await getAvailableCities();
@@ -251,24 +254,18 @@ bot.onText(/\/events/, async (msg)=>{
   bot.sendMessage(chatId,'📍 Select your city:',opts);
 });
 
-// /user_edit
 bot.onText(/\/user_edit/, async (msg)=>{
   const tgId = String(msg.from.id);
   const profile = await getUserProfile(tgId);
   if(!profile) await saveUserProfile(tgId,{ telegram_username:msg.from.username||'' });
 
-  if(!profile?.email){
-    userStates[tgId] = { step:'editingProfile', field:'email' };
-    bot.sendMessage(msg.chat.id,'📧 You do not have an email registered. Please send your email now.');
-  } else {
-    userStates[tgId] = { step:'editingProfile', field:'email' };
-    bot.sendMessage(msg.chat.id,`📧 Current email: ${profile.email}\nSend a new email to update.`);
-  }
+  userStates[tgId] = { step:'editingProfile', field:'email' };
+  bot.sendMessage(msg.chat.id,`📧 Current email: ${profile?.email || 'N/A'}\nSend a new email to update.`);
 });
 
-// /ticket
 bot.onText(/\/ticket/, async (msg)=>{
   const tgId = String(msg.from.id);
+  const username = msg.from.username || '';
   const events = await getUserEvents(tgId);
   if(!events.length) return bot.sendMessage(msg.chat.id,'📭 Not registered for events.');
   const opts = { reply_markup:{ inline_keyboard: [] } };
@@ -279,7 +276,6 @@ bot.onText(/\/ticket/, async (msg)=>{
   bot.sendMessage(msg.chat.id,'Select event for ticket:',opts);
 });
 
-// /myevents
 bot.onText(/\/myevents/, async (msg)=>{
   const tgId = String(msg.from.id);
   const events = await getUserEvents(tgId);
@@ -294,35 +290,26 @@ bot.onText(/\/myevents/, async (msg)=>{
   bot.sendMessage(msg.chat.id,text,opts);
 });
 
-// /scan
-bot.onText(/\/scan/, async (msg)=>{
-  const tgId = String(msg.from.id);
-  await startScan(tgId,msg.chat.id);
-});
-
 // ===== CALLBACK QUERY =====
 bot.on('callback_query', async (query)=>{
   const tgId = String(query.from.id);
   const data = query.data;
 
-  // City
   if(data.startsWith('city_')){
     const city = data.split('_')[1];
     await showEvents(query.message.chat.id,city);
     return bot.answerCallbackQuery(query.id);
   }
 
-  // Ticket
   if(data.startsWith('ticket_')){
     const eventId = parseInt(data.split('_')[1],10);
     const events = await getUserEvents(tgId);
     const event = events.find(e=>e.id===eventId);
     if(!event) return bot.answerCallbackQuery(query.id,'⚠️ Not registered.');
-    await sendTicket(query.message.chat.id,tgId,eventId,event.name);
+    await sendTicket(query.message.chat.id,tgId,eventId,event.name,query.from.username||'');
     return bot.answerCallbackQuery(query.id);
   }
 
-  // Register
   if(data.startsWith('register_')){
     const eventId = parseInt(data.split('_')[1],10);
     const profile = await getUserProfile(tgId);
@@ -331,7 +318,6 @@ bot.on('callback_query', async (query)=>{
     return bot.answerCallbackQuery(query.id);
   }
 
-  // Details
   if(data.startsWith('details_')){
     const eventId = parseInt(data.split('_')[1],10);
     const res = await pool.query('SELECT * FROM events WHERE id=$1',[eventId]);
@@ -346,56 +332,11 @@ bot.on('callback_query', async (query)=>{
   bot.answerCallbackQuery(query.id);
 });
 
-
-// Handle incoming messages depending on user state
+// Handle incoming messages for user_edit
 bot.on('message', async (msg) => {
   const tgId = String(msg.from.id);
   const state = userStates[tgId];
-
-  // Ignore commands (they're already handled separately)
   if (msg.text && msg.text.startsWith('/')) return;
-
-  // Handle scanning state
-  if (state?.step === 'scanningTicket') {
-    try {
-      let qrContent = null;
-
-      if (msg.photo) {
-        // User sent a photo -> download & decode QR
-        const fileId = msg.photo[msg.photo.length - 1].file_id; // largest resolution
-        const buffer = await downloadFile(fileId);
-
-        const image = await Jimp.read(buffer);
-        const qr = new QrCode();
-        qrContent = await new Promise((resolve, reject) => {
-          qr.callback = (err, value) => {
-            if (err) return reject(err);
-            resolve(value?.result || null);
-          };
-          qr.decode(image.bitmap);
-        });
-      } else if (msg.text) {
-        // User sent QR code text directly
-        qrContent = msg.text.trim();
-      }
-
-      if (!qrContent) {
-        return bot.sendMessage(msg.chat.id, '⚠️ Could not read QR code. Send a valid QR image or text.');
-      }
-
-      const result = await validateTicket(tgId, qrContent);
-      bot.sendMessage(msg.chat.id, result.msg);
-
-      // Clear scanning state
-      delete userStates[tgId];
-    } catch (err) {
-      console.error('❌ Scan error:', err);
-      bot.sendMessage(msg.chat.id, '❌ Failed to process QR. Try again.');
-      delete userStates[tgId];
-    }
-  }
-
-  // Handle user_edit state (email update)
   if (state?.step === 'editingProfile' && state.field === 'email') {
     const email = msg.text?.trim();
     if (!email || !email.includes('@')) {
@@ -406,8 +347,6 @@ bot.on('message', async (msg) => {
     delete userStates[tgId];
   }
 });
-
-
 
 // ===== WEBHOOK =====
 bot.setWebHook(`${PUBLIC_URL}/bot${BOT_TOKEN}`);
