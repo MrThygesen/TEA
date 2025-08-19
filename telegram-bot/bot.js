@@ -346,6 +346,69 @@ bot.on('callback_query', async (query)=>{
   bot.answerCallbackQuery(query.id);
 });
 
+
+// Handle incoming messages depending on user state
+bot.on('message', async (msg) => {
+  const tgId = String(msg.from.id);
+  const state = userStates[tgId];
+
+  // Ignore commands (they're already handled separately)
+  if (msg.text && msg.text.startsWith('/')) return;
+
+  // Handle scanning state
+  if (state?.step === 'scanningTicket') {
+    try {
+      let qrContent = null;
+
+      if (msg.photo) {
+        // User sent a photo -> download & decode QR
+        const fileId = msg.photo[msg.photo.length - 1].file_id; // largest resolution
+        const buffer = await downloadFile(fileId);
+
+        const image = await Jimp.read(buffer);
+        const qr = new QrCode();
+        qrContent = await new Promise((resolve, reject) => {
+          qr.callback = (err, value) => {
+            if (err) return reject(err);
+            resolve(value?.result || null);
+          };
+          qr.decode(image.bitmap);
+        });
+      } else if (msg.text) {
+        // User sent QR code text directly
+        qrContent = msg.text.trim();
+      }
+
+      if (!qrContent) {
+        return bot.sendMessage(msg.chat.id, '⚠️ Could not read QR code. Send a valid QR image or text.');
+      }
+
+      const result = await validateTicket(tgId, qrContent);
+      bot.sendMessage(msg.chat.id, result.msg);
+
+      // Clear scanning state
+      delete userStates[tgId];
+    } catch (err) {
+      console.error('❌ Scan error:', err);
+      bot.sendMessage(msg.chat.id, '❌ Failed to process QR. Try again.');
+      delete userStates[tgId];
+    }
+  }
+
+  // Handle user_edit state (email update)
+  if (state?.step === 'editingProfile' && state.field === 'email') {
+    const email = msg.text?.trim();
+    if (!email || !email.includes('@')) {
+      return bot.sendMessage(msg.chat.id, '⚠️ Invalid email. Please send a valid email address.');
+    }
+    await saveUserProfile(tgId, { email });
+    bot.sendMessage(msg.chat.id, `✅ Email updated to: ${email}`);
+    delete userStates[tgId];
+  }
+});
+
+
+
 // ===== WEBHOOK =====
 bot.setWebHook(`${PUBLIC_URL}/bot${BOT_TOKEN}`);
 app.post(`/bot${BOT_TOKEN}`, (req,res)=>{ bot.processUpdate(req.body); res.sendStatus(200); });
