@@ -6,7 +6,7 @@ import express from 'express';
 import { runMigrations } from './migrations.js';
 import fetch from 'node-fetch';
 import sgMail from '@sendgrid/mail';
-import * as Jimp from 'jimp'; 
+import * as Jimp from 'jimp';
 import QrCodeReader from 'qrcode-reader';
 
 dotenv.config();
@@ -74,13 +74,6 @@ async function saveUserProfile(tgId, data = {}) {
      ON CONFLICT (telegram_user_id) DO UPDATE SET ${setClause}, updated_at=CURRENT_TIMESTAMP`,
     [tgId, ...values]
   );
-}
-
-async function getAvailableCities() {
-  const res = await pool.query(
-    'SELECT DISTINCT city FROM events WHERE datetime > NOW() ORDER BY city ASC'
-  );
-  return res.rows.map((r) => r.city);
 }
 
 async function getOpenEventsByCity(city) {
@@ -208,14 +201,7 @@ async function startScan(tgId, chatId) {
   bot.sendMessage(chatId, '📸 Please send the QR code (text or photo) to validate the ticket.');
 }
 
-// ====== TELEGRAM HANDLERS ======
-
-// Inline buttons & /scan command
-bot.onText(/\/scan/, async (msg) => {
-  const tgId = String(msg.from.id);
-  await startScan(tgId, msg.chat.id);
-});
-
+// ====== MERGED CALLBACK QUERY HANDLER ======
 bot.on('callback_query', async (query) => {
   const tgId = String(query.from.id);
   const state = userStates[tgId];
@@ -223,9 +209,9 @@ bot.on('callback_query', async (query) => {
 
   if (data === 'scan_ticket') {
     await startScan(tgId, query.message.chat.id);
+    return;
   }
 
-  // Existing callback logic
   if (state?.step === 'choosingStartCity' && data.startsWith('setstartcity_')) {
     const city = data.replace('setstartcity_', '');
     await saveUserProfile(tgId, { city });
@@ -265,7 +251,7 @@ bot.on('callback_query', async (query) => {
   }
 });
 
-// Scan QR messages
+// ====== HANDLE SCANNED QR (TEXT OR PHOTO) ======
 bot.on('message', async (msg) => {
   const tgId = String(msg.from.id);
   const state = userStates[tgId];
@@ -273,18 +259,15 @@ bot.on('message', async (msg) => {
 
   try {
     let scannedData = null;
-
     if (msg.text && msg.text.startsWith('{') && msg.text.includes('eventId')) {
       scannedData = msg.text;
     }
-
     if (msg.photo?.length) {
       const fileId = msg.photo[msg.photo.length - 1].file_id;
       const file = await bot.getFile(fileId);
       const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
       scannedData = await scanQrFromPhotoUrl(url);
     }
-
     if (!scannedData) return bot.sendMessage(msg.chat.id, '❌ Could not detect QR code. Please try again.');
 
     const result = await validateTicket(tgId, scannedData);
@@ -297,7 +280,7 @@ bot.on('message', async (msg) => {
   }
 });
 
-// ====== BOT COMMANDS ======
+// ====== /help COMMAND ======
 bot.onText(/\/help/, (msg) => {
   const text = [
     '🤖 Bot Commands',
