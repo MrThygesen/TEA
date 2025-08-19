@@ -418,10 +418,12 @@ if(state.step==='scanningTicket'){
     bot.sendMessage(msg.chat.id,'❌ Failed to scan ticket. Send text or clear photo.');
   }
 }
-
-// Webhook
+});// Webhook
 bot.setWebHook(`${PUBLIC_URL}/bot${BOT_TOKEN}`);
-app.post(`/bot${BOT_TOKEN}`, (req,res)=>{ bot.processUpdate(req.body); res.sendStatus(200); });
+app.post(`/bot${BOT_TOKEN}`, (req,res)=>{
+  bot.processUpdate(req.body);
+  res.sendStatus(200);
+});
 
 // Start server
 app.listen(PORT,()=>console.log(`🚀 Bot listening on port ${PORT}`));
