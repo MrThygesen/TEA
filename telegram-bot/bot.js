@@ -6,7 +6,7 @@ import express from 'express';
 import { runMigrations } from './migrations.js';
 import fetch from 'node-fetch';
 import sgMail from '@sendgrid/mail';
-import Jimp from 'jimp';
+import * as Jimp from 'jimp'; 
 import QrCodeReader from 'qrcode-reader';
 
 dotenv.config();
