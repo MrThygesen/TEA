@@ -141,17 +141,21 @@ async function registerUser(eventId, tgId, username, email, wallet) {
   return { confirmed:newCount>=event.min_attendees, eventName:event.name, statusMsg };
 }
 
-// Deep link token generation
+// Generate a permanent ticket token for the user
 function generateTicketToken(eventId, tgId, guestUsername) {
-  const ts = Date.now();
   const secret = process.env.TICKET_SECRET;
+  if (!secret) throw new Error('TICKET_SECRET missing');
+
+  // No timestamp, just user + event + signature
   const sig = crypto
     .createHmac('sha256', secret)
-    .update(`${tgId}|${eventId}|${ts}`)
+    .update(`${tgId}|${eventId}`)
     .digest('hex');
-  const payload = { guest_id: tgId, guest_username: guestUsername, eventId, ts, sig };
+
+  const payload = { guest_id: tgId, guest_username: guestUsername, eventId, sig };
   return Buffer.from(JSON.stringify(payload)).toString('base64url');
 }
+
 
 // Ticket send (deep link)
 async function sendTicket(chatId, tgId, eventId, eventName, guestUsername) {
@@ -166,7 +170,7 @@ async function sendTicket(chatId, tgId, eventId, eventName, guestUsername) {
 }
 
 // Deep link verifier
-async function verifyDeepLinkToken(token, scannerTgId) {
+async function verifyLongTermTicket(token, scannerTgId) {
   let payload;
   try {
     payload = JSON.parse(Buffer.from(token, 'base64url').toString('utf8'));
@@ -177,22 +181,28 @@ async function verifyDeepLinkToken(token, scannerTgId) {
   const secret = process.env.TICKET_SECRET;
   const expectedSig = crypto
     .createHmac('sha256', secret)
-    .update(`${payload.guest_id}|${payload.eventId}|${payload.ts}`)
+    .update(`${payload.guest_id}|${payload.eventId}`)
     .digest('hex');
+
   if (expectedSig !== payload.sig) return { success: false, msg: 'Bad signature' };
 
-  if (Date.now() - payload.ts > 10 * 60 * 1000) return { success: false, msg: 'Token expired' };
-
+  // Check registration
   const regRes = await pool.query(
-    'SELECT r.*, e.name as event_name FROM registrations r JOIN events e ON r.event_id=e.id WHERE r.telegram_user_id=$1 AND r.event_id=$2',
+    `SELECT r.*, e.name as event_name, e.datetime 
+     FROM registrations r 
+     JOIN events e ON r.event_id=e.id 
+     WHERE r.telegram_user_id=$1 AND r.event_id=$2`,
     [payload.guest_id, payload.eventId]
   );
   const registration = regRes.rows[0];
   if (!registration) return { success: false, msg: 'No registration found' };
   if (registration.ticket_validated) return { success: false, msg: 'Ticket already used' };
 
+  // Mark ticket as validated by scanner
   await pool.query(
-    'UPDATE registrations SET ticket_validated=TRUE, validated_by=$1, validated_at=NOW() WHERE telegram_user_id=$2 AND event_id=$3',
+    `UPDATE registrations 
+     SET ticket_validated=TRUE, validated_by=$1, validated_at=NOW() 
+     WHERE telegram_user_id=$2 AND event_id=$3`,
     [scannerTgId, payload.guest_id, payload.eventId]
   );
 
