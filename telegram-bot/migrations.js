@@ -57,29 +57,30 @@ export async function runMigrations() {
     CREATE INDEX IF NOT EXISTS idx_events_city ON events(LOWER(city));
   `)
 
-  // 2️⃣ Registrations table
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS registrations (
-      id SERIAL PRIMARY KEY,
-      event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-      telegram_user_id TEXT NOT NULL,
-      telegram_username TEXT,
-      email TEXT,
-      wallet_address TEXT,
-      timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-      has_arrived BOOLEAN DEFAULT FALSE,
-      voucher_applied BOOLEAN DEFAULT FALSE,
-      UNIQUE (event_id, telegram_user_id)
-    );
-  `)
-  console.log('✅ Registrations table ready.')
+ // 2️⃣ Registrations table
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS registrations (
+    id SERIAL PRIMARY KEY,
+    event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    telegram_user_id TEXT NOT NULL,
+    telegram_username TEXT,
+    email TEXT,
+    wallet_address TEXT,
+    timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    has_arrived BOOLEAN DEFAULT FALSE,
+    voucher_applied BOOLEAN DEFAULT FALSE,
+    UNIQUE (event_id, telegram_user_id)
+  );
+`)
+console.log('✅ Registrations table ready.')
 
-  // Ensure new columns exist for upgrades
-  await pool.query(`
-    ALTER TABLE registrations
-    ADD COLUMN IF NOT EXISTS has_arrived BOOLEAN DEFAULT FALSE,
-    ADD COLUMN IF NOT EXISTS voucher_applied BOOLEAN DEFAULT FALSE;
-  `)
+// Ensure new columns exist for upgrades
+await pool.query(`
+  ALTER TABLE registrations
+  ADD COLUMN IF NOT EXISTS has_arrived BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS voucher_applied BOOLEAN DEFAULT FALSE;
+`)
+
 
   // 3️⃣ Invitations table
   await pool.query(`
@@ -109,26 +110,18 @@ export async function runMigrations() {
   // 5️⃣ User profiles table
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_profiles (
-      telegram_user_id TEXT UNIQUE,
-      telegram_username TEXT UNIQUE,
+      telegram_user_id TEXT PRIMARY KEY,
+      telegram_username TEXT,
       tier INTEGER DEFAULT 1 CHECK (tier IN (1, 2)),
       email TEXT,
       wallet_address TEXT,
       city TEXT DEFAULT 'Copenhagen',
-      role TEXT DEFAULT 'user',
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
-  `);
-
-  // Ensure role column exists for upgrades
-  await pool.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user';`);
-
-  // Ensure username is unique
-  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_profiles_username ON user_profiles(telegram_username);`);
-
-
+  `)
   console.log('✅ User profiles table ready.')
+
   console.log('All migrations complete. No data has been deleted.')
 }
 
