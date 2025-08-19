@@ -290,6 +290,28 @@ bot.onText(/\/myevents/, async (msg)=>{
   bot.sendMessage(msg.chat.id,text,opts);
 });
 
+// ===== HELPER: showEvents =====
+async function showEvents(chatId, city) {
+  const events = await getOpenEventsByCity(city);
+  if (!events.length) {
+    return bot.sendMessage(chatId, `📭 No upcoming events in ${city}.`);
+  }
+
+  const opts = { reply_markup: { inline_keyboard: [] } };
+  let text = `📅 Upcoming events in ${city}:\n`;
+
+  events.forEach(e => {
+    const dateStr = new Date(e.datetime).toLocaleString();
+    text += `\n• ${e.name} — ${dateStr}`;
+    opts.reply_markup.inline_keyboard.push([
+      { text: 'Details', callback_data: `details_${e.id}` },
+      { text: 'Register', callback_data: `register_${e.id}` }
+    ]);
+  });
+
+  bot.sendMessage(chatId, text, opts);
+}
+
 // ===== CALLBACK QUERY =====
 bot.on('callback_query', async (query)=>{
   const tgId = String(query.from.id);
@@ -297,7 +319,7 @@ bot.on('callback_query', async (query)=>{
 
   if(data.startsWith('city_')){
     const city = data.split('_')[1];
-    await showEvents(query.message.chat.id,city);
+    await showEvents(query.message.chat.id, city);
     return bot.answerCallbackQuery(query.id);
   }
 
@@ -331,6 +353,7 @@ bot.on('callback_query', async (query)=>{
 
   bot.answerCallbackQuery(query.id);
 });
+
 
 // Handle incoming messages for user_edit
 bot.on('message', async (msg) => {
