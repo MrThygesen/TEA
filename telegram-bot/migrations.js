@@ -1,17 +1,21 @@
-// telegram-bot/migrations.js
-import { pool } from './lib/postgres.js'
+// migrations.js
+import pkg from 'pg';
+const { Pool } = pkg;
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+});
 
 export async function runMigrations() {
-  console.log('Running safe migrations...')
-
-  // 1️⃣ Events table
   await pool.query(`
+    -- === EVENTS TABLE ===
     CREATE TABLE IF NOT EXISTS events (
       id SERIAL PRIMARY KEY,
       group_id TEXT,
-      name TEXT,
-      city TEXT,
-      datetime TIMESTAMPTZ,
+      name TEXT NOT NULL,
+      city TEXT NOT NULL,
+      datetime TIMESTAMPTZ NOT NULL,
       min_attendees INTEGER DEFAULT 1,
       max_attendees INTEGER DEFAULT 40,
       is_confirmed BOOLEAN DEFAULT FALSE,
@@ -22,21 +26,8 @@ export async function runMigrations() {
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
-  `)
-  console.log('✅ Events table ready.')
 
-  // Ensure columns exist (for upgrades)
-  await pool.query(`
-    ALTER TABLE events
-    ADD COLUMN IF NOT EXISTS description TEXT,
-    ADD COLUMN IF NOT EXISTS venue TEXT,
-    ADD COLUMN IF NOT EXISTS basic_perk TEXT,
-    ADD COLUMN IF NOT EXISTS advanced_perk TEXT,
-    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
-  `)
-
-  // Trigger for updated_at
-  await pool.query(`
+    -- Trigger for updated_at
     CREATE OR REPLACE FUNCTION update_updated_at_column()
     RETURNS TRIGGER AS $$
     BEGIN
@@ -50,40 +41,38 @@ export async function runMigrations() {
     BEFORE UPDATE ON events
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
-  `)
 
-  // Index for city filtering
-  await pool.query(`
-    CREATE INDEX IF NOT EXISTS idx_events_city ON events(LOWER(city));
-  `)
+    -- === USER PROFILES TABLE ===
+    CREATE TABLE IF NOT EXISTS user_profiles (
+      telegram_user_id TEXT PRIMARY KEY,
+      telegram_username TEXT UNIQUE,
+      tier INTEGER DEFAULT 1 CHECK (tier IN (1, 2)),
+      email TEXT,
+      wallet_address TEXT,
+      city TEXT DEFAULT 'Copenhagen',
+      role TEXT DEFAULT 'user' CHECK (role IN ('user','organizer','admin')),
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
 
- // 2️⃣ Registrations table
-await pool.query(`
-  CREATE TABLE IF NOT EXISTS registrations (
-    id SERIAL PRIMARY KEY,
-    event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-    telegram_user_id TEXT NOT NULL,
-    telegram_username TEXT,
-    email TEXT,
-    wallet_address TEXT,
-    timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    has_arrived BOOLEAN DEFAULT FALSE,
-    voucher_applied BOOLEAN DEFAULT FALSE,
-    UNIQUE (event_id, telegram_user_id)
-  );
-`)
-console.log('✅ Registrations table ready.')
+    -- === REGISTRATIONS TABLE ===
+    CREATE TABLE IF NOT EXISTS registrations (
+      id SERIAL PRIMARY KEY,
+      event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+      telegram_user_id TEXT NOT NULL REFERENCES user_profiles(telegram_user_id) ON DELETE CASCADE,
+      telegram_username TEXT,
+      email TEXT,
+      wallet_address TEXT,
+      timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      has_arrived BOOLEAN DEFAULT FALSE,
+      voucher_applied BOOLEAN DEFAULT FALSE,
+      ticket_validated BOOLEAN DEFAULT FALSE,
+      validated_by TEXT,
+      validated_at TIMESTAMPTZ,
+      UNIQUE (event_id, telegram_user_id)
+    );
 
-// Ensure new columns exist for upgrades
-await pool.query(`
-  ALTER TABLE registrations
-  ADD COLUMN IF NOT EXISTS has_arrived BOOLEAN DEFAULT FALSE,
-  ADD COLUMN IF NOT EXISTS voucher_applied BOOLEAN DEFAULT FALSE;
-`)
-
-
-  // 3️⃣ Invitations table
-  await pool.query(`
+    -- === INVITATIONS TABLE ===
     CREATE TABLE IF NOT EXISTS invitations (
       id SERIAL PRIMARY KEY,
       event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
@@ -94,34 +83,18 @@ await pool.query(`
       confirmed BOOLEAN DEFAULT FALSE,
       timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
-  `)
-  console.log('✅ Invitations table ready.')
 
-  // 4️⃣ User emails table
-  await pool.query(`
+    -- === EMAIL SUBSCRIBERS TABLE ===
     CREATE TABLE IF NOT EXISTS user_emails (
       telegram_user_id TEXT PRIMARY KEY,
       email TEXT NOT NULL,
       subscribed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
-  `)
-  console.log('✅ User emails table ready.')
 
-  // 5️⃣ User profiles table
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS user_profiles (
-      telegram_user_id TEXT PRIMARY KEY,
-      telegram_username TEXT,
-      tier INTEGER DEFAULT 1 CHECK (tier IN (1, 2)),
-      email TEXT,
-      wallet_address TEXT,
-      city TEXT DEFAULT 'Copenhagen',
-      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-    );
-  `)
-  console.log('✅ User profiles table ready.')
+    -- Index for city filtering
+    CREATE INDEX IF NOT EXISTS idx_events_city ON events(LOWER(city));
+  `);
 
-  console.log('All migrations complete. No data has been deleted.')
+  console.log('✅ Full migrations complete.');
 }
 
