@@ -6,8 +6,7 @@ import express from 'express';
 import { runMigrations } from './migrations.js';
 import fetch from 'node-fetch';
 import sgMail from '@sendgrid/mail';
-import * as Jimp from 'jimp';
-import QrCodeReader from 'qrcode-reader';
+import axios from 'axios';
 
 dotenv.config();
 const { Pool } = pkg;
@@ -57,7 +56,7 @@ function escapeMarkdownV1(text) {
   return text.toString().replace(/([\\_*[\]()~`>#+\-=|{}.!])/g, '\\$1');
 }
 
-// ====== HELPER FUNCTIONS ======
+// ====== DB HELPERS ======
 async function getUserProfile(tgId) {
   const res = await pool.query('SELECT * FROM user_profiles WHERE telegram_user_id=$1', [tgId]);
   return res.rows[0] || null;
@@ -74,6 +73,13 @@ async function saveUserProfile(tgId, data = {}) {
      ON CONFLICT (telegram_user_id) DO UPDATE SET ${setClause}, updated_at=CURRENT_TIMESTAMP`,
     [tgId, ...values]
   );
+}
+
+async function getAvailableCities() {
+  const res = await pool.query(
+    'SELECT DISTINCT city FROM events WHERE datetime > NOW() ORDER BY city ASC'
+  );
+  return res.rows.map(r => r.city);
 }
 
 async function getOpenEventsByCity(city) {
@@ -99,24 +105,123 @@ async function getUserEvents(tgId) {
   return res.rows;
 }
 
+// ====== EMAIL NOTIFICATIONS ======
+async function notifyEventConfirmedViaApi(eventId, eventName, eventCity, eventDateTime) {
+  try {
+    const regRes = await pool.query(
+      'SELECT email, wallet_address, telegram_username FROM registrations WHERE event_id=$1 AND email IS NOT NULL',
+      [eventId]
+    );
+    const attendees = regRes.rows;
+    if (!attendees.length) return;
+
+    await Promise.all(attendees.map(async (attendee) => {
+      const msg = {
+        to: attendee.email,
+        from: 'no-reply@teanet.xyz',
+        subject: `Event Confirmed: ${eventName}`,
+        html: `
+          <p>Hi ${attendee.telegram_username || ''},</p>
+          <p>Your event <strong>${eventName}</strong> is now confirmed! 🎉</p>
+          <p><strong>Date/Time:</strong> ${eventDateTime || 'TBA'}</p>
+          <p><strong>City:</strong> ${eventCity || 'TBA'}</p>
+        `
+      };
+      await sgMail.send(msg);
+    }));
+
+    console.log(`📧 Event confirmation sent to ${attendees.length} attendees`);
+  } catch (err) {
+    console.error('❌ Failed to send event confirmation via SendGrid', err);
+  }
+}
+
+// ====== REGISTRATION ======
+async function registerUser(eventId, tgId, username, email, wallet) {
+  const regCheck = await pool.query(
+    'SELECT * FROM registrations WHERE event_id=$1 AND telegram_user_id=$2',
+    [eventId, tgId]
+  );
+  const alreadyRegistered = regCheck.rows.length > 0;
+
+  const eventRes = await pool.query(
+    'SELECT name, min_attendees, max_attendees, is_confirmed FROM events WHERE id=$1',
+    [eventId]
+  );
+  const event = eventRes.rows[0];
+  if (!event) return { statusMsg: '⚠️ Event not found.', confirmed: false };
+
+  const countRes = await pool.query(
+    'SELECT COUNT(*)::int AS count FROM registrations WHERE event_id=$1',
+    [eventId]
+  );
+  const count = countRes.rows[0]?.count || 0;
+
+  if (event.max_attendees && !alreadyRegistered && count >= event.max_attendees) {
+    return { statusMsg: '⚠️ Sorry, this event is full.', confirmed: false };
+  }
+
+  if (!alreadyRegistered) {
+    await pool.query(
+      `INSERT INTO registrations
+       (event_id, telegram_user_id, telegram_username, email, wallet_address)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (event_id, telegram_user_id) DO NOTHING`,
+      [eventId, tgId, username, email, wallet || null]
+    );
+  }
+
+  const newCountRes = await pool.query(
+    'SELECT COUNT(*)::int AS count FROM registrations WHERE event_id=$1',
+    [eventId]
+  );
+  const newCount = newCountRes.rows[0]?.count || 0;
+
+  let statusMsg = `👥 ${newCount} people registered.\n`;
+  if (alreadyRegistered) statusMsg = `ℹ️ You have already registered for this event.\n${statusMsg}`;
+
+  if (!event.is_confirmed && newCount >= event.min_attendees) {
+    await pool.query('UPDATE events SET is_confirmed=TRUE WHERE id=$1', [eventId]);
+    statusMsg += '✅ The event is now confirmed! You can generate your ticket.';
+
+    const detailsRes = await pool.query('SELECT name, city, datetime FROM events WHERE id=$1', [eventId]);
+    const details = detailsRes.rows[0];
+    const eventDateTime = details ? new Date(details.datetime).toLocaleString() : '';
+    await notifyEventConfirmedViaApi(eventId, event.name, details?.city, eventDateTime);
+  } else if (!event.is_confirmed) {
+    statusMsg += '⌛ We are awaiting confirmation.';
+  } else {
+    statusMsg += '✅ This event is already confirmed!';
+  }
+
+  return {
+    confirmed: newCount >= event.min_attendees,
+    eventName: event.name,
+    statusMsg,
+  };
+}
+
+// ====== TICKET GENERATION ======
 async function sendTicket(chatId, tgId, eventId, eventName) {
   const events = await getUserEvents(tgId);
   const isRegistered = events.some(e => e.id === eventId);
   if (!isRegistered) {
     return bot.sendMessage(chatId, '⚠️ You are not registered for this event.', { parse_mode: 'Markdown' });
   }
+
   const qrData = JSON.stringify({ eventId, tgId });
   const qrImage = await QRCode.toBuffer(qrData);
+
   bot.sendPhoto(chatId, qrImage, {
     caption: `🎟 Ticket for ${escapeMarkdownV1(eventName)}`,
-    parse_mode: 'Markdown',
+    parse_mode: 'Markdown'
   });
 }
 
+// ====== TICKET VALIDATION ======
 async function validateTicket(scannedByTgId, scannedTicketData) {
   try {
     const { eventId, tgId } = JSON.parse(scannedTicketData);
-
     const regRes = await pool.query(
       'SELECT * FROM registrations WHERE telegram_user_id=$1 AND event_id=$2',
       [tgId, eventId]
@@ -151,17 +256,37 @@ async function validateTicket(scannedByTgId, scannedTicketData) {
   }
 }
 
-// ====== QR IMAGE SCANNING ======
-async function scanQrFromPhotoUrl(url) {
-  const image = await Jimp.read(url);
-  return new Promise((resolve, reject) => {
-    const qr = new QrCodeReader();
-    qr.callback = (err, value) => {
-      if (err || !value) return reject('❌ Failed to read QR code.');
-      resolve(value.result);
-    };
-    qr.decode(image.bitmap);
-  });
+// ====== QR SCAN ======
+async function downloadFile(fileId) {
+  const file = await bot.getFile(fileId);
+  const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+  const resp = await axios.get(url, { responseType: 'arraybuffer' });
+  return Buffer.from(resp.data);
+}
+
+async function scanQrFromTelegramPhoto(fileId) {
+  const buffer = await downloadFile(fileId);
+  try {
+    const result = await QRCode.decode(buffer);
+    return result;
+  } catch (err) {
+    throw new Error('❌ Failed to decode QR code from photo.');
+  }
+}
+
+// ====== START SCAN ======
+async function startScan(tgId, chatId) {
+  const profileRes = await pool.query(
+    'SELECT role, telegram_username FROM user_profiles WHERE telegram_user_id=$1',
+    [tgId]
+  );
+  const profile = profileRes.rows[0];
+  if (!profile || profile.role !== 'organizer') {
+    return bot.sendMessage(chatId, '❌ You are not authorized to validate tickets.');
+  }
+
+  userStates[tgId] = { step: 'scanningTicket' };
+  bot.sendMessage(chatId, '📸 Please send the QR code (text or photo) to validate the ticket.');
 }
 
 // ====== SHOW EVENTS ======
@@ -186,22 +311,33 @@ async function showEvents(chatId, city) {
   bot.sendMessage(chatId, text, { parse_mode: 'Markdown', ...opts });
 }
 
-// ====== SCAN LOGIC ======
-async function startScan(tgId, chatId) {
-  const profileRes = await pool.query(
-    'SELECT role, telegram_username FROM user_profiles WHERE telegram_user_id=$1',
-    [tgId]
-  );
-  const profile = profileRes.rows[0];
-  if (!profile || profile.role !== 'organizer') {
-    return bot.sendMessage(chatId, '❌ You are not authorized to validate tickets.');
-  }
+// ====== BOT COMMANDS ======
 
-  userStates[tgId] = { step: 'scanningTicket' };
-  bot.sendMessage(chatId, '📸 Please send the QR code (text or photo) to validate the ticket.');
-}
+// /start
+bot.onText(/\/start/, async (msg) => {
+  const tgId = String(msg.from.id);
+  const username = msg.from.username || '';
+  const profile = await getUserProfile(tgId);
+  if (!profile) await saveUserProfile(tgId, { telegram_username: username });
 
-// ====== /user_edit COMMAND ======
+  bot.sendMessage(msg.chat.id, `👋 Welcome ${username}! Use /events to see upcoming events, /myevents to view your registrations, or /help for commands.`);
+});
+
+// /help
+bot.onText(/\/help/, async (msg) => {
+  bot.sendMessage(msg.chat.id,
+    `ℹ️ *Commands*:
+/start - Welcome message
+/help - This message
+/events - List events by city
+/myevents - Your registered events
+/ticket - Get ticket for event
+/user_edit - Edit your profile
+/scan - Scan QR code (organizers only)
+`, { parse_mode: 'Markdown' });
+});
+
+// /user_edit
 bot.onText(/\/user_edit/, async (msg) => {
   const tgId = String(msg.from.id);
   const profile = await getUserProfile(tgId);
@@ -218,7 +354,7 @@ bot.onText(/\/user_edit/, async (msg) => {
   bot.sendMessage(msg.chat.id, 'Select a field to edit:', opts);
 });
 
-// ====== /ticket COMMAND ======
+// /ticket
 bot.onText(/\/ticket/, async (msg) => {
   const tgId = String(msg.from.id);
   const events = await getUserEvents(tgId);
@@ -234,15 +370,124 @@ bot.onText(/\/ticket/, async (msg) => {
   bot.sendMessage(msg.chat.id, 'Select an event to get your ticket:', opts);
 });
 
-// ====== /scan COMMAND ======
+// /myevents
+bot.onText(/\/myevents/, async (msg) => {
+  const tgId = String(msg.from.id);
+  const events = await getUserEvents(tgId);
+
+  if (!events.length) return bot.sendMessage(msg.chat.id, '📭 You are not registered for any events yet.');
+
+  const opts = { reply_markup: { inline_keyboard: [] } };
+  let text = '📅 *Your upcoming events*:\n';
+
+  events.forEach((e, i) => {
+    const dateStr = new Date(e.datetime).toLocaleString();
+    text += `\n• *${escapeMarkdownV1(e.name)}* — ${escapeMarkdownV1(dateStr)}`;
+    opts.reply_markup.inline_keyboard.push([
+      { text: '🎟 Get Ticket', callback_data: `ticket_${e.id}` }
+    ]);
+  });
+
+  bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown', ...opts });
+});
+
+// /scan
 bot.onText(/\/scan/, async (msg) => {
   const tgId = String(msg.from.id);
   await startScan(tgId, msg.chat.id);
 });
 
-// ====== /start, /myevents, /help and callback_query ======
-// (Keep all your current implementations, including /start, /myevents, QR scanning, callback_query handling)
-// No changes needed except adding /user_edit, /ticket, /scan
+// ====== CALLBACK QUERY ======
+bot.on('callback_query', async (query) => {
+  const tgId = String(query.from.id);
+  const data = query.data;
+
+  if (data.startsWith('ticket_')) {
+    const eventId = parseInt(data.split('_')[1], 10);
+    const events = await getUserEvents(tgId);
+    const event = events.find(e => e.id === eventId);
+    if (!event) return bot.answerCallbackQuery(query.id, { text: '⚠️ Not registered.' });
+    await sendTicket(query.message.chat.id, tgId, eventId, event.name);
+    return bot.answerCallbackQuery(query.id);
+  }
+
+  if (data.startsWith('register_')) {
+    const eventId = parseInt(data.split('_')[1], 10);
+    const profile = await getUserProfile(tgId);
+    const username = profile?.telegram_username || '';
+    const email = profile?.email || null;
+    const wallet = profile?.wallet_address || null;
+
+    const res = await registerUser(eventId, tgId, username, email, wallet);
+    bot.answerCallbackQuery(query.id, { text: res.statusMsg });
+    return;
+  }
+
+  if (data.startsWith('details_')) {
+    const eventId = parseInt(data.split('_')[1], 10);
+    const eventRes = await pool.query('SELECT * FROM events WHERE id=$1', [eventId]);
+    const event = eventRes.rows[0];
+    if (!event) return bot.answerCallbackQuery(query.id, { text: 'Event not found.' });
+
+    const dateStr = new Date(event.datetime).toLocaleString();
+    let text = `ℹ️ *${escapeMarkdownV1(event.name)}*\n`;
+    text += `📍 City: ${escapeMarkdownV1(event.city)}\n`;
+    text += `📅 Date/Time: ${escapeMarkdownV1(dateStr)}\n`;
+    if (event.description) text += `📝 Description: ${escapeMarkdownV1(event.description)}\n`;
+    if (event.venue) text += `🏛 Venue: ${escapeMarkdownV1(event.venue)}\n`;
+    bot.sendMessage(query.message.chat.id, text, { parse_mode: 'Markdown' });
+    bot.answerCallbackQuery(query.id);
+  }
+
+  if (data.startsWith('edit_')) {
+    const field = data.split('_')[1];
+    userStates[tgId] = { step: 'editingProfile', field };
+    bot.sendMessage(query.message.chat.id, `✏️ Please send the new ${field}`);
+    bot.answerCallbackQuery(query.id);
+  }
+});
+
+// ====== MESSAGE HANDLER FOR SCAN / PROFILE EDIT ======
+bot.on('message', async (msg) => {
+  const tgId = String(msg.from.id);
+  const state = userStates[tgId];
+
+  if (!state) return;
+
+  // Scanning QR
+  if (state.step === 'scanningTicket') {
+    try {
+      let qrData;
+
+      if (msg.text && msg.text.startsWith('{') && msg.text.includes('eventId')) {
+        qrData = msg.text;
+      } else if (msg.photo && msg.photo.length) {
+        const fileId = msg.photo[msg.photo.length - 1].file_id;
+        qrData = await scanQrFromTelegramPhoto(fileId);
+      } else {
+        return bot.sendMessage(msg.chat.id, '⚠️ Please send a valid QR code (text or photo).');
+      }
+
+      const result = await validateTicket(tgId, qrData);
+      bot.sendMessage(msg.chat.id, result.msg, { parse_mode: 'Markdown' });
+    } catch (err) {
+      console.error(err);
+      bot.sendMessage(msg.chat.id, '❌ Failed to scan QR code.');
+    } finally {
+      delete userStates[tgId];
+    }
+    return;
+  }
+
+  // Editing profile
+  if (state.step === 'editingProfile') {
+    const field = state.field;
+    await saveUserProfile(tgId, { [field]: msg.text });
+    bot.sendMessage(msg.chat.id, `✅ ${field} updated successfully.`);
+    delete userStates[tgId];
+    return;
+  }
+});
 
 // ====== EXPRESS SERVER & WEBHOOK ======
 app.post(`/bot${BOT_TOKEN}`, (req, res) => {
