@@ -313,28 +313,52 @@ async function showEvents(chatId, city) {
 
 // ====== BOT COMMANDS ======
 
-// /start
+// ====== /start ======
 bot.onText(/\/start/, async (msg) => {
   const tgId = String(msg.from.id);
   const username = msg.from.username || '';
   const profile = await getUserProfile(tgId);
   if (!profile) await saveUserProfile(tgId, { telegram_username: username });
 
-  bot.sendMessage(msg.chat.id, `👋 Welcome ${username}! Use /events to see upcoming events, /myevents to view your registrations, or /help for commands.`);
+  const safeUsername = escapeMarkdownV1(username);
+
+  const text = `👋 Welcome ${safeUsername}!\n\n` +
+               `Use the following commands:\n` +
+               `/events - List upcoming events by city\n` +
+               `/myevents - Your registered events\n` +
+               `/help - Show this help message\n` +
+               `/myid - Show your Telegram ID and username`;
+
+  bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown' });
 });
 
-// /help
+
+// ====== /myid ======
+bot.onText(/\/myid/, async (msg) => {
+  const tgId = msg.from.id;
+  const username = msg.from.username || '';
+  const safeUsername = escapeMarkdownV1(username);
+
+  const text = `🆔 *Your Telegram info*:\n` +
+               `• ID: \`${tgId}\`\n` +
+               `• Username: @${safeUsername}`;
+
+  bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown' });
+});
+
+// ====== /help ======
 bot.onText(/\/help/, async (msg) => {
-  bot.sendMessage(msg.chat.id,
-    `ℹ️ *Commands*:
-/start - Welcome message
-/help - This message
-/events - List events by city
-/myevents - Your registered events
-/ticket - Get ticket for event
-/user_edit - Edit your profile
-/scan - Scan QR code (organizers only)
-`, { parse_mode: 'Markdown' });
+  const text = `ℹ️ *Commands*:\n` +
+               `/start - Welcome message\n` +
+               `/help - This message\n` +
+               `/events - List events by city\n` +
+               `/myevents - Your registered events\n` +
+               `/ticket - Get ticket for event\n` +
+               `/user_edit - Edit your profile\n` +
+               `/scan - Scan QR code (organizers only)\n` +
+               `/myid - Show your Telegram ID and username`;
+
+  bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown' });
 });
 
 // /events
@@ -385,18 +409,27 @@ bot.onText(/\/ticket/, async (msg) => {
 });
 
 // /myevents
+// /myevents - show user's events with single line + ticket button
 bot.onText(/\/myevents/, async (msg) => {
   const tgId = String(msg.from.id);
   const events = await getUserEvents(tgId);
-  if (!events.length) return bot.sendMessage(msg.chat.id, '📭 You are not registered for any events yet.');
 
+  if (!events.length) {
+    return bot.sendMessage(msg.chat.id, '📭 You are not registered for any events yet.');
+  }
+
+  // Build inline keyboard & text
   const opts = { reply_markup: { inline_keyboard: [] } };
-  let text = '📅 *Your upcoming events*:\n';
+  let text = '📅 *Your upcoming events*:\n\n';
+
   events.forEach((e, i) => {
     const dateStr = new Date(e.datetime).toLocaleString();
-    text += `\n• *${escapeMarkdownV1(e.name)}* — ${escapeMarkdownV1(dateStr)}`;
+    const eventName = escapeMarkdownV1(e.name);
+    const eventDate = escapeMarkdownV1(dateStr);
+
+    text += `• ${eventName} — ${eventDate}\n`; // 1 line per event
     opts.reply_markup.inline_keyboard.push([
-      { text: '🎟 Get Ticket', callback_data: `ticket_${e.id}` }
+      { text: '🎟 Ticket', callback_data: `ticket_${e.id}` }
     ]);
   });
 
