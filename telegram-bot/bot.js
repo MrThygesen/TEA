@@ -58,7 +58,6 @@ function escapeMarkdownV1(text) {
 }
 
 // ====== HELPER FUNCTIONS ======
-
 async function getUserProfile(tgId) {
   const res = await pool.query('SELECT * FROM user_profiles WHERE telegram_user_id=$1', [tgId]);
   return res.rows[0] || null;
@@ -194,12 +193,39 @@ async function showEvents(chatId, city) {
   bot.sendMessage(chatId, text, { parse_mode: 'Markdown', ...opts });
 }
 
-// ====== CALLBACK HANDLER ======
+// ====== SCAN LOGIC ======
+async function startScan(tgId, chatId) {
+  const profileRes = await pool.query(
+    'SELECT role, telegram_username FROM user_profiles WHERE telegram_user_id=$1',
+    [tgId]
+  );
+  const profile = profileRes.rows[0];
+  if (!profile || profile.role !== 'organizer') {
+    return bot.sendMessage(chatId, '❌ You are not authorized to validate tickets.');
+  }
+
+  userStates[tgId] = { step: 'scanningTicket' };
+  bot.sendMessage(chatId, '📸 Please send the QR code (text or photo) to validate the ticket.');
+}
+
+// ====== TELEGRAM HANDLERS ======
+
+// Inline buttons & /scan command
+bot.onText(/\/scan/, async (msg) => {
+  const tgId = String(msg.from.id);
+  await startScan(tgId, msg.chat.id);
+});
+
 bot.on('callback_query', async (query) => {
   const tgId = String(query.from.id);
   const state = userStates[tgId];
   const data = decodeURIComponent(query.data);
 
+  if (data === 'scan_ticket') {
+    await startScan(tgId, query.message.chat.id);
+  }
+
+  // Existing callback logic
   if (state?.step === 'choosingStartCity' && data.startsWith('setstartcity_')) {
     const city = data.replace('setstartcity_', '');
     await saveUserProfile(tgId, { city });
@@ -207,14 +233,12 @@ bot.on('callback_query', async (query) => {
     return bot.sendMessage(query.message.chat.id, `✅ City set to ${escapeMarkdownV1(city)}. You can now use /events to browse events.`, { parse_mode: 'Markdown' });
   }
 
-  // EDIT PROFILE
   if (data.startsWith('edit_')) {
     const field = data.replace('edit_', '');
     userStates[tgId] = { editField: field };
     return bot.sendMessage(query.message.chat.id, `✏️ Please type your new ${escapeMarkdownV1(field)}:`, { parse_mode: 'Markdown' });
   }
 
-  // REGISTER
   if (data.startsWith('register_')) {
     const eventId = parseInt(data.replace('register_', ''), 10);
     const profile = await getUserProfile(tgId);
@@ -223,7 +247,6 @@ bot.on('callback_query', async (query) => {
     return bot.sendMessage(query.message.chat.id, escapeMarkdownV1(result.statusMsg), { parse_mode: 'Markdown' });
   }
 
-  // DETAILS
   if (data.startsWith('details_')) {
     const eventId = parseInt(data.replace('details_', ''), 10);
     const res = await pool.query('SELECT * FROM events WHERE id=$1', [eventId]);
@@ -233,7 +256,6 @@ bot.on('callback_query', async (query) => {
     return bot.sendMessage(query.message.chat.id, detailsMsg, { parse_mode: 'Markdown' });
   }
 
-  // TICKET
   if (data.startsWith('ticket_')) {
     const eventId = parseInt(data.replace('ticket_', ''), 10);
     const events = await getUserEvents(tgId);
@@ -241,31 +263,21 @@ bot.on('callback_query', async (query) => {
     if (!ev) return bot.sendMessage(query.message.chat.id, '⚠️ You are not registered for this event.', { parse_mode: 'Markdown' });
     return sendTicket(query.message.chat.id, tgId, ev.id, ev.name);
   }
-
-  // SCAN TICKET
-  if (data === 'scan_ticket') {
-    userStates[tgId] = { step: 'awaitingScan' };
-    return bot.sendMessage(query.message.chat.id, '📸 Please send the QR code (text or image) to validate the ticket.');
-  }
 });
 
-// ====== MESSAGE HANDLER (SCAN QR) ======
+// Scan QR messages
 bot.on('message', async (msg) => {
   const tgId = String(msg.from.id);
   const state = userStates[tgId];
-
-  // Only process messages if waiting for scan
-  if (!state?.step || state.step !== 'awaitingScan') return;
+  if (!state?.step || state.step !== 'scanningTicket') return;
 
   try {
     let scannedData = null;
 
-    // Text QR code
     if (msg.text && msg.text.startsWith('{') && msg.text.includes('eventId')) {
       scannedData = msg.text;
     }
 
-    // Photo QR code
     if (msg.photo?.length) {
       const fileId = msg.photo[msg.photo.length - 1].file_id;
       const file = await bot.getFile(fileId);
@@ -281,7 +293,7 @@ bot.on('message', async (msg) => {
     console.error('❌ Scan error', err);
     bot.sendMessage(msg.chat.id, '❌ Error scanning ticket. Please try again.');
   } finally {
-    delete userStates[tgId]; // reset scan state
+    delete userStates[tgId];
   }
 });
 
@@ -299,7 +311,7 @@ bot.onText(/\/help/, (msg) => {
     '🎯 Tiers',
     '1️⃣ Networking & perks (Email only)',
     '2️⃣ Networking & more perks (Email + Wallet)',
-    '📷 Organizers can use Scan Ticket via buttons'
+    '📷 Organizers can use Scan Ticket via buttons or /scan'
   ].join('\n');
   bot.sendMessage(msg.chat.id, escapeMarkdownV1(text), { parse_mode: 'Markdown' });
 });
