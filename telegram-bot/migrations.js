@@ -66,6 +66,8 @@ export async function runMigrations() {
       timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
       has_arrived BOOLEAN DEFAULT FALSE,
       voucher_applied BOOLEAN DEFAULT FALSE,
+      basic_perk_applied BOOLEAN DEFAULT FALSE,
+      advanced_perk_applied BOOLEAN DEFAULT FALSE,
       ticket_validated BOOLEAN DEFAULT FALSE,
       validated_by TEXT,
       validated_at TIMESTAMPTZ,
