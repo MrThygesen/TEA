@@ -46,7 +46,7 @@ export default function AdminSBTManager() {
     fetchTemplates()
   }, [])
 
-  // Fetch SBT types from contract (parallel)
+  // Fetch SBT types from contract
   useEffect(() => {
     if (!publicClient) return
     async function fetchTypes() {
@@ -94,6 +94,10 @@ export default function AdminSBTManager() {
         }
       }
       setSbtTypesData(types)
+
+      // Set next available typeId automatically
+      const nextId = types.length > 0 ? Math.max(...types.map(t => t.id)) + 1 : 1
+      setTypeId(BigInt(nextId))
     }
     fetchTypes()
   }, [publicClient, loading])
@@ -130,10 +134,22 @@ export default function AdminSBTManager() {
         args: [typeId, uri, BigInt(maxSupply), burnable],
       })
       toast.success('SBT type created')
-      // Optionally post event to DB if typeId <= 4999
-      if (typeId <= 4999) {
+
+      // Post event to DB if typeId <= 4999
+      if (typeId <= 4999n) {
         await postEventToDB(typeId, title, previewData?.date || new Date().toISOString(), createSbtCity)
       }
+
+      // Reset inputs after creation
+      setTitle('')
+      setMaxSupply('')
+      setCreateSbtCity('')
+      setBurnable(false)
+      setPreviewData(null)
+
+      // Increment typeId for next creation
+      setTypeId(prev => prev + 1n)
+
     } catch (err) {
       console.error(err)
       toast.error('Failed to create SBT type')
@@ -195,7 +211,6 @@ export default function AdminSBTManager() {
     setLoading(false)
   }
 
-  // --- Post Event to DB ---
   async function postEventToDB(typeId, title, datetime, city) {
     if (!city || !datetime) return toast.error('City and datetime are required')
     try {
@@ -229,7 +244,7 @@ export default function AdminSBTManager() {
       {/* --- Create SBT --- */}
       <div>
         <h3 className="font-semibold mb-2">Create New SBT Type</h3>
-        <input type="number" value={typeId.toString()} onChange={(e) => setTypeId(e.target.value ? BigInt(e.target.value) : 0n)} className="w-full mb-2 p-2 border rounded" placeholder="Type ID" />
+        <input type="number" value={typeId.toString()} readOnly className="w-full mb-2 p-2 border rounded" placeholder="Type ID" />
         <select value={title} onChange={(e) => setTitle(e.target.value)} className="w-full mb-2 p-2 border rounded">
           <option value="">Select metadata template</option>
           {availableTemplates.map((file, i) => <option key={i} value={file}>{formatDisplayName(file)}</option>)}
@@ -256,28 +271,15 @@ export default function AdminSBTManager() {
         )}
       </div>
 
-      {/* --- SBT Dashboard --- */}
       <SbtDashboard sbtTypesData={sbtTypesData} />
-
-      {/* --- Burn Token --- */}
       <BurnToken handleBurn={handleBurn} burnTokenId={burnTokenId} setBurnTokenId={setBurnTokenId} loading={loading} />
+      <div className="mt-6 p-4 border rounded bg-gray-50"><h3 className="font-semibold mb-2">Database Dump (Render DB)</h3><DbDump /></div>
+      <div className="mt-6 p-4 border rounded bg-gray-50"><h3 className="font-semibold mb-2">Assign Role to User</h3><SetRoleForm /></div>
+      <div className="mt-6 p-4 border rounded bg-gray-50"><h3 className="font-semibold mb-2">Create Event (DB Only)</h3><EventCreator /></div>
 
-      {/* --- DbDump --- */}
-      <div className="mt-6 p-4 border rounded bg-gray-50">
-        <h3 className="font-semibold mb-2">Database Dump (Render DB)</h3>
-        <DbDump />
-      </div>
-
-      {/* --- Set Role --- */}
-      <div className="mt-6 p-4 border rounded bg-gray-50">
-        <h3 className="font-semibold mb-2">Assign Role to User</h3>
-        <SetRoleForm />
-      </div>
-
-      {/* --- Event Creator --- */}
-      <div className="mt-6 p-4 border rounded bg-gray-50">
-        <h3 className="font-semibold mb-2">Create Event (DB Only)</h3>
-        <EventCreator />
+      {/* Link to AdminEventManager */}
+      <div className="mt-4">
+        <a href="/admin-event-manager" className="text-blue-600 underline">Go to Event Manager</a>
       </div>
     </div>
   )
@@ -395,53 +397,32 @@ function SetRoleForm() {
 
   return (
     <div className="space-y-2">
-      <input
-        type="text"
-        placeholder="Telegram username (optional)"
-        value={telegramUsername}
-        onChange={(e) => setTelegramUsername(e.target.value)}
-        className="w-full p-2 border rounded"
-      />
-      <input
-        type="text"
-        placeholder="Telegram user ID (optional)"
-        value={telegramUserId}
-        onChange={(e) => setTelegramUserId(e.target.value)}
-        className="w-full p-2 border rounded"
-      />
-      <select
-        value={role}
-        onChange={(e) => setRole(e.target.value)}
-        className="w-full p-2 border rounded"
-      >
+      <input type="text" placeholder="Telegram username (optional)" value={telegramUsername} onChange={(e) => setTelegramUsername(e.target.value)} className="w-full p-2 border rounded" />
+      <input type="text" placeholder="Telegram user ID (optional)" value={telegramUserId} onChange={(e) => setTelegramUserId(e.target.value)} className="w-full p-2 border rounded" />
+      <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full p-2 border rounded">
         <option value="organizer">Organizer</option>
         <option value="admin">Admin</option>
         <option value="user">User</option>
       </select>
-      <button
-        onClick={handleSetRole}
-        disabled={loading}
-        className={`px-4 py-2 rounded text-white ${loading ? 'bg-blue-300' : 'bg-blue-600'}`}
-      >
+      <button onClick={handleSetRole} disabled={loading} className={`px-4 py-2 rounded text-white ${loading ? 'bg-blue-300' : 'bg-blue-600'}`}>
         {loading ? 'Assigning...' : 'Assign Role'}
       </button>
-      {message && <p className="mt-2 text-sm">{message}</p>}
+      {message && <p className="text-sm">{message}</p>}
     </div>
   )
 }
 
-
 function EventCreator() {
-  const [typeId, setTypeId] = useState('')
-  const [name, setName] = useState('')
+  const [eventName, setEventName] = useState('')
   const [city, setCity] = useState('')
   const [datetime, setDatetime] = useState('')
+  const [minAttendees, setMinAttendees] = useState(1)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
-  async function handleCreate() {
-    if (!typeId || !name || !city || !datetime) {
-      setMessage('All fields are required')
+  const handleCreateEvent = async () => {
+    if (!eventName || !city || !datetime) {
+      setMessage('Event name, city, and datetime are required')
       return
     }
     setLoading(true)
@@ -449,17 +430,15 @@ function EventCreator() {
       const res = await fetch('/api/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          typeId: Number(typeId),
-          name,
-          city,
-          datetime: new Date(datetime).toISOString(),
-          min_attendees: 1,
-        }),
+        body: JSON.stringify({ name: eventName, city, datetime, min_attendees: minAttendees }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Error creating event')
-      setMessage(`✅ Event "${name}" created in DB`)
+      if (!res.ok) throw new Error(data.error || 'Failed to create event')
+      setMessage(`✅ Event "${eventName}" created`)
+      setEventName('')
+      setCity('')
+      setDatetime('')
+      setMinAttendees(1)
     } catch (err) {
       setMessage('❌ ' + err.message)
     } finally {
@@ -469,12 +448,14 @@ function EventCreator() {
 
   return (
     <div className="space-y-2">
-      <input type="number" placeholder="Type ID" value={typeId} onChange={(e) => setTypeId(e.target.value)} className="w-full p-2 border rounded" />
-      <input type="text" placeholder="Event Name" value={name} onChange={(e) => setName(e.target.value)} className="w-full p-2 border rounded" />
+      <input type="text" placeholder="Event Name" value={eventName} onChange={(e) => setEventName(e.target.value)} className="w-full p-2 border rounded" />
       <input type="text" placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} className="w-full p-2 border rounded" />
       <input type="datetime-local" placeholder="Datetime" value={datetime} onChange={(e) => setDatetime(e.target.value)} className="w-full p-2 border rounded" />
-      <button onClick={handleCreate} disabled={loading} className={`px-4 py-2 rounded text-white ${loading ? 'bg-blue-300' : 'bg-blue-600'}`}>{loading ? 'Creating...' : 'Create Event'}</button>
-      {message && <p className="text-sm mt-1">{message}</p>}
+      <input type="number" placeholder="Min Attendees" value={minAttendees} onChange={(e) => setMinAttendees(Number(e.target.value))} className="w-full p-2 border rounded" />
+      <button onClick={handleCreateEvent} disabled={loading} className={`px-4 py-2 rounded text-white ${loading ? 'bg-blue-300' : 'bg-blue-600'}`}>
+        {loading ? 'Creating...' : 'Create Event'}
+      </button>
+      {message && <p className="text-sm">{message}</p>}
     </div>
   )
 }
