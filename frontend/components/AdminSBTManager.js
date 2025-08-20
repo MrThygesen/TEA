@@ -50,7 +50,7 @@ export default function AdminSBTManager() {
   useEffect(() => {
     if (!publicClient) return
     async function fetchTypes() {
-      const typePromises = Array.from({ length: MAX_TYPES 35årig mam}, (_, i) =>
+      const typePromises = Array.from({ length: MAX_TYPES }, (_, i) =>
         publicClient.readContract({
           address: CONTRACT_ADDRESS,
           abi: WebAccessSBTV33_ABI,
@@ -344,7 +344,7 @@ function DbDump() {
     }
     fetchDump()
   }, [])
- 
+
   if (loading) return <p>Loading database dump...</p>
   if (error) return <p className="text-red-600">Error loading dump: {error}</p>
   if (!data) return <p>No data available.</p>
