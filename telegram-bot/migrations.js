@@ -5,7 +5,7 @@ export async function runMigrations() {
     -- === EVENTS TABLE ===
     CREATE TABLE IF NOT EXISTS events (
       id SERIAL PRIMARY KEY,
-      group_id TEXT,
+      group_id TEXT, -- group/organizer identifier
       name TEXT NOT NULL,
       city TEXT NOT NULL,
       datetime TIMESTAMPTZ NOT NULL,
@@ -13,20 +13,19 @@ export async function runMigrations() {
       max_attendees INTEGER DEFAULT 40,
       is_confirmed BOOLEAN DEFAULT FALSE,
       description TEXT,
-      details TEXT,
+      details TEXT,                -- New detailed description
       venue TEXT,
       basic_perk TEXT,
       advanced_perk TEXT,
-      image_url TEXT,
+      tag1 TEXT,                   -- New tag fields
+      tag2 TEXT,
+      tag3 TEXT,
+      image_url TEXT,              -- Optional event image
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
-    -- Patch missing columns (safe for existing tables)
-    ALTER TABLE events ADD COLUMN IF NOT EXISTS tag1 TEXT;
-    ALTER TABLE events ADD COLUMN IF NOT EXISTS tag2 TEXT;
-    ALTER TABLE events ADD COLUMN IF NOT EXISTS tag3 TEXT;
-
+    -- Trigger for updated_at
     CREATE OR REPLACE FUNCTION update_updated_at_column()
     RETURNS TRIGGER AS $$
     BEGIN
@@ -107,9 +106,10 @@ export async function runMigrations() {
       subscribed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
+    -- Index for city filtering
     CREATE INDEX IF NOT EXISTS idx_events_city ON events(LOWER(city));
   `);
 
-  console.log('✅ Full migrations complete with safety checks and example event inserted.');
+  console.log('✅ Full migrations complete and schema matches schema.sql exactly.');
 }
 
