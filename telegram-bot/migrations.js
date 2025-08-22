@@ -1,4 +1,3 @@
-
 import { pool } from './lib/postgres.js';
 
 export async function runMigrations() {
@@ -18,13 +17,15 @@ export async function runMigrations() {
       venue TEXT,
       basic_perk TEXT,
       advanced_perk TEXT,
-      tag1 TEXT,
-      tag2 TEXT,
-      tag3 TEXT,
       image_url TEXT,
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
+
+    -- Patch missing columns (safe for existing tables)
+    ALTER TABLE events ADD COLUMN IF NOT EXISTS tag1 TEXT;
+    ALTER TABLE events ADD COLUMN IF NOT EXISTS tag2 TEXT;
+    ALTER TABLE events ADD COLUMN IF NOT EXISTS tag3 TEXT;
 
     CREATE OR REPLACE FUNCTION update_updated_at_column()
     RETURNS TRIGGER AS $$
@@ -40,7 +41,7 @@ export async function runMigrations() {
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
-    -- Insert example event
+    -- Insert example event (safe if already exists)
     INSERT INTO events (name, city, datetime, tag1, tag2, tag3, details, image_url)
     VALUES (
       'Test Event',
@@ -52,7 +53,7 @@ export async function runMigrations() {
       'This is a detailed description',
       'https://example.com/event.jpg'
     )
-    ON CONFLICT DO NOTHING;  -- prevents duplicate inserts if migration runs multiple times
+    ON CONFLICT DO NOTHING;
 
     -- === USER PROFILES TABLE ===
     CREATE TABLE IF NOT EXISTS user_profiles (
@@ -109,6 +110,6 @@ export async function runMigrations() {
     CREATE INDEX IF NOT EXISTS idx_events_city ON events(LOWER(city));
   `);
 
-  console.log('✅ Full migrations complete with new event fields and example event inserted.');
+  console.log('✅ Full migrations complete with safety checks and example event inserted.');
 }
 
