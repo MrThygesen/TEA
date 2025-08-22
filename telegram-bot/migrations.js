@@ -1,5 +1,5 @@
 
-import { pool } from '../lib/postgres.js';
+import { pool } from './lib/postgres.js';
 
 export async function runMigrations() {
   await pool.query(`
