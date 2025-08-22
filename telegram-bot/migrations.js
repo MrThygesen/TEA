@@ -40,19 +40,7 @@ export async function runMigrations() {
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
-    -- Insert example event (safe if already exists)
-    INSERT INTO events (name, city, datetime, tag1, tag2, tag3, details, image_url)
-    VALUES (
-      'Test Event',
-      'Copenhagen',
-      NOW() + INTERVAL '1 day',
-      'Networking',
-      'Web3',
-      'VIP',
-      'This is a detailed description',
-      'https://example.com/event.jpg'
-    )
-    ON CONFLICT DO NOTHING;
+    ) ON CONFLICT DO NOTHING;
 
     -- === USER PROFILES TABLE ===
     CREATE TABLE IF NOT EXISTS user_profiles (
