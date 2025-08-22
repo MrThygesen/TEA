@@ -3,7 +3,7 @@ import TelegramBot from 'node-telegram-bot-api';
 import pkg from 'pg';
 import dotenv from 'dotenv';
 import express from 'express';
-import { runMigrations } from './migrations.js';
+//import { runMigrations } from './migrations.js';
 import sgMail from '@sendgrid/mail';
 import crypto from 'crypto';
 
