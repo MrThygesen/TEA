@@ -1,7 +1,7 @@
 -- === EVENTS TABLE ===
 CREATE TABLE IF NOT EXISTS events (
   id SERIAL PRIMARY KEY,
-  group_id TEXT,
+  group_id TEXT, -- group/organizer identifier
   name TEXT NOT NULL,
   city TEXT NOT NULL,
   datetime TIMESTAMPTZ NOT NULL,
@@ -9,9 +9,14 @@ CREATE TABLE IF NOT EXISTS events (
   max_attendees INTEGER DEFAULT 40,
   is_confirmed BOOLEAN DEFAULT FALSE,
   description TEXT,
+  details TEXT,                -- New detailed description
   venue TEXT,
   basic_perk TEXT,
   advanced_perk TEXT,
+  tag1 TEXT,                   -- New tag fields
+  tag2 TEXT,
+  tag3 TEXT,
+  image_url TEXT,              -- Optional event image
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
@@ -40,6 +45,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   wallet_address TEXT,
   city TEXT DEFAULT 'Copenhagen',
   role TEXT DEFAULT 'user' CHECK (role IN ('user','organizer','admin')),
+  group_id TEXT,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
@@ -55,6 +61,8 @@ CREATE TABLE IF NOT EXISTS registrations (
   timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   has_arrived BOOLEAN DEFAULT FALSE,
   voucher_applied BOOLEAN DEFAULT FALSE,
+  basic_perk_applied BOOLEAN DEFAULT FALSE,
+  advanced_perk_applied BOOLEAN DEFAULT FALSE,
   ticket_validated BOOLEAN DEFAULT FALSE,
   validated_by TEXT,
   validated_at TIMESTAMPTZ,

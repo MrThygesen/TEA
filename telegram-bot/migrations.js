@@ -1,12 +1,3 @@
-// migrations.js
-import pkg from 'pg';
-const { Pool } = pkg;
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
-
 export async function runMigrations() {
   await pool.query(`
     -- === EVENTS TABLE ===
@@ -20,14 +11,18 @@ export async function runMigrations() {
       max_attendees INTEGER DEFAULT 40,
       is_confirmed BOOLEAN DEFAULT FALSE,
       description TEXT,
+      details TEXT,
       venue TEXT,
       basic_perk TEXT,
       advanced_perk TEXT,
+      tag1 TEXT,
+      tag2 TEXT,
+      tag3 TEXT,
+      image_url TEXT,
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
-    -- Trigger for updated_at
     CREATE OR REPLACE FUNCTION update_updated_at_column()
     RETURNS TRIGGER AS $$
     BEGIN
@@ -42,6 +37,20 @@ export async function runMigrations() {
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+    -- Insert example event
+    INSERT INTO events (name, city, datetime, tag1, tag2, tag3, details, image_url)
+    VALUES (
+      'Test Event',
+      'Copenhagen',
+      NOW() + INTERVAL '1 day',
+      'Networking',
+      'Web3',
+      'VIP',
+      'This is a detailed description',
+      'https://example.com/event.jpg'
+    )
+    ON CONFLICT DO NOTHING;  -- prevents duplicate inserts if migration runs multiple times
+
     -- === USER PROFILES TABLE ===
     CREATE TABLE IF NOT EXISTS user_profiles (
       telegram_user_id TEXT PRIMARY KEY,
@@ -51,6 +60,7 @@ export async function runMigrations() {
       wallet_address TEXT,
       city TEXT DEFAULT 'Copenhagen',
       role TEXT DEFAULT 'user' CHECK (role IN ('user','organizer','admin')),
+      group_id TEXT,
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -93,10 +103,9 @@ export async function runMigrations() {
       subscribed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
-    -- Index for city filtering
     CREATE INDEX IF NOT EXISTS idx_events_city ON events(LOWER(city));
   `);
 
-  console.log('✅ Full migrations complete.');
+  console.log('✅ Full migrations complete with new event fields and example event inserted.');
 }
 
