@@ -33,7 +33,7 @@ export default function AdminSBTManager() {
 
   // Fetch metadata templates from GitHub
   useEffect(() => {
-    async function fetchTemplates() {
+    async funcpostEventToDBtion fetchTemplates() {
       try {
         const res = await fetch('https://api.github.com/repos/MrThygesen/TEA/contents/data')
         const data = await res.json()
@@ -431,6 +431,10 @@ function SetRoleForm() {
 }
 
 
+'use client'
+
+import { useState } from 'react'
+
 function EventCreator() {
   const [event, setEvent] = useState({
     id: '',
@@ -449,63 +453,130 @@ function EventCreator() {
     tag2: '',
     tag3: '',
     image_url: ''
-  });
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  })
+  const [errors, setErrors] = useState({})
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState('')
 
   const handleChange = (field, value) => {
-    setEvent((prev) => ({ ...prev, [field]: value }));
-  };
+    setEvent(prev => ({ ...prev, [field]: value }))
+    // Clear error for this field as user types
+    setErrors(prev => ({ ...prev, [field]: '' }))
+  }
+
+  const validate = (method) => {
+    const newErrors = {}
+    if (method === 'PUT' && !event.id) newErrors.id = 'Event ID is required for update'
+    if (!event.name) newErrors.name = 'Event Name is required'
+    if (!event.city) newErrors.city = 'City is required'
+    if (!event.datetime) newErrors.datetime = 'Date and Time are required'
+    if (event.min_attendees && isNaN(Number(event.min_attendees))) newErrors.min_attendees = 'Must be a number'
+    if (event.max_attendees && isNaN(Number(event.max_attendees))) newErrors.max_attendees = 'Must be a number'
+    return newErrors
+  }
 
   const handleSubmit = async (method) => {
-    if (!event.id || !event.name || !event.city || !event.datetime) {
-      setMessage('ID, name, city, and datetime are required');
-      return;
+    const fieldErrors = validate(method)
+    if (Object.keys(fieldErrors).length > 0) {
+      setErrors(fieldErrors)
+      setMessage('❌ Please fix the highlighted fields')
+      return
     }
-    setLoading(true);
+
+    setLoading(true)
+    setMessage('')
     try {
+      const body = {
+        ...event,
+        min_attendees: Number(event.min_attendees),
+        max_attendees: Number(event.max_attendees),
+        datetime: new Date(event.datetime).toISOString()
+      }
+
       const res = await fetch('/api/events', {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(event),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error saving event');
-      setMessage(`✅ Event ${method === 'POST' ? 'created' : 'updated'} successfully`);
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error saving event')
+
+      setMessage(`✅ Event ${method === 'POST' ? 'created' : 'updated'} successfully`)
+      if (method === 'POST') {
+        setEvent({
+          id: '',
+          name: '',
+          city: '',
+          datetime: '',
+          min_attendees: 1,
+          max_attendees: 40,
+          is_confirmed: false,
+          description: '',
+          details: '',
+          venue: '',
+          basic_perk: '',
+          advanced_perk: '',
+          tag1: '',
+          tag2: '',
+          tag3: '',
+          image_url: ''
+        })
+      }
     } catch (err) {
-      setMessage('❌ ' + err.message);
+      setMessage('❌ ' + err.message)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
+
+  const inputClass = (field) =>
+    `w-full p-2 border rounded ${errors[field] ? 'border-red-500' : 'border-gray-300'}`
 
   return (
     <div className="space-y-2">
-      <input type="number" placeholder="Event ID" value={event.id} onChange={(e) => handleChange('id', e.target.value)} className="w-full p-2 border rounded" />
-      <input type="text" placeholder="Event Name" value={event.name} onChange={(e) => handleChange('name', e.target.value)} className="w-full p-2 border rounded" />
-      <input type="text" placeholder="City" value={event.city} onChange={(e) => handleChange('city', e.target.value)} className="w-full p-2 border rounded" />
-      <input type="datetime-local" value={event.datetime} onChange={(e) => handleChange('datetime', e.target.value)} className="w-full p-2 border rounded" />
-      <input type="number" placeholder="Min Attendees" value={event.min_attendees} onChange={(e) => handleChange('min_attendees', e.target.value)} className="w-full p-2 border rounded" />
-      <input type="number" placeholder="Max Attendees" value={event.max_attendees} onChange={(e) => handleChange('max_attendees', e.target.value)} className="w-full p-2 border rounded" />
-      <textarea placeholder="Description" value={event.description} onChange={(e) => handleChange('description', e.target.value)} className="w-full p-2 border rounded" />
-      <textarea placeholder="Details" value={event.details} onChange={(e) => handleChange('details', e.target.value)} className="w-full p-2 border rounded" />
-      <input type="text" placeholder="Venue" value={event.venue} onChange={(e) => handleChange('venue', e.target.value)} className="w-full p-2 border rounded" />
-      <input type="text" placeholder="Basic Perk" value={event.basic_perk} onChange={(e) => handleChange('basic_perk', e.target.value)} className="w-full p-2 border rounded" />
-      <input type="text" placeholder="Advanced Perk" value={event.advanced_perk} onChange={(e) => handleChange('advanced_perk', e.target.value)} className="w-full p-2 border rounded" />
-      <input type="text" placeholder="Tag1" value={event.tag1} onChange={(e) => handleChange('tag1', e.target.value)} className="w-full p-2 border rounded" />
-      <input type="text" placeholder="Tag2" value={event.tag2} onChange={(e) => handleChange('tag2', e.target.value)} className="w-full p-2 border rounded" />
-      <input type="text" placeholder="Tag3" value={event.tag3} onChange={(e) => handleChange('tag3', e.target.value)} className="w-full p-2 border rounded" />
-      <input type="text" placeholder="Image URL" value={event.image_url} onChange={(e) => handleChange('image_url', e.target.value)} className="w-full p-2 border rounded" />
+      <input type="number" placeholder="Event ID (for update only)" value={event.id} onChange={e => handleChange('id', e.target.value)} className={inputClass('id')} />
+      {errors.id && <p className="text-red-500 text-sm">{errors.id}</p>}
+
+      <input type="text" placeholder="Event Name" value={event.name} onChange={e => handleChange('name', e.target.value)} className={inputClass('name')} />
+      {errors.name && <p className="text-red-500 text-sm">{errors.name}</p>}
+
+      <input type="text" placeholder="City" value={event.city} onChange={e => handleChange('city', e.target.value)} className={inputClass('city')} />
+      {errors.city && <p className="text-red-500 text-sm">{errors.city}</p>}
+
+      <input type="datetime-local" value={event.datetime} onChange={e => handleChange('datetime', e.target.value)} className={inputClass('datetime')} />
+      {errors.datetime && <p className="text-red-500 text-sm">{errors.datetime}</p>}
+
+      <input type="number" placeholder="Min Attendees" value={event.min_attendees} onChange={e => handleChange('min_attendees', e.target.value)} className={inputClass('min_attendees')} />
+      {errors.min_attendees && <p className="text-red-500 text-sm">{errors.min_attendees}</p>}
+
+      <input type="number" placeholder="Max Attendees" value={event.max_attendees} onChange={e => handleChange('max_attendees', e.target.value)} className={inputClass('max_attendees')} />
+      {errors.max_attendees && <p className="text-red-500 text-sm">{errors.max_attendees}</p>}
+
+      <textarea placeholder="Description" value={event.description} onChange={e => handleChange('description', e.target.value)} className={inputClass('description')} />
+      <textarea placeholder="Details" value={event.details} onChange={e => handleChange('details', e.target.value)} className={inputClass('details')} />
+      <input type="text" placeholder="Venue" value={event.venue} onChange={e => handleChange('venue', e.target.value)} className={inputClass('venue')} />
+      <input type="text" placeholder="Basic Perk" value={event.basic_perk} onChange={e => handleChange('basic_perk', e.target.value)} className={inputClass('basic_perk')} />
+      <input type="text" placeholder="Advanced Perk" value={event.advanced_perk} onChange={e => handleChange('advanced_perk', e.target.value)} className={inputClass('advanced_perk')} />
+      <input type="text" placeholder="Tag1" value={event.tag1} onChange={e => handleChange('tag1', e.target.value)} className={inputClass('tag1')} />
+      <input type="text" placeholder="Tag2" value={event.tag2} onChange={e => handleChange('tag2', e.target.value)} className={inputClass('tag2')} />
+      <input type="text" placeholder="Tag3" value={event.tag3} onChange={e => handleChange('tag3', e.target.value)} className={inputClass('tag3')} />
+      <input type="text" placeholder="Image URL" value={event.image_url} onChange={e => handleChange('image_url', e.target.value)} className={inputClass('image_url')} />
+
       <label className="flex items-center">
-        <input type="checkbox" checked={event.is_confirmed} onChange={(e) => handleChange('is_confirmed', e.target.checked)} className="mr-2" />
+        <input type="checkbox" checked={event.is_confirmed} onChange={e => handleChange('is_confirmed', e.target.checked)} className="mr-2" />
         Confirmed
       </label>
+
       <div className="flex gap-2">
         <button onClick={() => handleSubmit('POST')} disabled={loading} className={`px-4 py-2 rounded text-white ${loading ? 'bg-blue-300' : 'bg-blue-600'}`}>Create</button>
         <button onClick={() => handleSubmit('PUT')} disabled={loading} className={`px-4 py-2 rounded text-white ${loading ? 'bg-green-300' : 'bg-green-600'}`}>Update</button>
       </div>
+
       {message && <p className="text-sm mt-1">{message}</p>}
     </div>
-  );
+  )
 }
+
+export default EventCreator
+
 
