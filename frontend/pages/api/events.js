@@ -37,10 +37,11 @@ export default async function handler(req, res) {
           ($1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
          RETURNING *`,
         [
-          id,                // id ($1)
-          name,              // name ($2)
-          city,              // city ($3)
-          datetime,          // datetime ($4)
+          id,                // id  #1
+          id,                // groupid #2
+          name,              // name 
+          city,              // city 
+          datetime,          // datetime 
           min_attendees || 1,
           max_attendees || 40,
           is_confirmed || false,
