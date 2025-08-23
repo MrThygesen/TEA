@@ -431,7 +431,6 @@ function SetRoleForm() {
   )
 }
 
-
 function EventCreator() {
   const [event, setEvent] = useState({
     id: '',
@@ -457,7 +456,6 @@ function EventCreator() {
 
   const handleChange = (field, value) => {
     setEvent(prev => ({ ...prev, [field]: value }))
-    // Clear error for this field as user types
     setErrors(prev => ({ ...prev, [field]: '' }))
   }
 
@@ -483,8 +481,10 @@ function EventCreator() {
     setLoading(true)
     setMessage('')
     try {
+      // Ensure group_id = id and never null
       const body = {
         ...event,
+        group_id: Number(event.id) || Date.now(), // fallback in case id is empty
         min_attendees: Number(event.min_attendees),
         max_attendees: Number(event.max_attendees),
         datetime: new Date(event.datetime).toISOString()
