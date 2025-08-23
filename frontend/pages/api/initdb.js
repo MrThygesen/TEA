@@ -1,7 +1,7 @@
 // pages/api/initdb.js
 import pkg from 'pg';
-
 const { Pool } = pkg;
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
@@ -49,7 +49,6 @@ export default async function handler(req, res) {
       END;
       $$ language 'plpgsql';
     `);
-
     await client.query(`DROP TRIGGER IF EXISTS set_updated_at ON events;`);
     await client.query(`
       CREATE TRIGGER set_updated_at
