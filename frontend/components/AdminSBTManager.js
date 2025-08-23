@@ -1,5 +1,4 @@
 'use client'
-
 import { useState, useEffect, useRef } from 'react'
 import { useAccount, useWriteContract, usePublicClient } from 'wagmi'
 import WebAccessSBTV33_ABI from '../abis/WebAccessSBTV33_ABI.json'
@@ -431,10 +430,6 @@ function SetRoleForm() {
   )
 }
 
-
-'use client'
-
-import { useState } from 'react'
 
 function EventCreator() {
   const [event, setEvent] = useState({
