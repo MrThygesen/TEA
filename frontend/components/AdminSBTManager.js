@@ -32,19 +32,20 @@ export default function AdminSBTManager() {
     filename.replace('.json', '').replace(/[_-]/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
 
   // Fetch metadata templates from GitHub
-  useEffect(() => {
-    async funcpostEventToDBtion fetchTemplates() {
-      try {
-        const res = await fetch('https://api.github.com/repos/MrThygesen/TEA/contents/data')
-        const data = await res.json()
-        const jsonFiles = data.filter((file) => file.name.endsWith('.json')).map((file) => file.name)
-        setAvailableTemplates(jsonFiles)
-      } catch (err) {
-        console.error('Failed to fetch templates from GitHub:', err)
-      }
+useEffect(() => {
+  async function fetchTemplates() {
+    try {
+      const res = await fetch('https://api.github.com/repos/MrThygesen/TEA/contents/data')
+      const data = await res.json()
+      const jsonFiles = data.filter((file) => file.name.endsWith('.json')).map((file) => file.name)
+      setAvailableTemplates(jsonFiles)
+    } catch (err) {
+      console.error('Failed to fetch templates from GitHub:', err)
     }
-    fetchTemplates()
-  }, [])
+  }
+  fetchTemplates()
+}, [])
+
 
   // Fetch SBT types from contract (parallel)
   useEffect(() => {
