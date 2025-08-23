@@ -9,93 +9,81 @@ export default async function handler(req, res) {
     return num
   }
 
-  if (method === 'POST') {
-    try {
-      const {
-        id,
-        name,
-        city,
-        datetime,
-        min_attendees,
-        max_attendees,
-        is_confirmed,
-        description,
-        details,
-        venue,
-        basic_perk,
-        advanced_perk,
-        tag1,
-        tag2,
-        tag3,
-        image_url
-      } = body
+  // ===== POST: Create new event =====
+ if (method === 'POST') {
+  const {
+    name, city, datetime,
+    min_attendees, max_attendees,
+    is_confirmed, description, details,
+    venue, basic_perk, advanced_perk,
+    tag1, tag2, tag3, image_url
+  } = body;
 
-      if (!id || !name || !city || !datetime) {
-        return res.status(400).json({ error: 'Missing required fields: id, name, city, datetime' })
-      }
-
-      const group_id = parseIntOrFail(id, 'id')
-
-      const result = await pool.query(
-        `INSERT INTO events
-          (group_id, name, city, datetime, min_attendees, max_attendees, is_confirmed,
-           description, details, venue, basic_perk, advanced_perk, tag1, tag2, tag3, image_url)
-         VALUES
-          ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
-         RETURNING *`,
-        [
-          group_id,
-          name,
-          city,
-          new Date(datetime).toISOString(),
-          min_attendees ?? 1,
-          max_attendees ?? 40,
-          is_confirmed ?? false,
-          description || null,
-          details || null,
-          venue || null,
-          basic_perk || null,
-          advanced_perk || null,
-          tag1 || null,
-          tag2 || null,
-          tag3 || null,
-          image_url || null
-        ]
-      )
-
-      return res.status(201).json(result.rows[0])
-    } catch (err) {
-      console.error('[POST] Error inserting event:', err)
-      return res.status(500).json({ error: 'Failed to insert event', details: err.message })
-    }
+  if (!name || !city || !datetime) {
+    return res.status(400).json({ error: 'Missing required fields: name, city, datetime' });
   }
 
+  try {
+    // Insert event with group_id = id in a single transaction
+    const result = await pool.query(`
+      INSERT INTO events
+        (name, city, datetime, min_attendees, max_attendees, is_confirmed,
+         description, details, venue, basic_perk, advanced_perk, tag1, tag2, tag3, image_url, group_id)
+      VALUES
+        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, DEFAULT)
+      RETURNING id
+    `, [
+      name,
+      city,
+      new Date(datetime).toISOString(),
+      min_attendees ?? 1,
+      max_attendees ?? 40,
+      is_confirmed ?? false,
+      description || null,
+      details || null,
+      venue || null,
+      basic_perk || null,
+      advanced_perk || null,
+      tag1 || null,
+      tag2 || null,
+      tag3 || null,
+      image_url || null
+    ]);
+
+    const newId = result.rows[0].id;
+
+    // Set group_id = id
+    const insertedEvent = await pool.query(`
+      UPDATE events
+      SET group_id = $1
+      WHERE id = $1
+      RETURNING *
+    `, [newId]);
+
+    return res.status(201).json(insertedEvent.rows[0]);
+  } catch (err) {
+    console.error('[POST] Error inserting event:', err);
+    return res.status(500).json({ error: 'Failed to insert event', details: err.message });
+  }
+}
+
+
+  // ===== PUT: Update existing event =====
   if (method === 'PUT') {
     try {
       const {
-        id,
-        name,
-        city,
-        datetime,
-        min_attendees,
-        max_attendees,
-        is_confirmed,
-        description,
-        details,
-        venue,
-        basic_perk,
-        advanced_perk,
-        tag1,
-        tag2,
-        tag3,
-        image_url
-      } = body
+        id, name, city, datetime,
+        min_attendees, max_attendees,
+        is_confirmed, description, details,
+        venue, basic_perk, advanced_perk,
+        tag1, tag2, tag3, image_url
+      } = body;
 
       if (!id || !name || !city || !datetime) {
-        return res.status(400).json({ error: 'Missing required fields for update' })
+        return res.status(400).json({ error: 'Missing required fields for update' });
       }
 
-      const group_id = parseIntOrFail(id, 'id')
+      const group_id = parseIntOrFail(id, 'id');
 
       const result = await pool.query(
         `UPDATE events
@@ -123,34 +111,36 @@ export default async function handler(req, res) {
           image_url || null,
           id
         ]
-      )
+      );
 
       if (result.rowCount === 0) {
-        return res.status(404).json({ error: 'Event not found for update' })
+        return res.status(404).json({ error: 'Event not found for update' });
       }
 
-      return res.status(200).json(result.rows[0])
+      return res.status(200).json(result.rows[0]);
+
     } catch (err) {
-      console.error('[PUT] Error updating event:', err)
-      return res.status(500).json({ error: 'Failed to update event', details: err.message })
+      console.error('[PUT] Error updating event:', err);
+      return res.status(500).json({ error: 'Failed to update event', details: err.message });
     }
   }
 
+  // ===== GET: Fetch events =====
   if (method === 'GET') {
     try {
-      const approvedOnly = query.approvedOnly === 'true'
+      const approvedOnly = query.approvedOnly === 'true';
       const result = await pool.query(
         approvedOnly
           ? 'SELECT * FROM events WHERE is_confirmed = TRUE ORDER BY datetime ASC'
           : 'SELECT * FROM events ORDER BY datetime ASC'
-      )
-      return res.status(200).json(result.rows)
+      );
+      return res.status(200).json(result.rows);
     } catch (err) {
-      console.error('[GET] Error fetching events:', err)
-      return res.status(500).json({ error: 'Failed to fetch events', details: err.message })
+      console.error('[GET] Error fetching events:', err);
+      return res.status(500).json({ error: 'Failed to fetch events', details: err.message });
     }
   }
 
-  return res.status(405).json({ error: `Method ${method} Not Allowed` })
+  return res.status(405).json({ error: `Method ${method} Not Allowed` });
 }
 

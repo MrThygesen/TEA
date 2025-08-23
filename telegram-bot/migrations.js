@@ -9,7 +9,7 @@ export async function runMigrations() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS events (
         id SERIAL PRIMARY KEY,
-        group_id TEXT,
+        group_id INTEGER,
         name TEXT NOT NULL,
         city TEXT NOT NULL,
         datetime TIMESTAMPTZ NOT NULL,
@@ -62,7 +62,7 @@ export async function runMigrations() {
         wallet_address TEXT,
         city TEXT DEFAULT 'Copenhagen',
         role TEXT DEFAULT 'user' CHECK (role IN ('user','organizer','admin')),
-        group_id TEXT,
+        group_id INTEGER,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );

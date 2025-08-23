@@ -1,7 +1,7 @@
 -- === EVENTS TABLE ===
 CREATE TABLE IF NOT EXISTS events (
   id SERIAL PRIMARY KEY,
-  group_id TEXT, -- group/organizer identifier
+  group_id INTEGER, -- matches id type
   name TEXT NOT NULL,
   city TEXT NOT NULL,
   datetime TIMESTAMPTZ NOT NULL,
@@ -9,14 +9,14 @@ CREATE TABLE IF NOT EXISTS events (
   max_attendees INTEGER DEFAULT 40,
   is_confirmed BOOLEAN DEFAULT FALSE,
   description TEXT,
-  details TEXT,                -- New detailed description
+  details TEXT,
   venue TEXT,
   basic_perk TEXT,
   advanced_perk TEXT,
-  tag1 TEXT,                   -- New tag fields
+  tag1 TEXT,
   tag2 TEXT,
   tag3 TEXT,
-  image_url TEXT,              -- Optional event image
+  image_url TEXT,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
@@ -36,6 +36,7 @@ BEFORE UPDATE ON events
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
+
 -- === USER PROFILES TABLE ===
 CREATE TABLE IF NOT EXISTS user_profiles (
   telegram_user_id TEXT PRIMARY KEY,
@@ -45,7 +46,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   wallet_address TEXT,
   city TEXT DEFAULT 'Copenhagen',
   role TEXT DEFAULT 'user' CHECK (role IN ('user','organizer','admin')),
-  group_id TEXT,
+  group_id INTEGER,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
