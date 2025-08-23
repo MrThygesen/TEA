@@ -1,4 +1,5 @@
 'use client'
+
 import { useState, useEffect, useRef } from 'react'
 import { useAccount, useWriteContract, usePublicClient } from 'wagmi'
 import WebAccessSBTV33_ABI from '../abis/WebAccessSBTV33_ABI.json'
@@ -572,7 +573,4 @@ function EventCreator() {
     </div>
   )
 }
-
-export default EventCreator
-
 
