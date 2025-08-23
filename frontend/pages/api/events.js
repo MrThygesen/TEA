@@ -1,49 +1,56 @@
-// pages/api/events.js
-import { pool } from '../../lib/postgres.js';
+import { pool } from '../../lib/postgres.js'
 
 export default async function handler(req, res) {
-  const { method, body, query } = req;
+  const { method, body, query } = req
+
+  const parseIntOrFail = (val, field) => {
+    const num = Number(val)
+    if (!num || isNaN(num)) throw new Error(`${field} must be a valid number`)
+    return num
+  }
 
   if (method === 'POST') {
-    const {
-      group_id,
-      name,
-      city,
-      datetime,
-      min_attendees,
-      max_attendees,
-      is_confirmed,
-      description,
-      details,
-      venue,
-      basic_perk,
-      advanced_perk,
-      tag1,
-      tag2,
-      tag3,
-      image_url
-    } = body;
-
-    if (!name || !city || !datetime) {
-      return res.status(400).json({ error: 'Missing required fields: name, city, datetime' });
-    }
-
     try {
+      const {
+        id,
+        name,
+        city,
+        datetime,
+        min_attendees,
+        max_attendees,
+        is_confirmed,
+        description,
+        details,
+        venue,
+        basic_perk,
+        advanced_perk,
+        tag1,
+        tag2,
+        tag3,
+        image_url
+      } = body
+
+      if (!id || !name || !city || !datetime) {
+        return res.status(400).json({ error: 'Missing required fields: id, name, city, datetime' })
+      }
+
+      const group_id = parseIntOrFail(id, 'id')
+
       const result = await pool.query(
-        `INSERT INTO events 
+        `INSERT INTO events
           (group_id, name, city, datetime, min_attendees, max_attendees, is_confirmed,
            description, details, venue, basic_perk, advanced_perk, tag1, tag2, tag3, image_url)
-         VALUES 
+         VALUES
           ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
          RETURNING *`,
         [
-          group_id || null,
+          group_id,
           name,
           city,
-          datetime,
-          min_attendees || 1,
-          max_attendees || 40,
-          is_confirmed || false,
+          new Date(datetime).toISOString(),
+          min_attendees ?? 1,
+          max_attendees ?? 40,
+          is_confirmed ?? false,
           description || null,
           details || null,
           venue || null,
@@ -54,41 +61,42 @@ export default async function handler(req, res) {
           tag3 || null,
           image_url || null
         ]
-      );
+      )
 
-      return res.status(201).json(result.rows[0]);
+      return res.status(201).json(result.rows[0])
     } catch (err) {
-      console.error('[POST] Error inserting event:', err);
-      return res.status(500).json({ error: 'Failed to insert event', details: err.message });
+      console.error('[POST] Error inserting event:', err)
+      return res.status(500).json({ error: 'Failed to insert event', details: err.message })
     }
   }
 
   if (method === 'PUT') {
-    const {
-      id,
-      group_id,
-      name,
-      city,
-      datetime,
-      min_attendees,
-      max_attendees,
-      is_confirmed,
-      description,
-      details,
-      venue,
-      basic_perk,
-      advanced_perk,
-      tag1,
-      tag2,
-      tag3,
-      image_url
-    } = body;
-
-    if (!id || !name || !city || !datetime) {
-      return res.status(400).json({ error: 'Missing required fields for update' });
-    }
-
     try {
+      const {
+        id,
+        name,
+        city,
+        datetime,
+        min_attendees,
+        max_attendees,
+        is_confirmed,
+        description,
+        details,
+        venue,
+        basic_perk,
+        advanced_perk,
+        tag1,
+        tag2,
+        tag3,
+        image_url
+      } = body
+
+      if (!id || !name || !city || !datetime) {
+        return res.status(400).json({ error: 'Missing required fields for update' })
+      }
+
+      const group_id = parseIntOrFail(id, 'id')
+
       const result = await pool.query(
         `UPDATE events
          SET group_id=$1, name=$2, city=$3, datetime=$4, min_attendees=$5, max_attendees=$6, is_confirmed=$7,
@@ -97,13 +105,13 @@ export default async function handler(req, res) {
          WHERE id=$17
          RETURNING *`,
         [
-          group_id || null,
+          group_id,
           name,
           city,
-          datetime,
-          min_attendees || 1,
-          max_attendees || 40,
-          is_confirmed || false,
+          new Date(datetime).toISOString(),
+          min_attendees ?? 1,
+          max_attendees ?? 40,
+          is_confirmed ?? false,
           description || null,
           details || null,
           venue || null,
@@ -115,34 +123,34 @@ export default async function handler(req, res) {
           image_url || null,
           id
         ]
-      );
+      )
 
       if (result.rowCount === 0) {
-        return res.status(404).json({ error: 'Event not found for update' });
+        return res.status(404).json({ error: 'Event not found for update' })
       }
 
-      return res.status(200).json(result.rows[0]);
+      return res.status(200).json(result.rows[0])
     } catch (err) {
-      console.error('[PUT] Error updating event:', err);
-      return res.status(500).json({ error: 'Failed to update event', details: err.message });
+      console.error('[PUT] Error updating event:', err)
+      return res.status(500).json({ error: 'Failed to update event', details: err.message })
     }
   }
 
   if (method === 'GET') {
     try {
-      const approvedOnly = query.approvedOnly === 'true';
+      const approvedOnly = query.approvedOnly === 'true'
       const result = await pool.query(
         approvedOnly
           ? 'SELECT * FROM events WHERE is_confirmed = TRUE ORDER BY datetime ASC'
           : 'SELECT * FROM events ORDER BY datetime ASC'
-      );
-      return res.status(200).json(result.rows);
+      )
+      return res.status(200).json(result.rows)
     } catch (err) {
-      console.error('[GET] Error fetching events:', err);
-      return res.status(500).json({ error: 'Failed to fetch events', details: err.message });
+      console.error('[GET] Error fetching events:', err)
+      return res.status(500).json({ error: 'Failed to fetch events', details: err.message })
     }
   }
 
-  return res.status(405).json({ error: `Method ${method} Not Allowed` });
+  return res.status(405).json({ error: `Method ${method} Not Allowed` })
 }
 
