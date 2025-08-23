@@ -432,50 +432,80 @@ function SetRoleForm() {
 
 
 function EventCreator() {
-  const [typeId, setTypeId] = useState('')
-  const [name, setName] = useState('')
-  const [city, setCity] = useState('')
-  const [datetime, setDatetime] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState('')
+  const [event, setEvent] = useState({
+    id: '',
+    name: '',
+    city: '',
+    datetime: '',
+    min_attendees: 1,
+    max_attendees: 40,
+    is_confirmed: false,
+    description: '',
+    details: '',
+    venue: '',
+    basic_perk: '',
+    advanced_perk: '',
+    tag1: '',
+    tag2: '',
+    tag3: '',
+    image_url: ''
+  });
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
 
-  async function handleCreate() {
-    if (!typeId || !name || !city || !datetime) {
-      setMessage('All fields are required')
-      return
+  const handleChange = (field, value) => {
+    setEvent((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = async (method) => {
+    if (!event.id || !event.name || !event.city || !event.datetime) {
+      setMessage('ID, name, city, and datetime are required');
+      return;
     }
-    setLoading(true)
+    setLoading(true);
     try {
       const res = await fetch('/api/events', {
-        method: 'POST',
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          typeId: Number(typeId),
-          name,
-          city,
-          datetime: new Date(datetime).toISOString(),
-          min_attendees: 1,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Error creating event')
-      setMessage(`✅ Event "${name}" created in DB`)
+        body: JSON.stringify(event),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error saving event');
+      setMessage(`✅ Event ${method === 'POST' ? 'created' : 'updated'} successfully`);
     } catch (err) {
-      setMessage('❌ ' + err.message)
+      setMessage('❌ ' + err.message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="space-y-2">
-      <input type="number" placeholder="Type ID" value={typeId} onChange={(e) => setTypeId(e.target.value)} className="w-full p-2 border rounded" />
-      <input type="text" placeholder="Event Name" value={name} onChange={(e) => setName(e.target.value)} className="w-full p-2 border rounded" />
-      <input type="text" placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} className="w-full p-2 border rounded" />
-      <input type="datetime-local" placeholder="Datetime" value={datetime} onChange={(e) => setDatetime(e.target.value)} className="w-full p-2 border rounded" />
-      <button onClick={handleCreate} disabled={loading} className={`px-4 py-2 rounded text-white ${loading ? 'bg-blue-300' : 'bg-blue-600'}`}>{loading ? 'Creating...' : 'Create Event'}</button>
+      <input type="number" placeholder="Event ID" value={event.id} onChange={(e) => handleChange('id', e.target.value)} className="w-full p-2 border rounded" />
+      <input type="text" placeholder="Event Name" value={event.name} onChange={(e) => handleChange('name', e.target.value)} className="w-full p-2 border rounded" />
+      <input type="text" placeholder="City" value={event.city} onChange={(e) => handleChange('city', e.target.value)} className="w-full p-2 border rounded" />
+      <input type="datetime-local" value={event.datetime} onChange={(e) => handleChange('datetime', e.target.value)} className="w-full p-2 border rounded" />
+      <input type="number" placeholder="Min Attendees" value={event.min_attendees} onChange={(e) => handleChange('min_attendees', e.target.value)} className="w-full p-2 border rounded" />
+      <input type="number" placeholder="Max Attendees" value={event.max_attendees} onChange={(e) => handleChange('max_attendees', e.target.value)} className="w-full p-2 border rounded" />
+      <textarea placeholder="Description" value={event.description} onChange={(e) => handleChange('description', e.target.value)} className="w-full p-2 border rounded" />
+      <textarea placeholder="Details" value={event.details} onChange={(e) => handleChange('details', e.target.value)} className="w-full p-2 border rounded" />
+      <input type="text" placeholder="Venue" value={event.venue} onChange={(e) => handleChange('venue', e.target.value)} className="w-full p-2 border rounded" />
+      <input type="text" placeholder="Basic Perk" value={event.basic_perk} onChange={(e) => handleChange('basic_perk', e.target.value)} className="w-full p-2 border rounded" />
+      <input type="text" placeholder="Advanced Perk" value={event.advanced_perk} onChange={(e) => handleChange('advanced_perk', e.target.value)} className="w-full p-2 border rounded" />
+      <input type="text" placeholder="Tag1" value={event.tag1} onChange={(e) => handleChange('tag1', e.target.value)} className="w-full p-2 border rounded" />
+      <input type="text" placeholder="Tag2" value={event.tag2} onChange={(e) => handleChange('tag2', e.target.value)} className="w-full p-2 border rounded" />
+      <input type="text" placeholder="Tag3" value={event.tag3} onChange={(e) => handleChange('tag3', e.target.value)} className="w-full p-2 border rounded" />
+      <input type="text" placeholder="Image URL" value={event.image_url} onChange={(e) => handleChange('image_url', e.target.value)} className="w-full p-2 border rounded" />
+      <label className="flex items-center">
+        <input type="checkbox" checked={event.is_confirmed} onChange={(e) => handleChange('is_confirmed', e.target.checked)} className="mr-2" />
+        Confirmed
+      </label>
+      <div className="flex gap-2">
+        <button onClick={() => handleSubmit('POST')} disabled={loading} className={`px-4 py-2 rounded text-white ${loading ? 'bg-blue-300' : 'bg-blue-600'}`}>Create</button>
+        <button onClick={() => handleSubmit('PUT')} disabled={loading} className={`px-4 py-2 rounded text-white ${loading ? 'bg-green-300' : 'bg-green-600'}`}>Update</button>
+      </div>
       {message && <p className="text-sm mt-1">{message}</p>}
     </div>
-  )
+  );
 }
 
