@@ -196,14 +196,14 @@ export default function AdminSBTManager() {
   }
 
   // --- Post Event to DB ---
-  async function postEventToDB(typeId, title, datetime, city) {
+  async function postEventToDB(id, title, datetime, city) {
     if (!city || !datetime) return toast.error('City and datetime are required')
     try {
       const res = await fetch('/api/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          typeId: Number(typeId),
+          id: Number(id),
           name: title,
           city,
           datetime: new Date(datetime).toISOString(),
