@@ -1,72 +1,101 @@
-// tea-project/frontend/pages/api/initdb.js
-import pkg from 'pg'
+// pages/api/initdb.js
+import pkg from 'pg';
 
-const { Pool } = pkg
+const { Pool } = pkg;
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
-})
+});
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method Not Allowed' })
+    return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
+  const client = await pool.connect();
   try {
-    const client = await pool.connect()
-
-    // 1️⃣ Create events table if not exists
+    // === EVENTS TABLE ===
     await client.query(`
       CREATE TABLE IF NOT EXISTS events (
         id SERIAL PRIMARY KEY,
         group_id TEXT,
-        name TEXT,
-        city TEXT,
-        datetime TIMESTAMPTZ,
+        name TEXT NOT NULL,
+        city TEXT NOT NULL,
+        datetime TIMESTAMPTZ NOT NULL,
         min_attendees INTEGER DEFAULT 1,
         max_attendees INTEGER DEFAULT 40,
         is_confirmed BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        description TEXT,
+        details TEXT,
+        venue TEXT,
+        basic_perk TEXT,
+        advanced_perk TEXT,
+        tag1 TEXT,
+        tag2 TEXT,
+        tag3 TEXT,
+        image_url TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
-    `)
+    `);
 
-    // Ensure city index exists
+    // Trigger for updated_at
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_events_city
-      ON events(LOWER(city));
-    `)
+      CREATE OR REPLACE FUNCTION update_updated_at_column()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.updated_at = CURRENT_TIMESTAMP;
+        RETURN NEW;
+      END;
+      $$ language 'plpgsql';
+    `);
 
-    // 2️⃣ Create registrations table if not exists
+    await client.query(`DROP TRIGGER IF EXISTS set_updated_at ON events;`);
+    await client.query(`
+      CREATE TRIGGER set_updated_at
+      BEFORE UPDATE ON events
+      FOR EACH ROW
+      EXECUTE FUNCTION update_updated_at_column();
+    `);
+
+    // === USER PROFILES TABLE ===
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_profiles (
+        telegram_user_id TEXT PRIMARY KEY,
+        telegram_username TEXT UNIQUE,
+        tier INTEGER DEFAULT 1 CHECK (tier IN (1, 2)),
+        email TEXT,
+        wallet_address TEXT,
+        city TEXT DEFAULT 'Copenhagen',
+        role TEXT DEFAULT 'user' CHECK (role IN ('user','organizer','admin')),
+        group_id TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // === REGISTRATIONS TABLE ===
     await client.query(`
       CREATE TABLE IF NOT EXISTS registrations (
         id SERIAL PRIMARY KEY,
-        event_id INTEGER NOT NULL REFERENCES events(id),
-        telegram_user_id TEXT NOT NULL,
+        event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+        telegram_user_id TEXT NOT NULL REFERENCES user_profiles(telegram_user_id) ON DELETE CASCADE,
         telegram_username TEXT,
         email TEXT,
         wallet_address TEXT,
-        tier INTEGER DEFAULT 1,
-        wallet_verified BOOLEAN DEFAULT FALSE,
         timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        has_arrived BOOLEAN DEFAULT FALSE,
+        voucher_applied BOOLEAN DEFAULT FALSE,
+        basic_perk_applied BOOLEAN DEFAULT FALSE,
+        advanced_perk_applied BOOLEAN DEFAULT FALSE,
+        ticket_validated BOOLEAN DEFAULT FALSE,
+        validated_by TEXT,
+        validated_at TIMESTAMPTZ,
         UNIQUE (event_id, telegram_user_id)
       );
-    `)
+    `);
 
-    // Ensure new columns exist for existing tables
-    await client.query(`
-      ALTER TABLE registrations
-      ADD COLUMN IF NOT EXISTS ticket_code TEXT UNIQUE
-    `)
-    await client.query(`
-      ALTER TABLE registrations
-      ADD COLUMN IF NOT EXISTS tier INTEGER DEFAULT 1
-    `)
-    await client.query(`
-      ALTER TABLE registrations
-      ADD COLUMN IF NOT EXISTS wallet_verified BOOLEAN DEFAULT FALSE
-    `)
-
-    // 3️⃣ Create invitations table if not exists
+    // === INVITATIONS TABLE ===
     await client.query(`
       CREATE TABLE IF NOT EXISTS invitations (
         id SERIAL PRIMARY KEY,
@@ -78,32 +107,29 @@ export default async function handler(req, res) {
         confirmed BOOLEAN DEFAULT FALSE,
         timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
-    `)
+    `);
 
-    // 4️⃣ Create user_emails table if not exists
+    // === EMAIL SUBSCRIBERS TABLE ===
     await client.query(`
       CREATE TABLE IF NOT EXISTS user_emails (
         telegram_user_id TEXT PRIMARY KEY,
         email TEXT NOT NULL,
         subscribed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
-    `)
+    `);
 
-    // 5️⃣ Generate ticket_code for existing registrations if missing
-    const existing = await client.query(`
-      SELECT id, ticket_code FROM registrations WHERE ticket_code IS NULL
-    `)
-    for (const row of existing.rows) {
-      const code = `TICKET-${row.id.toString().padStart(5, '0')}-${Math.random().toString(36).slice(2,7).toUpperCase()}`
-      await client.query(`UPDATE registrations SET ticket_code=$1 WHERE id=$2`, [code, row.id])
-      console.log(`✅ Set ticket_code for registration id=${row.id}: ${code}`)
-    }
+    // === City index ===
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_events_city
+      ON events(LOWER(city));
+    `);
 
-    client.release()
-    res.status(200).json({ message: '✅ Database initialized/updated successfully' })
+    res.status(200).json({ message: '✅ Database initialized/updated successfully' });
   } catch (err) {
-    console.error('❌ Init DB error:', err)
-    res.status(500).json({ error: err.message })
+    console.error('❌ Init DB error:', err);
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
   }
 }
 
