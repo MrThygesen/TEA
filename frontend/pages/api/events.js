@@ -129,17 +129,31 @@ export default async function handler(req, res) {
   if (method === 'GET') {
     try {
       const approvedOnly = query.approvedOnly === 'true';
-      const result = await pool.query(
-        approvedOnly
-          ? 'SELECT * FROM events WHERE is_confirmed = TRUE ORDER BY datetime ASC'
-          : 'SELECT * FROM events ORDER BY datetime ASC'
-      );
-      return res.status(200).json(result.rows);
-    } catch (err) {
-      console.error('[GET] Error fetching events:', err);
-      return res.status(500).json({ error: 'Failed to fetch events', details: err.message });
-    }
-  }
+     const result = await pool.query(
+  approvedOnly
+    ? `
+      SELECT e.*, COUNT(r.id) AS registered_users
+      FROM events e
+      LEFT JOIN registrations r ON r.event_id = e.id
+      WHERE e.is_confirmed = TRUE
+      GROUP BY e.id
+      ORDER BY e.datetime ASC
+    `
+    : `
+      SELECT e.*, COUNT(r.id) AS registered_users
+      FROM events e
+      LEFT JOIN registrations r ON r.event_id = e.id
+      GROUP BY e.id
+      ORDER BY e.datetime ASC
+    `
+);
+
+          return res.status(200).json(result.rows);
+        } catch (err) {
+          console.error('[GET] Error fetching events:', err);
+          return res.status(500).json({ error: 'Failed to fetch events', details: err.message });
+        }
+      }
 
   return res.status(405).json({ error: `Method ${method} Not Allowed` });
 }
