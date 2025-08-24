@@ -17,15 +17,10 @@ export default async function handler(req, res) {
         e.tag2,
         e.tag3,
         e.image_url,
-        COALESCE(COUNT(r.id), 0)::int AS registered_users,
-        COALESCE(
-          ARRAY_AGG(up.user_id) FILTER (WHERE up.role = 'organizer'), '{}'
-        ) AS organizers
+        COALESCE(COUNT(r.id), 0)::int AS registered_users
       FROM events e
       LEFT JOIN registrations r 
         ON e.id = r.event_id
-      LEFT JOIN user_profiles up
-        ON up.role = 'organizer'
       WHERE e.datetime > NOW()
       GROUP BY 
         e.id, e.name, e.city, e.datetime, e.description, e.venue, 
