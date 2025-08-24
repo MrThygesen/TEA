@@ -326,29 +326,42 @@ async function showAttendees(chatId, eventId) {
 }
 
 // ==== EVENT ADMIN (ORGANIZER) ====
-bot.onText(/\/event_admin/, async (msg)=>{
+bot.onText(/\/event_admin/, async (msg) => {
   const chatId = msg.chat.id;
   const tgId = String(msg.from.id);
 
   const profile = await getUserProfile(tgId);
-  if(!profile || !profile.group_id) return bot.sendMessage(chatId,'⚠️ You are not assigned to any group.');
+  if (!profile || !profile.group_id) {
+    return bot.sendMessage(chatId, '⚠️ You are not assigned to any group.');
+  }
 
   const { rows: events } = await pool.query(
-    `SELECT id,name,datetime,is_confirm
+    `SELECT id, name, datetime, is_confirmed 
+     FROM events 
+     WHERE group_id = $1 
+     ORDER BY datetime ASC`,
+    [profile.group_id]
+  );
 
+  if (!events.length) {
+    return bot.sendMessage(chatId, '📭 No events for your group yet.');
+  }
 
-
-
-if(!events.length) return bot.sendMessage(chatId,'📭 No events for your group yet.');
-
-
-for(const e of events){
-const dateStr = new Date(e.datetime).toLocaleString();
-const opts = { reply_markup:{ inline_keyboard:[[
-{ text:'Show Attendees', callback_data:`showattendees_${e.id}` }
-]] }};
-await bot.sendMessage(chatId, `📅 ${e.name} — ${dateStr}\nConfirmed: ${e.is_confirmed?'✅':'⌛'}`, opts);
-}
+  for (const e of events) {
+    const dateStr = new Date(e.datetime).toLocaleString();
+    const opts = {
+      reply_markup: {
+        inline_keyboard: [[
+          { text: 'Show Attendees', callback_data: `showattendees_${e.id}` }
+        ]]
+      }
+    };
+    await bot.sendMessage(
+      chatId,
+      `📅 ${e.name} — ${dateStr}\nConfirmed: ${e.is_confirmed ? '✅' : '⌛'}`,
+      opts
+    );
+  }
 });
 
 
