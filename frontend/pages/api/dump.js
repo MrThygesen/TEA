@@ -2,7 +2,24 @@
 import { pool } from '../../lib/postgres.js'
 
 export default async function handler(req, res) {
+  const { user_id } = req.query // expecting ?user_id=... in request
+
+  if (!user_id) {
+    return res.status(400).json({ error: 'Missing user_id' })
+  }
+
   try {
+    // Check if user has 'organizer' role
+    const roleCheck = await pool.query(
+      'SELECT 1 FROM user_profiles WHERE user_id = $1 AND role = $2',
+      [user_id, 'organizer']
+    )
+
+    if (roleCheck.rowCount === 0) {
+      return res.status(403).json({ error: 'User is not an organizer' })
+    }
+
+    // Fetch events
     const result = await pool.query(`
       SELECT 
         e.id,
