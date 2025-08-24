@@ -210,14 +210,37 @@ bot.onText(/\/events/, async (msg)=>{
   bot.sendMessage(chatId,'📍 Select your city:',opts);
 });
 
-bot.onText(/\/user_edit/, async (msg)=>{
+bot.onText(/\/user_edit/, async (msg) => {
   const tgId = String(msg.from.id);
   const profile = await getUserProfile(tgId);
-  if(!profile) await saveUserProfile(tgId,{ telegram_username:msg.from.username||'' });
+  if (!profile) await saveUserProfile(tgId, { telegram_username: msg.from.username || '' });
 
-  userStates[tgId] = { step:'editingProfile', field:'email' };
-  bot.sendMessage(msg.chat.id,`📧 Current email: ${profile?.email || 'N/A'}\nSend a new email to update.`);
+  userStates[tgId] = { step: 'editingProfile', field: 'email' };
+  bot.sendMessage(
+    msg.chat.id,
+    `📧 Current email: ${profile?.email || 'N/A'}\n` +
+    `Please send your new email address (must include '@' and '.').`
+  );
 });
+
+bot.on('message', async (msg) => {
+  const tgId = String(msg.from.id);
+  const state = userStates[tgId];
+  if (!state) return; // no active edit
+
+  if (state.field === 'email') {
+    const email = msg.text.trim();
+    if (!email.includes('@') || !email.includes('.')) {
+      return bot.sendMessage(msg.chat.id, '❌ Invalid email. Please include both "@" and "."');
+    }
+
+    await saveUserProfile(tgId, { email });
+    delete userStates[tgId];
+    bot.sendMessage(msg.chat.id, `✅ Email updated to: ${email}`);
+  }
+});
+
+
 
 // ==== MY EVENTS ====
 bot.onText(/\/myevents/, async (msg)=>{

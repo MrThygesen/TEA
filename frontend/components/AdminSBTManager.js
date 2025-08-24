@@ -360,6 +360,7 @@ function DbDump() {
 function SetRoleForm() {
   const [telegramUsername, setTelegramUsername] = useState('')
   const [telegramUserId, setTelegramUserId] = useState('')
+  const [groupId, setGroupId] = useState('')   // <-- added
   const [role, setRole] = useState('organizer')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
@@ -375,6 +376,7 @@ function SetRoleForm() {
       const body = { role }
       if (telegramUsername) body.telegram_username = telegramUsername
       if (telegramUserId) body.telegram_user_id = telegramUserId
+      if (groupId) body.group_id = parseInt(groupId, 10)  // <-- added
 
       const res = await fetch('/api/setRole', {
         method: 'POST',
@@ -386,7 +388,7 @@ function SetRoleForm() {
       if (!res.ok) throw new Error(data.error || 'Error setting role')
 
       const target = telegramUserId ? `ID ${telegramUserId}` : `@${telegramUsername}`
-      setMessage(`✅ Role "${role}" assigned to ${target}`)
+      setMessage(`✅ Role "${role}" assigned to ${target} in group ${groupId}`)
     } catch (err) {
       setMessage('❌ ' + err.message)
     } finally {
@@ -408,6 +410,13 @@ function SetRoleForm() {
         placeholder="Telegram user ID (optional)"
         value={telegramUserId}
         onChange={(e) => setTelegramUserId(e.target.value)}
+        className="w-full p-2 border rounded"
+      />
+      <input
+        type="number"
+        placeholder="Group ID"
+        value={groupId}
+        onChange={(e) => setGroupId(e.target.value)}
         className="w-full p-2 border rounded"
       />
       <select
