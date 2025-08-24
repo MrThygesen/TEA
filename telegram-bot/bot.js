@@ -210,30 +210,67 @@ bot.onText(/\/events/, async (msg)=>{
   bot.sendMessage(chatId,'📍 Select your city:',opts);
 });
 
-bot.onText(/\/user_edit/, async (msg) => {
-  const tgId = String(msg.from.id);
-  const profile = await getUserProfile(tgId);
-  if (!profile) await saveUserProfile(tgId, { telegram_username: msg.from.username || '' });
+// helper (simple check as requested)
+function isLikelyEmail(s) {
+  return typeof s === 'string' && s.includes('@') && s.includes('.')
+}
 
-  userStates[tgId] = { step: 'editingProfile', field: 'email' };
-  bot.sendMessage(
-    msg.chat.id,
+bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const tgId = String(msg.from.id);
+
+  let profile = await getUserProfile(tgId);
+  if (!profile) {
+    await saveUserProfile(tgId, { telegram_username: msg.from.username || '' });
+    profile = await getUserProfile(tgId);
+  }
+
+  // Support: /user_edit you@example.com
+  const inlineEmail = (match && match[1]) ? match[1].trim() : null;
+  if (inlineEmail) {
+    if (!isLikelyEmail(inlineEmail)) {
+      return bot.sendMessage(chatId, '❌ Invalid email. Please include both "@" and "."');
+    }
+    await saveUserProfile(tgId, { email: inlineEmail });
+    return bot.sendMessage(chatId, `✅ Email updated to: ${inlineEmail}`);
+  }
+
+  // Ask the user to reply with Force Reply (creates an input field)
+  const prompt = await bot.sendMessage(
+    chatId,
     `📧 Current email: ${profile?.email || 'N/A'}\n` +
-    `Please send your new email address (must include '@' and '.').`
+    `Reply to this message with your new email (must include '@' and '.').`,
+    { reply_markup: { force_reply: true, input_field_placeholder: 'you@example.com' } }
   );
+
+  // track only the reply to this prompt
+  userStates[tgId] = { step: 'editingProfile', field: 'email', replyTo: prompt.message_id };
 });
 
+// optional: let the user cancel the edit
+bot.onText(/\/cancel/, async (msg) => {
+  delete userStates[String(msg.from.id)];
+  bot.sendMessage(msg.chat.id, '✖️ Email update canceled.');
+});
+
+// capture the reply
 bot.on('message', async (msg) => {
   const tgId = String(msg.from.id);
   const state = userStates[tgId];
-  if (!state) return; // no active edit
+  if (!state) return;                // no active edit
+  if (!msg.text) return;             // non-text message
+  if (msg.text.startsWith('/')) return; // ignore commands
+
+  // ensure it's a reply to our prompt (prevents false positives)
+  if (state.replyTo && (!msg.reply_to_message || msg.reply_to_message.message_id !== state.replyTo)) {
+    return;
+  }
 
   if (state.field === 'email') {
     const email = msg.text.trim();
-    if (!email.includes('@') || !email.includes('.')) {
+    if (!isLikelyEmail(email)) {
       return bot.sendMessage(msg.chat.id, '❌ Invalid email. Please include both "@" and "."');
     }
-
     await saveUserProfile(tgId, { email });
     delete userStates[tgId];
     bot.sendMessage(msg.chat.id, `✅ Email updated to: ${email}`);
@@ -349,21 +386,30 @@ async function showAttendees(chatId, eventId) {
 }
 
 // ==== EVENT ADMIN (ORGANIZER) ====
-bot.onText(/\/event_admin/, async (msg) => {
-  const chatId = msg.chat.id;
-  const tgId = String(msg.from.id);
-
+async function ensureOrganizer(chatId, tgId) {
   const profile = await getUserProfile(tgId);
-  if (!profile || !profile.group_id) {
-    return bot.sendMessage(chatId, '⚠️ You are not assigned to any group.');
+  if (!profile) {
+    await bot.sendMessage(chatId, '⚠️ You are not registered. Use /user_edit to complete your profile.');
+    return null;
   }
+  if (profile.role !== 'organizer') {
+    await bot.sendMessage(chatId, '🚫 Access denied: Organizer role required.');
+    return null;
+  }
+  if (!profile.group_id) {
+    await bot.sendMessage(chatId, '⚠️ You are not assigned to any group.');
+    return null;
+  }
+  return profile;
+}
 
+async function showOrganizerEvents(chatId, groupId) {
   const { rows: events } = await pool.query(
-    `SELECT id, name, datetime, is_confirmed 
-     FROM events 
-     WHERE group_id = $1 
+    `SELECT id, name, datetime, is_confirmed
+     FROM events
+     WHERE group_id = $1
      ORDER BY datetime ASC`,
-    [profile.group_id]
+    [groupId]
   );
 
   if (!events.length) {
@@ -385,10 +431,26 @@ bot.onText(/\/event_admin/, async (msg) => {
       opts
     );
   }
+}
+
+bot.onText(/\/event_admin|\/user_admin/, async (msg) => {
+  const chatId = msg.chat.id;
+  const tgId = String(msg.from.id);
+
+  const profile = await ensureOrganizer(chatId, tgId);
+  if (!profile) return;
+
+  await showOrganizerEvents(chatId, profile.group_id);
 });
 
 
 // ==== CALLBACK QUERIES ====
+
+
+
+
+
+
 bot.on('callback_query', async (query)=>{
 const data = query.data;
 const chatId = query.message.chat.id;
@@ -420,10 +482,16 @@ await bot.sendMessage(chatId,res.statusMsg);
 }
 
 
-if(data.startsWith('showattendees_')){
-const eventId = parseInt(data.split('_')[1],10);
-await showAttendees(chatId,eventId);
-}
+if (data.startsWith('showattendees_')) {
+    const prof = await getUserProfile(tgId);
+    if (prof?.role !== 'organizer') {
+      // show an alert on the callback
+      try { await bot.answerCallbackQuery(query.id, { text: 'Organizer role required', show_alert: true }); } catch {}
+      return;
+    }
+    const eventId = parseInt(data.split('_')[1], 10);
+    return await showAttendees(chatId, eventId);
+  }
 });
 
 
