@@ -365,10 +365,10 @@ async function showEvents(chatId, city) {
 
 // ==== SHOW ATTENDEES ====
 async function showAttendees(chatId, eventId, messageId = null) {
-  const { rows: [event] } = await pool.query(`SELECT id, basic_perk, advanced_perk FROM events WHERE id=$1`, [eventId]);
   const { rows: regs } = await pool.query(`
-    SELECT r.id, r.telegram_username, u.role, 
-           r.has_arrived, r.voucher_applied, r.basic_perk_applied, r.advanced_perk_applied
+    SELECT r.id, r.telegram_username,
+           r.has_arrived, r.voucher_applied,
+           r.basic_perk_applied, r.advanced_perk_applied
     FROM registrations r
     JOIN user_profiles u ON u.telegram_user_id = r.telegram_user_id
     WHERE r.event_id=$1
@@ -381,29 +381,36 @@ async function showAttendees(chatId, eventId, messageId = null) {
       : bot.sendMessage(chatId, '📭 No attendees yet.');
   }
 
-  // Build message text
-  let text = `👥 Attendees for event ID ${eventId}:\n`;
-  regs.forEach(r => {
-    text += `\n@${r.telegram_username} | Role: ${r.role} | Arrived: ${r.has_arrived ? '✅':'❌'} | Voucher: ${r.voucher_applied?'✅':'❌'} | Basic perk: ${r.basic_perk_applied?'✅':'❌'} | Advanced perk: ${r.advanced_perk_applied?'✅':'❌'}`;
-  });
+  // HEADER row
+  const headerRow = [
+    { text: 'Guest', callback_data: 'noop_header_guest' },
+    { text: 'Arr', callback_data: 'noop_header_arr' },
+    { text: 'Vouch', callback_data: 'noop_header_vouch' },
+    { text: 'Basic', callback_data: 'noop_header_basic' },
+    { text: 'Advance', callback_data: 'noop_header_advance' },
+  ];
 
-  // Build inline keyboard for toggles
- const inline_keyboard = regs.map(r => ([
-  { text: `@${r.telegram_username}`, callback_data: `noop_${r.id}` }, // User column (non-clickable)
-  { text: `Arrived: ${r.has_arrived ? '✅' : '❌'}`, callback_data: `toggle_${r.id}_has_arrived` },
-  { text: `Voucher: ${r.voucher_applied ? '✅' : '❌'}`, callback_data: `toggle_${r.id}_voucher_applied` },
-  { text: `Basic: ${r.basic_perk_applied ? '✅' : '❌'}`, callback_data: `toggle_${r.id}_basic_perk_applied` },
-  { text: `Advanced: ${r.advanced_perk_applied ? '✅' : '❌'}`, callback_data: `toggle_${r.id}_advanced_perk_applied` },
-]));
+  // ATTENDEE rows
+  const attendeeRows = regs.map(r => ([
+    { text: `@${r.telegram_username}`, callback_data: `noop_${r.id}` },
+    { text: r.has_arrived ? '✅' : '❌', callback_data: `toggle_${r.id}_has_arrived` },
+    { text: r.voucher_applied ? '✅' : '❌', callback_data: `toggle_${r.id}_voucher_applied` },
+    { text: r.basic_perk_applied ? '✅' : '❌', callback_data: `toggle_${r.id}_basic_perk_applied` },
+    { text: r.advanced_perk_applied ? '✅' : '❌', callback_data: `toggle_${r.id}_advanced_perk_applied` },
+  ]));
+
+  const inline_keyboard = [headerRow, ...attendeeRows];
 
   const opts = { reply_markup: { inline_keyboard } };
 
   if (messageId) {
-    // Edit previous message
-    await bot.editMessageText(text, { chat_id: chatId, message_id: messageId, reply_markup: opts.reply_markup }).catch(()=>{});
+    await bot.editMessageText(`👥 Attendees for event ID ${eventId}:`, {
+      chat_id: chatId,
+      message_id: messageId,
+      reply_markup: opts.reply_markup
+    }).catch(()=>{});
   } else {
-    // Send new message
-    await bot.sendMessage(chatId, text, opts);
+    await bot.sendMessage(chatId, `👥 Attendees for event ID ${eventId}:`, opts);
   }
 }
 
