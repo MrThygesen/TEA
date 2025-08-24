@@ -467,78 +467,87 @@ bot.onText(/\/event_admin|\/user_admin/, async (msg) => {
 
 
 // ==== CALLBACK QUERIES ====
+bot.on('callback_query', async (query) => {
+  const data = query.data;
+  const chatId = query.message.chat.id;
+  const tgId = String(query.from.id);
 
-bot.on('callback_query', async (query)=>{
-const data = query.data;
-const chatId = query.message.chat.id;
-const tgId = String(query.from.id);
-
-
-if(data.startsWith('city_')){
-const city = data.split('_')[1];
-await showEvents(chatId, city);
-}
-
-if (data.startsWith('toggle_')) {
-  const prof = await getUserProfile(tgId);
-  if (prof?.role !== 'organizer') {
-    try { await bot.answerCallbackQuery(query.id, { text: 'Organizer role required', show_alert: true }); } catch {}
+  // --- CITY SELECTION ---
+  if (data.startsWith('city_')) {
+    const city = data.split('_')[1];
+    await showEvents(chatId, city);
     return;
   }
 
-  const parts = data.split('_'); // ['toggle', regId, 'field', 'name']
-  const regId = parseInt(parts[1], 10);
-  const field = parts.slice(2).join('_'); // combine remaining parts to get correct column name
-
-  // Get current value
-  const currentRes = await pool.query(`SELECT ${field} FROM registrations WHERE id=$1`, [regId]);
-  if (!currentRes.rows.length) return;
-  const current = currentRes.rows[0][field];
-  const newValue = !current;
-
-  // Update DB
-//  await pool.query(`UPDATE registrations SET ${field}=$1, updated_at=NOW() WHERE id=$2`, [newValue, regId]);
-
-  // Refresh attendee list in-place
-  const eventRes = await pool.query('SELECT event_id FROM registrations WHERE id=$1', [regId]);
-  const eventId = eventRes.rows[0]?.event_id;
-  if (!eventId) return;
-
-  await showAttendees(chatId, eventId, query.message.message_id);
-  try { await bot.answerCallbackQuery(query.id); } catch {} // remove loading spinner
-}
-
-
-
-
-if(data.startsWith('details_')){
-const eventId = parseInt(data.split('_')[1],10);
-const res = await pool.query('SELECT * FROM events WHERE id=$1',[eventId]);
-const event = res.rows[0];
-if(!event) return bot.sendMessage(chatId, '⚠️ Event not found.');
-const dateStr = new Date(event.datetime).toLocaleString();
-const text = `📌 Event: ${event.name}\nCity: ${event.city}\nDate/Time: ${dateStr}\nMin/Max attendees: ${event.min_attendees}/${event.max_attendees}\nConfirmed: ${event.is_confirmed ? '✅' : '⌛'}\nDescription: ${event.description || 'N/A'}\nVenue: ${event.venue || 'N/A'}\nBasic perk: ${event.basic_perk || 'N/A'}\nAdvanced perk: ${event.advanced_perk || 'N/A'}`;
-await bot.sendMessage(chatId, text);
-}
-
-
-if(data.startsWith('register_')){
-const eventId = parseInt(data.split('_')[1],10);
-const profile = await getUserProfile(tgId);
-const res = await registerUser(eventId,tgId,profile?.telegram_username||'',profile?.email,profile?.wallet_address);
-await bot.sendMessage(chatId,res.statusMsg);
-}
-
-
-if (data.startsWith('showattendees_')) {
+  // --- TOGGLE FIELDS (Organizer only) ---
+  if (data.startsWith('toggle_')) {
     const prof = await getUserProfile(tgId);
     if (prof?.role !== 'organizer') {
-      // show an alert on the callback
+      try {
+        await bot.answerCallbackQuery(query.id, { text: 'Organizer role required', show_alert: true });
+      } catch {}
+      return;
+    }
+
+    const parts = data.split('_'); // ['toggle', regId, 'field', ...]
+    const regId = parseInt(parts[1], 10);
+    const field = parts.slice(2).join('_');
+
+    // Validate field name
+    const allowedFields = ['has_arrived', 'voucher_applied', 'basic_perk_applied', 'advanced_perk_applied'];
+    if (!allowedFields.includes(field)) return;
+
+    // Get current value
+    const currentRes = await pool.query(`SELECT ${field} FROM registrations WHERE id=$1`, [regId]);
+    if (!currentRes.rows.length) return;
+    const current = currentRes.rows[0][field];
+    const newValue = !current;
+
+    // Update DB
+    await pool.query(`UPDATE registrations SET ${field}=$1 WHERE id=$2`, [newValue, regId]);
+
+    // Refresh attendee list in-place
+    const eventRes = await pool.query('SELECT event_id FROM registrations WHERE id=$1', [regId]);
+    const eventId = eventRes.rows[0]?.event_id;
+    if (!eventId) return;
+
+    await showAttendees(chatId, eventId, query.message.message_id);
+
+    try { await bot.answerCallbackQuery(query.id); } catch {} // remove loading spinner
+    return;
+  }
+
+  // --- EVENT DETAILS ---
+  if (data.startsWith('details_')) {
+    const eventId = parseInt(data.split('_')[1], 10);
+    const res = await pool.query('SELECT * FROM events WHERE id=$1', [eventId]);
+    const event = res.rows[0];
+    if (!event) return bot.sendMessage(chatId, '⚠️ Event not found.');
+    const dateStr = new Date(event.datetime).toLocaleString();
+    const text = `📌 Event: ${event.name}\nCity: ${event.city}\nDate/Time: ${dateStr}\nMin/Max attendees: ${event.min_attendees}/${event.max_attendees}\nConfirmed: ${event.is_confirmed ? '✅' : '⌛'}\nDescription: ${event.description || 'N/A'}\nVenue: ${event.venue || 'N/A'}\nBasic perk: ${event.basic_perk || 'N/A'}\nAdvanced perk: ${event.advanced_perk || 'N/A'}`;
+    await bot.sendMessage(chatId, text);
+    return;
+  }
+
+  // --- REGISTER ---
+  if (data.startsWith('register_')) {
+    const eventId = parseInt(data.split('_')[1], 10);
+    const profile = await getUserProfile(tgId);
+    const res = await registerUser(eventId, tgId, profile?.telegram_username || '', profile?.email, profile?.wallet_address);
+    await bot.sendMessage(chatId, res.statusMsg);
+    return;
+  }
+
+  // --- SHOW ATTENDEES (Organizer only) ---
+  if (data.startsWith('showattendees_')) {
+    const prof = await getUserProfile(tgId);
+    if (prof?.role !== 'organizer') {
       try { await bot.answerCallbackQuery(query.id, { text: 'Organizer role required', show_alert: true }); } catch {}
       return;
     }
     const eventId = parseInt(data.split('_')[1], 10);
-    return await showAttendees(chatId, eventId);
+    await showAttendees(chatId, eventId);
+    return;
   }
 });
 
