@@ -1,3 +1,4 @@
+
 // bot.js
 import TelegramBot from 'node-telegram-bot-api';
 import pkg from 'pg';
@@ -170,10 +171,15 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
   const profile = await getUserProfile(tgId);
   if (!profile) await saveUserProfile(tgId,{ telegram_username:username });
 
-  if (!payload) {
-    return bot.sendMessage(msg.chat.id,
-      `👋 Welcome ${username}! Use /events to see events, /myevents for your registrations, /user_edit to add email, /help for commands.`);
+  if (payload && !isNaN(payload)) {
+    const eventId = parseInt(payload, 10);
+    const profile = await getUserProfile(tgId);
+    const res = await registerUser(eventId, tgId, profile?.telegram_username || '', profile?.email, profile?.wallet_address);
+    return bot.sendMessage(msg.chat.id, `🔗 Deep link detected: Event ${eventId}\n${res.statusMsg}`);
   }
+
+  return bot.sendMessage(msg.chat.id,
+    `👋 Welcome ${username}! Use /events to see events, /myevents for your registrations, /user_edit to add email, /help for commands.`);
 });
 
 bot.onText(/\/help/, async (msg)=>{
@@ -213,6 +219,28 @@ bot.onText(/\/user_edit/, async (msg)=>{
   bot.sendMessage(msg.chat.id,`📧 Current email: ${profile?.email || 'N/A'}\nSend a new email to update.`);
 });
 
+// ==== MY EVENTS ====
+bot.onText(/\/myevents/, async (msg)=>{
+  const tgId = String(msg.from.id);
+  const events = await getUserEvents(tgId);
+  if(!events.length) return bot.sendMessage(msg.chat.id,'📭 You are not registered for any events.');
+
+  for (const e of events) {
+    const dateStr = new Date(e.datetime).toLocaleString();
+    await bot.sendMessage(msg.chat.id,
+      `📅 ${e.name} — ${dateStr}\n/event_detail_${e.id} to see details\n/deregister_${e.id} to leave the event`
+    );
+  }
+});
+
+// ==== DEREGISTER ====
+bot.onText(/\/deregister_(\d+)/, async (msg, match) => {
+  const eventId = parseInt(match[1], 10);
+  const tgId = String(msg.from.id);
+  await pool.query('DELETE FROM registrations WHERE event_id=$1 AND telegram_user_id=$2', [eventId, tgId]);
+  await bot.sendMessage(msg.chat.id, `❌ You have been deregistered from event ${eventId}.`);
+});
+
 // ==== TICKET VIEW ====
 bot.onText(/\/ticket/, async (msg)=>{
   const tgId = String(msg.from.id);
@@ -228,12 +256,23 @@ bot.onText(/\/ticket/, async (msg)=>{
       `👤 Username: @${username}\n` +
       `📅 Date/Time: ${dateStr}\n` +
       `📌 Show this ticket at the entrance/staff.\n` +
-      `/see_event_detail_${e.id}`;
+      `/event_detail_${e.id}`;
     bot.sendMessage(msg.chat.id, ticketText);
   });
 });
 
 // ==== EVENT DETAIL ====
+bot.onText(/\/event_detail_(\d+)/, async (msg, match)=>{
+  const eventId = parseInt(match[1],10);
+  const res = await pool.query('SELECT * FROM events WHERE id=$1',[eventId]);
+  const event = res.rows[0];
+  if(!event) return bot.sendMessage(msg.chat.id,'⚠️ Event not found.');
+  const dateStr = new Date(event.datetime).toLocaleString();
+  let text = `📌 Event: ${event.name}\nCity: ${event.city}\nDate/Time: ${dateStr}\nMin/Max attendees: ${event.min_attendees}/${event.max_attendees}\nConfirmed: ${event.is_confirmed ? '✅' : '⌛'}\nDescription: ${event.description || 'N/A'}\nVenue: ${event.venue || 'N/A'}\nBasic perk: ${event.basic_perk || 'N/A'}\nAdvanced perk: ${event.advanced_perk || 'N/A'}`;
+  bot.sendMessage(msg.chat.id,text);
+});
+
+// Keep legacy see_event_detail working
 bot.onText(/\/see_event_detail_(\d+)/, async (msg, match)=>{
   const eventId = parseInt(match[1],10);
   const res = await pool.query('SELECT * FROM events WHERE id=$1',[eventId]);
@@ -295,57 +334,69 @@ bot.onText(/\/event_admin/, async (msg)=>{
   if(!profile || !profile.group_id) return bot.sendMessage(chatId,'⚠️ You are not assigned to any group.');
 
   const { rows: events } = await pool.query(
-    `SELECT id,name,datetime,is_confirmed FROM events WHERE group_id=$1 ORDER BY datetime ASC`,
-    [profile.group_id]
-  );
+    `SELECT id,name,datetime,is_confirm
 
-  if(!events.length) return bot.sendMessage(chatId,'📭 No events for your group yet.');
 
-  for(const e of events){
-    const dateStr = new Date(e.datetime).toLocaleString();
-    const opts = { reply_markup:{ inline_keyboard:[[
-      { text:'Show Attendees', callback_data:`showattendees_${e.id}` }
-    ]] }};
-    await bot.sendMessage(chatId, `📅 ${e.name} — ${dateStr}\nConfirmed: ${e.is_confirmed?'✅':'⌛'}`, opts);
-  }
+
+
+if(!events.length) return bot.sendMessage(chatId,'📭 No events for your group yet.');
+
+
+for(const e of events){
+const dateStr = new Date(e.datetime).toLocaleString();
+const opts = { reply_markup:{ inline_keyboard:[[
+{ text:'Show Attendees', callback_data:`showattendees_${e.id}` }
+]] }};
+await bot.sendMessage(chatId, `📅 ${e.name} — ${dateStr}\nConfirmed: ${e.is_confirmed?'✅':'⌛'}`, opts);
+}
 });
+
 
 // ==== CALLBACK QUERIES ====
 bot.on('callback_query', async (query)=>{
-  const data = query.data;
-  const chatId = query.message.chat.id;
-  const tgId = String(query.from.id);
+const data = query.data;
+const chatId = query.message.chat.id;
+const tgId = String(query.from.id);
 
-  if(data.startsWith('city_')){
-    const city = data.split('_')[1];
-    await showEvents(chatId, city);
-  }
 
-  if(data.startsWith('details_')){
-    const eventId = parseInt(data.split('_')[1],10);
-    await bot.sendMessage(chatId,`Loading event details...`);
-    bot.emit('text', { chat:{id:chatId}, from:{id:tgId}, text:`/see_event_detail_${eventId}` });
-  }
+if(data.startsWith('city_')){
+const city = data.split('_')[1];
+await showEvents(chatId, city);
+}
 
-  if(data.startsWith('register_')){
-    const eventId = parseInt(data.split('_')[1],10);
-    const profile = await getUserProfile(tgId);
-    const res = await registerUser(eventId,tgId,profile?.telegram_username||'',profile?.email,profile?.wallet_address);
-    await bot.sendMessage(chatId,res.statusMsg);
-  }
 
-  if(data.startsWith('showattendees_')){
-    const eventId = parseInt(data.split('_')[1],10);
-    await showAttendees(chatId,eventId);
-  }
+if(data.startsWith('details_')){
+const eventId = parseInt(data.split('_')[1],10);
+const res = await pool.query('SELECT * FROM events WHERE id=$1',[eventId]);
+const event = res.rows[0];
+if(!event) return bot.sendMessage(chatId, '⚠️ Event not found.');
+const dateStr = new Date(event.datetime).toLocaleString();
+const text = `📌 Event: ${event.name}\nCity: ${event.city}\nDate/Time: ${dateStr}\nMin/Max attendees: ${event.min_attendees}/${event.max_attendees}\nConfirmed: ${event.is_confirmed ? '✅' : '⌛'}\nDescription: ${event.description || 'N/A'}\nVenue: ${event.venue || 'N/A'}\nBasic perk: ${event.basic_perk || 'N/A'}\nAdvanced perk: ${event.advanced_perk || 'N/A'}`;
+await bot.sendMessage(chatId, text);
+}
+
+
+if(data.startsWith('register_')){
+const eventId = parseInt(data.split('_')[1],10);
+const profile = await getUserProfile(tgId);
+const res = await registerUser(eventId,tgId,profile?.telegram_username||'',profile?.email,profile?.wallet_address);
+await bot.sendMessage(chatId,res.statusMsg);
+}
+
+
+if(data.startsWith('showattendees_')){
+const eventId = parseInt(data.split('_')[1],10);
+await showAttendees(chatId,eventId);
+}
 });
+
 
 // ==== EXPRESS WEBHOOK ====
 app.post(`/webhook/${BOT_TOKEN}`, (req,res)=>{
-  bot.processUpdate(req.body);
-  res.sendStatus(200);
+bot.processUpdate(req.body);
+res.sendStatus(200);
 });
+
 
 bot.setWebHook(`${PUBLIC_URL}/webhook/${BOT_TOKEN}`);
 app.listen(PORT,()=>console.log(`🚀 Bot running on port ${PORT}`));
-
