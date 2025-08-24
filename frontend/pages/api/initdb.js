@@ -34,6 +34,7 @@ export default async function handler(req, res) {
         tag2 TEXT,
         tag3 TEXT,
         image_url TEXT,
+        price TEXT,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
@@ -90,6 +91,7 @@ export default async function handler(req, res) {
         ticket_validated BOOLEAN DEFAULT FALSE,
         validated_by TEXT,
         validated_at TIMESTAMPTZ,
+        has_paid BOOLEAN DEFAULT FALSE,
         UNIQUE (event_id, telegram_user_id)
       );
     `);

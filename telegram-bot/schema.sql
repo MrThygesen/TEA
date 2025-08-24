@@ -1,7 +1,7 @@
 -- === EVENTS TABLE ===
 CREATE TABLE IF NOT EXISTS events (
   id SERIAL PRIMARY KEY,
-  group_id INTEGER, -- matches id type
+  group_id INTEGER,
   name TEXT NOT NULL,
   city TEXT NOT NULL,
   datetime TIMESTAMPTZ NOT NULL,
@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS events (
   tag2 TEXT,
   tag3 TEXT,
   image_url TEXT,
+  price TEXT,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
@@ -67,6 +68,7 @@ CREATE TABLE IF NOT EXISTS registrations (
   ticket_validated BOOLEAN DEFAULT FALSE,
   validated_by TEXT,
   validated_at TIMESTAMPTZ,
+  has_paid BOOLEAN DEFAULT FALSE,
   UNIQUE (event_id, telegram_user_id)
 );
 

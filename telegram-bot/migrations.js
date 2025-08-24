@@ -27,12 +27,10 @@ export async function runMigrations() {
       );
     `);
 
-    // Ensure new columns exist (safe patching)
-    const eventColumns = ['tag1', 'tag2', 'tag3'];
+    // Ensure new columns exist
+    const eventColumns = ['tag1', 'tag2', 'tag3', 'price'];
     for (const col of eventColumns) {
-      await pool.query(
-        `ALTER TABLE events ADD COLUMN IF NOT EXISTS ${col} TEXT;`
-      );
+      await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ${col} TEXT;`);
     }
 
     // Trigger for updated_at
@@ -88,6 +86,9 @@ export async function runMigrations() {
         UNIQUE (event_id, telegram_user_id)
       );
     `);
+
+    // Ensure new columns exist
+    await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS has_paid BOOLEAN DEFAULT FALSE;`);
 
     // === INVITATIONS TABLE ===
     await pool.query(`
