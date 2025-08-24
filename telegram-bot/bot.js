@@ -497,7 +497,7 @@ if (data.startsWith('toggle_')) {
   const newValue = !current;
 
   // Update DB
-  await pool.query(`UPDATE registrations SET ${field}=$1, updated_at=NOW() WHERE id=$2`, [newValue, regId]);
+//  await pool.query(`UPDATE registrations SET ${field}=$1, updated_at=NOW() WHERE id=$2`, [newValue, regId]);
 
   // Refresh attendee list in-place
   const eventRes = await pool.query('SELECT event_id FROM registrations WHERE id=$1', [regId]);
