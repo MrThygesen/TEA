@@ -364,7 +364,8 @@ async function showEvents(chatId, city) {
 }
 
 // ==== SHOW ATTENDEES ====
-async function showAttendees(chatId, eventId) {
+async function showAttendees(chatId, eventId, messageId = null) {
+  const { rows: [event] } = await pool.query(`SELECT id, basic_perk, advanced_perk FROM events WHERE id=$1`, [eventId]);
   const { rows: regs } = await pool.query(`
     SELECT r.id, r.telegram_username, u.role, 
            r.has_arrived, r.voucher_applied, r.basic_perk_applied, r.advanced_perk_applied
@@ -374,24 +375,33 @@ async function showAttendees(chatId, eventId) {
     ORDER BY r.id ASC
   `, [eventId]);
 
-  if (!regs.length) return bot.sendMessage(chatId, '📭 No attendees yet.');
+  if (!regs.length) {
+    return messageId
+      ? bot.editMessageText('📭 No attendees yet.', { chat_id: chatId, message_id: messageId }).catch(()=>{})
+      : bot.sendMessage(chatId, '📭 No attendees yet.');
+  }
 
-  for (const r of regs) {
-    const text = `@${r.telegram_username} | Role: ${r.role}`;
-    const opts = {
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: `Arrived: ${r.has_arrived ? '✅' : '❌'}`, callback_data: `toggle_${r.id}_has_arrived` },
-            { text: `Voucher: ${r.voucher_applied ? '✅' : '❌'}`, callback_data: `toggle_${r.id}_voucher_applied` }
-          ],
-          [
-            { text: `Basic: ${r.basic_perk_applied ? '✅' : '❌'}`, callback_data: `toggle_${r.id}_basic_perk_applied` },
-            { text: `Advanced: ${r.advanced_perk_applied ? '✅' : '❌'}`, callback_data: `toggle_${r.id}_advanced_perk_applied` }
-          ]
-        ]
-      }
-    };
+  // Build message text
+  let text = `👥 Attendees for event ID ${eventId}:\n`;
+  regs.forEach(r => {
+    text += `\n@${r.telegram_username} | Role: ${r.role} | Arrived: ${r.has_arrived ? '✅':'❌'} | Voucher: ${r.voucher_applied?'✅':'❌'} | Basic perk: ${r.basic_perk_applied?'✅':'❌'} | Advanced perk: ${r.advanced_perk_applied?'✅':'❌'}`;
+  });
+
+  // Build inline keyboard for toggles
+  const inline_keyboard = regs.map(r => ([
+    { text: `Arrived: ${r.has_arrived?'✅':'❌'}`, callback_data: `toggle_${r.id}_has_arrived` },
+    { text: `Voucher: ${r.voucher_applied?'✅':'❌'}`, callback_data: `toggle_${r.id}_voucher_applied` },
+    { text: `Basic: ${r.basic_perk_applied?'✅':'❌'}`, callback_data: `toggle_${r.id}_basic_perk_applied` },
+    { text: `Advanced: ${r.advanced_perk_applied?'✅':'❌'}`, callback_data: `toggle_${r.id}_advanced_perk_applied` },
+  ]));
+
+  const opts = { reply_markup: { inline_keyboard } };
+
+  if (messageId) {
+    // Edit previous message
+    await bot.editMessageText(text, { chat_id: chatId, message_id: messageId, reply_markup: opts.reply_markup }).catch(()=>{});
+  } else {
+    // Send new message
     await bot.sendMessage(chatId, text, opts);
   }
 }
@@ -469,7 +479,6 @@ const city = data.split('_')[1];
 await showEvents(chatId, city);
 }
 
-
 if (data.startsWith('toggle_')) {
   const prof = await getUserProfile(tgId);
   if (prof?.role !== 'organizer') {
@@ -477,30 +486,28 @@ if (data.startsWith('toggle_')) {
     return;
   }
 
-  const [, regIdStr, field] = data.split('_');
-  const regId = parseInt(regIdStr, 10);
+  const parts = data.split('_'); // ['toggle', regId, 'field', 'name']
+  const regId = parseInt(parts[1], 10);
+  const field = parts.slice(2).join('_'); // combine remaining parts to get correct column name
 
   // Get current value
-  const res = await pool.query(`SELECT ${field} FROM registrations WHERE id=$1`, [regId]);
-  if (!res.rows.length) return;
-
-  const current = res.rows[0][field];
+  const currentRes = await pool.query(`SELECT ${field} FROM registrations WHERE id=$1`, [regId]);
+  if (!currentRes.rows.length) return;
+  const current = currentRes.rows[0][field];
   const newValue = !current;
 
-  // Update the field
+  // Update DB
   await pool.query(`UPDATE registrations SET ${field}=$1, updated_at=NOW() WHERE id=$2`, [newValue, regId]);
 
-  // Notify user (alert)
-  try {
-    await bot.answerCallbackQuery(query.id, { text: `${field} set to ${newValue ? '✅' : '❌'}`, show_alert: false });
-  } catch {}
+  // Refresh attendee list in-place
+  const eventRes = await pool.query('SELECT event_id FROM registrations WHERE id=$1', [regId]);
+  const eventId = eventRes.rows[0]?.event_id;
+  if (!eventId) return;
 
-  // Refresh attendee list
-  const registration = await pool.query('SELECT event_id FROM registrations WHERE id=$1', [regId]);
-  if (registration.rows.length) {
-    await showAttendees(chatId, registration.rows[0].event_id);
-  }
+  await showAttendees(chatId, eventId, query.message.message_id);
+  try { await bot.answerCallbackQuery(query.id); } catch {} // remove loading spinner
 }
+
 
 
 
