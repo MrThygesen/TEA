@@ -388,12 +388,13 @@ async function showAttendees(chatId, eventId, messageId = null) {
   });
 
   // Build inline keyboard for toggles
-  const inline_keyboard = regs.map(r => ([
-    { text: `Arrived: ${r.has_arrived?'✅':'❌'}`, callback_data: `toggle_${r.id}_has_arrived` },
-    { text: `Voucher: ${r.voucher_applied?'✅':'❌'}`, callback_data: `toggle_${r.id}_voucher_applied` },
-    { text: `Basic: ${r.basic_perk_applied?'✅':'❌'}`, callback_data: `toggle_${r.id}_basic_perk_applied` },
-    { text: `Advanced: ${r.advanced_perk_applied?'✅':'❌'}`, callback_data: `toggle_${r.id}_advanced_perk_applied` },
-  ]));
+ const inline_keyboard = regs.map(r => ([
+  { text: `@${r.telegram_username}`, callback_data: `noop_${r.id}` }, // User column (non-clickable)
+  { text: `Arrived: ${r.has_arrived ? '✅' : '❌'}`, callback_data: `toggle_${r.id}_has_arrived` },
+  { text: `Voucher: ${r.voucher_applied ? '✅' : '❌'}`, callback_data: `toggle_${r.id}_voucher_applied` },
+  { text: `Basic: ${r.basic_perk_applied ? '✅' : '❌'}`, callback_data: `toggle_${r.id}_basic_perk_applied` },
+  { text: `Advanced: ${r.advanced_perk_applied ? '✅' : '❌'}`, callback_data: `toggle_${r.id}_advanced_perk_applied` },
+]));
 
   const opts = { reply_markup: { inline_keyboard } };
 
@@ -471,6 +472,14 @@ bot.on('callback_query', async (query) => {
   const data = query.data;
   const chatId = query.message.chat.id;
   const tgId = String(query.from.id);
+
+
+// --- IGNORE NOOP BUTTONS ---
+if (data.startsWith('noop_')) {
+  try { await bot.answerCallbackQuery(query.id); } catch {}
+  return;
+}
+
 
   // --- CITY SELECTION ---
   if (data.startsWith('city_')) {
