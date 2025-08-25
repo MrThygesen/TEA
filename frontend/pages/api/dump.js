@@ -18,7 +18,8 @@ export default async function handler(req, res) {
         e.tag3,
         e.price,
         e.image_url,
-        COALESCE(COUNT(r.id), 0)::int AS registered_users
+        COALESCE(COUNT(r.id), 0)::int AS registered_users,
+        COALESCE(SUM(CASE WHEN r.has_paid = TRUE THEN 1 ELSE 0 END), 0)::int AS paid_count
       FROM events e
       LEFT JOIN registrations r 
         ON e.id = r.event_id

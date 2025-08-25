@@ -48,12 +48,21 @@ function DynamicEventCard({ event }) {
           >
             Preview
           </button>
-          <button
-            onClick={() => window.open(telegramLink, '_blank')}
-            className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm"
-          >
-            Register
-          </button>
+       {(event.registered_users || 0) < event.min_attendees ? (
+  <button
+    onClick={() => window.open(telegramLink, '_blank')}
+    className="px-3 py-1 rounded bg-yellow-600 hover:bg-yellow-700 text-white text-sm"
+  >
+    Prebook
+  </button>
+) : (
+  <button
+    onClick={() => window.open(`https://t.me/TeaIsHereBot?start=buy_${event.id}`, '_blank')}
+    className="px-3 py-1 rounded bg-green-600 hover:bg-green-700 text-white text-sm"
+  >
+    Book
+  </button>
+)}
         </div>
 
         {/* Bottom line: Price and Registered Users */}
@@ -62,7 +71,7 @@ function DynamicEventCard({ event }) {
             💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}
           </span>
           <span>
-            👥 {event.registered_users || 0} Registered
+            👥 {event.registered_users || 0} Users
           </span>
         </div>
       </div>
@@ -87,9 +96,17 @@ function DynamicEventCard({ event }) {
               {new Date(event.datetime).toLocaleString()} @ {event.venue}
             </p>
             <p className="mb-4">{event.details}</p>
-            <p className="text-sm text-gray-300">
-              <strong>Basic Perk:</strong> {event.basic_perk || 'None'}
-            </p>
+          {event.basic_perk && (
+  <p className="text-sm text-gray-300">
+    <strong>Basic Perk:</strong> {event.basic_perk}
+  </p>
+)}
+{event.advanced_perk && (
+  <p className="text-sm text-gray-300">
+    <strong>Advanced Perk:</strong> {event.advanced_perk}
+  </p>
+)}
+
             <button
               onClick={() => setShowModal(false)}
               className="mt-6 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
@@ -249,7 +266,9 @@ export default function Home() {
           <p className="text-left text-gray-400 mb-6">
             We’re the club for social and/or business meetings. The TEA Network operates in
             the cafe, bar, restaurant domain. Meet connections, enjoy perks, and expand your
-            network with Polygon blockchain technology.
+            network. The TEA NETWORK is Telegram centric for booking and guestlist management.
+ 
+
           </p>
           <p>
             <a
