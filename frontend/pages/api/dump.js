@@ -11,6 +11,8 @@ export default async function handler(req, res) {
         e.datetime,
         e.description,
         e.venue,
+        e.min_attendees,              -- added field
+        e.max_attendees,              -- optional but good to include
         e.basic_perk,
         e.advanced_perk,
         e.tag1,
@@ -26,6 +28,7 @@ export default async function handler(req, res) {
       WHERE e.datetime > NOW()
       GROUP BY 
         e.id, e.name, e.city, e.datetime, e.description, e.venue, 
+        e.min_attendees, e.max_attendees,   -- added to group by
         e.basic_perk, e.advanced_perk, e.tag1, e.tag2, e.tag3, e.price, e.image_url
       ORDER BY e.datetime ASC
       LIMIT 50
