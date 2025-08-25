@@ -63,7 +63,7 @@ async function getAvailableCities() {
 
 async function getOpenEventsByCity(city) {
   const res = await pool.query(
-    `SELECT id,name,datetime,min_attendees,max_attendees,is_confirmed
+    `SELECT id,name,datetime,min_attendees,max_attendees,is_confirmed, price
      FROM events
      WHERE datetime>NOW() AND LOWER(city)=LOWER($1)
      ORDER BY datetime ASC`, [city]
@@ -73,7 +73,7 @@ async function getOpenEventsByCity(city) {
 
 async function getUserEvents(tgId) {
   const res = await pool.query(
-    `SELECT e.id, e.name, e.datetime
+    `SELECT e.id, e.name, e.datetime, e.price
      FROM registrations r
      JOIN events e ON r.event_id=e.id
      WHERE r.telegram_user_id=$1
@@ -288,7 +288,7 @@ bot.onText(/\/myevents/, async (msg)=>{
   for (const e of events) {
     const dateStr = new Date(e.datetime).toLocaleString();
     await bot.sendMessage(msg.chat.id,
-      `📅 ${e.name} — ${dateStr}\n/event_detail_${e.id} to see details\n/deregister_${e.id} to leave the event`
+      `📅${e.name} — ${dateStr} — ${e.price ? `${e.price} USD` : 'Free'}\n/event_detail_${e.id} to see details\n/deregister_${e.id} to leave the event`
     );
   }
 });
@@ -302,7 +302,16 @@ bot.onText(/\/deregister_(\d+)/, async (msg, match) => {
 });
 
 // ==== TICKET VIEW ====
+
+
+
 bot.onText(/\/ticket/, async (msg)=>{
+
+const profile = await getUserProfile(tgId);
+if (!profile?.has_paid) {
+  return bot.sendMessage(msg.chat.id, '💳 You need to complete payment before accessing your tickets.');
+}
+
   const tgId = String(msg.from.id);
   const username = msg.from.username || '';
   const events = await getUserEvents(tgId);
@@ -315,6 +324,7 @@ bot.onText(/\/ticket/, async (msg)=>{
       `🆔 Ticket ID: ${e.id}\n` +
       `👤 Username: @${username}\n` +
       `📅 Date/Time: ${dateStr}\n` +
+      `💰 Price: ${e.price ? `${e.price} USD` : 'Free'}\n` +
       `📌 Show this ticket at the entrance/staff.\n` +
       `/event_detail_${e.id}`;
     bot.sendMessage(msg.chat.id, ticketText);
@@ -353,7 +363,7 @@ async function showEvents(chatId, city) {
 
   events.forEach(e => {
     const dateStr = new Date(e.datetime).toLocaleString();
-    text += `\n• ${e.name} — ${dateStr}`;
+    text += `\n• ${e.name} — ${dateStr} — ${e.price ? `${e.price} DKK` : 'Free'}`;
     opts.reply_markup.inline_keyboard.push([
       { text: 'Details', callback_data: `details_${e.id}` },
       { text: 'Register', callback_data: `register_${e.id}` }

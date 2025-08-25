@@ -568,8 +568,9 @@ function EventCreator() {
       <input type="text" placeholder="Tag1" value={event.tag1} onChange={e => handleChange('tag1', e.target.value)} className={inputClass('tag1')} />
       <input type="text" placeholder="Tag2" value={event.tag2} onChange={e => handleChange('tag2', e.target.value)} className={inputClass('tag2')} />
       <input type="text" placeholder="Tag3" value={event.tag3} onChange={e => handleChange('tag3', e.target.value)} className={inputClass('tag3')} />
-      <input type="number" placeholder="Price" value={event.id} onChange={e => handleChange('price', e.target.value)} className={inputClass('id')} />
-      {errors.id && <p className="text-red-500 text-sm">{errors.id}</p>}
+<input type="number" placeholder="Price" value={event.price} onChange={e => handleChange('price', e.target.value)} className={inputClass('price')} />
+ {errors.price && <p className="text-red-500 text-sm">{errors.price}</p>}
+
    
 <input type="text" placeholder="Image URL" value={event.image_url} onChange={e => handleChange('image_url', e.target.value)} className={inputClass('image_url')} />
 

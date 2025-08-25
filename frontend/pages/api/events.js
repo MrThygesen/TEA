@@ -88,10 +88,10 @@ export default async function handler(req, res) {
 
       const result = await pool.query(
         `UPDATE events
-         SET group_id=$1, name=$2, city=$3, datetime=$4, min_attendees=$5, max_attendees=$6, is_confirmed=$7,
-             description=$8, details=$9, venue=$10, basic_perk=$11, advanced_perk=$12,
-             tag1=$13, tag2=$14, tag3=$15, image_url=$16, image_url=$17, updated_at=NOW()
-         WHERE id=$18
+        SET group_id=$1, name=$2, city=$3, datetime=$4, min_attendees=$5, max_attendees=$6, is_confirmed=$7,
+     description=$8, details=$9, venue=$10, basic_perk=$11, advanced_perk=$12,
+     tag1=$13, tag2=$14, tag3=$15, price=$16, image_url=$17, updated_at=NOW() 
+WHERE id=$18
          RETURNING *`,
         [
           group_id,
