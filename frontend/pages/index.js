@@ -48,21 +48,21 @@ function DynamicEventCard({ event }) {
           >
             Preview
           </button>
-       {(event.registered_users || 0) < event.min_attendees ? (
-  <button
-    onClick={() => window.open(telegramLink, '_blank')}
-    className="px-3 py-1 rounded bg-yellow-600 hover:bg-yellow-700 text-white text-sm"
-  >
-    Prebook
-  </button>
-) : (
-  <button
-    onClick={() => window.open(`https://t.me/TeaIsHereBot?start=buy_${event.id}`, '_blank')}
-    className="px-3 py-1 rounded bg-green-600 hover:bg-green-700 text-white text-sm"
-  >
-    Book
-  </button>
-)}
+          {(event.registered_users || 0) < event.min_attendees ? (
+            <button
+              onClick={() => window.open(telegramLink, '_blank')}
+              className="px-3 py-1 rounded bg-yellow-600 hover:bg-yellow-700 text-white text-sm"
+            >
+              Prebook
+            </button>
+          ) : (
+            <button
+              onClick={() => window.open(`https://t.me/TeaIsHereBot?start=buy_${event.id}`, '_blank')}
+              className="px-3 py-1 rounded bg-green-600 hover:bg-green-700 text-white text-sm"
+            >
+              Book
+            </button>
+          )}
         </div>
 
         {/* Bottom line: Price and Registered Users */}
@@ -76,52 +76,56 @@ function DynamicEventCard({ event }) {
         </div>
       </div>
 
-  {/* Preview Modal */}
-{showModal && (
-  <div
-    className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
-    onClick={() => setShowModal(false)}
-  >
-    <div
-      className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <h2 className="text-xl font-bold mb-4">{event.name}</h2>
-      <img
-        src={event.image_url || '/default-event.jpg'}
-        alt={event.name}
-        className="w-full h-56 object-contain rounded mb-4"
-      />
-      <p className="mb-2 text-sm text-gray-400">
-        {new Date(event.datetime).toLocaleString()} @ {event.venue}
-      </p>
-      <p className="mb-4">{event.details}</p>
+      {/* Preview Modal */}
+      {showModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowModal(false)}
+        >
+          <div
+            className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold mb-4">{event.name}</h2>
+            <img
+              src={event.image_url || '/default-event.jpg'}
+              alt={event.name}
+              className="w-full h-56 object-contain rounded mb-4"
+            />
+            <p className="mb-2 text-sm text-gray-400">
+              {new Date(event.datetime).toLocaleString()} @ {event.venue}
+            </p>
+            <p className="mb-4">{event.details}</p>
 
-      {/* Show perks only if paid_count >= 10 */}
-      {event.paid_count >= 10 && (
-        <>
-          {event.basic_perk && (
-            <p className="text-sm text-gray-300">
-              <strong>Basic Perk:</strong> {event.basic_perk}
-            </p>
-          )}
-          {event.advanced_perk && (
-            <p className="text-sm text-gray-300">
-              <strong>Advanced Perk:</strong> {event.advanced_perk}
-            </p>
-          )}
-        </>
+            {/* Show perks only if paid_count >= 10 */}
+            {event.paid_count >= 10 && (
+              <>
+                {event.basic_perk && (
+                  <p className="text-sm text-gray-300">
+                    <strong>Basic Perk:</strong> {event.basic_perk}
+                  </p>
+                )}
+                {event.advanced_perk && (
+                  <p className="text-sm text-gray-300">
+                    <strong>Advanced Perk:</strong> {event.advanced_perk}
+                  </p>
+                )}
+              </>
+            )}
+
+            <button
+              onClick={() => setShowModal(false)}
+              className="mt-6 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Close
+            </button>
+          </div>
+        </div>
       )}
+    </>
+  )
+}
 
-      <button
-        onClick={() => setShowModal(false)}
-        className="mt-6 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
-      >
-        Close
-      </button>
-    </div>
-  </div>
-)}
 
 
 export default function Home() {
