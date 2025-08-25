@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     min_attendees, max_attendees,
     is_confirmed, description, details,
     venue, basic_perk, advanced_perk,
-    tag1, tag2, tag3, image_url
+    tag1, tag2, tag3, price, image_url
   } = body;
 
   if (!name || !city || !datetime) {
@@ -28,9 +28,9 @@ export default async function handler(req, res) {
     const result = await pool.query(`
       INSERT INTO events
         (name, city, datetime, min_attendees, max_attendees, is_confirmed,
-         description, details, venue, basic_perk, advanced_perk, tag1, tag2, tag3, image_url, group_id)
+         description, details, venue, basic_perk, advanced_perk, tag1, tag2, tag3, price, image_url, group_id)
       VALUES
-        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, DEFAULT)
+        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, $16, DEFAULT)
       RETURNING id
     `, [
       name,
@@ -47,6 +47,7 @@ export default async function handler(req, res) {
       tag1 || null,
       tag2 || null,
       tag3 || null,
+      price || null,
       image_url || null
     ]);
 
@@ -76,7 +77,7 @@ export default async function handler(req, res) {
         min_attendees, max_attendees,
         is_confirmed, description, details,
         venue, basic_perk, advanced_perk,
-        tag1, tag2, tag3, image_url
+        tag1, tag2, tag3, price, image_url
       } = body;
 
       if (!id || !name || !city || !datetime) {
@@ -89,8 +90,8 @@ export default async function handler(req, res) {
         `UPDATE events
          SET group_id=$1, name=$2, city=$3, datetime=$4, min_attendees=$5, max_attendees=$6, is_confirmed=$7,
              description=$8, details=$9, venue=$10, basic_perk=$11, advanced_perk=$12,
-             tag1=$13, tag2=$14, tag3=$15, image_url=$16, updated_at=NOW()
-         WHERE id=$17
+             tag1=$13, tag2=$14, tag3=$15, image_url=$16, image_url=$17, updated_at=NOW()
+         WHERE id=$18
          RETURNING *`,
         [
           group_id,
@@ -108,6 +109,7 @@ export default async function handler(req, res) {
           tag1 || null,
           tag2 || null,
           tag3 || null,
+          price || null,
           image_url || null,
           id
         ]

@@ -48,6 +48,11 @@ function DynamicEventCard({ event }) {
           >
             Register
           </button>
+
+        <p className="text-xs text-gray-400 mb-2">
+          Registered: {event.price || 0}
+        </p>
+
         </div>
       </div>
 
