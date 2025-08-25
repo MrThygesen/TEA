@@ -167,9 +167,420 @@ function isLikelyEmail(s) {
 }
 
 // ==== COMMANDS (/start, /help, /myid, /events, /user_edit, /cancel, /message capture, /myevents, /deregister, /ticket, /event_detail) ====
-// <<< KEEP OLD FUNCTIONALITY >>>
-// (All your original command implementations remain unchanged here)
+// ==== COMMANDS ====
+bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
+  const tgId = String(msg.from.id);
+  const username = msg.from.username || '';
+  const payload = match[1];
 
+  const profile = await getUserProfile(tgId);
+  if (!profile) await saveUserProfile(tgId,{ telegram_username:username });
+
+  if (payload && !isNaN(payload)) {
+    const eventId = parseInt(payload, 10);
+    const profile = await getUserProfile(tgId);
+    const res = await registerUser(eventId, tgId, profile?.telegram_username || '', profile?.email, profile?.wallet_address);
+    return bot.sendMessage(msg.chat.id, `🔗 Deep link detected: Event ${eventId}\n${res.statusMsg}`);
+  }
+
+  return bot.sendMessage(msg.chat.id,
+    `👋 Welcome ${username}! Use /events to see events, /myevents for your registrations, /user_edit to add email, /help for commands.`);
+});
+
+bot.onText(/\/help/, async (msg)=>{
+  bot.sendMessage(msg.chat.id,
+`ℹ️ Commands:
+- /start - Welcome message
+- /help - This message
+- /events - List events by city
+- /myevents - Your registered events
+- /ticket - Show your ticket
+- /user_edit - Add/update email
+- /myid - Show your Telegram ID
+- /event_admin - Organizer dashboard
+`);
+});
+
+bot.onText(/\/myid/, async (msg)=>{
+  const tgId = String(msg.from.id);
+  const username = msg.from.username || '';
+  bot.sendMessage(msg.chat.id, `🆔 Your Telegram ID: ${tgId}\nUsername: @${username}`);
+});
+
+bot.onText(/\/events/, async (msg)=>{
+  const chatId = msg.chat.id;
+  const cities = await getAvailableCities();
+  if(!cities.length) return bot.sendMessage(chatId,'📭 No upcoming events.');
+  const opts = { reply_markup:{ inline_keyboard: cities.map(city=>[{ text: city, callback_data:`city_${city}`}]) } };
+  bot.sendMessage(chatId,'📍 Select your city:',opts);
+});
+
+// helper (simple check as requested)
+function isLikelyEmail(s) {
+  return typeof s === 'string' && s.includes('@') && s.includes('.')
+}
+
+bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const tgId = String(msg.from.id);
+
+  let profile = await getUserProfile(tgId);
+  if (!profile) {
+    await saveUserProfile(tgId, { telegram_username: msg.from.username || '' });
+    profile = await getUserProfile(tgId);
+  }
+
+  // Support: /user_edit you@example.com
+  const inlineEmail = (match && match[1]) ? match[1].trim() : null;
+  if (inlineEmail) {
+    if (!isLikelyEmail(inlineEmail)) {
+      return bot.sendMessage(chatId, '❌ Invalid email. Please include both "@" and "."');
+    }
+    await saveUserProfile(tgId, { email: inlineEmail });
+    return bot.sendMessage(chatId, `✅ Email updated to: ${inlineEmail}`);
+  }
+
+  // Ask the user to reply with Force Reply (creates an input field)
+  const prompt = await bot.sendMessage(
+    chatId,
+    `📧 Current email: ${profile?.email || 'N/A'}\n` +
+    `Reply to this message with your new email (must include '@' and '.').`,
+    { reply_markup: { force_reply: true, input_field_placeholder: 'you@example.com' } }
+  );
+
+  // track only the reply to this prompt
+  userStates[tgId] = { step: 'editingProfile', field: 'email', replyTo: prompt.message_id };
+});
+
+// optional: let the user cancel the edit
+bot.onText(/\/cancel/, async (msg) => {
+  delete userStates[String(msg.from.id)];
+  bot.sendMessage(msg.chat.id, '✖️ Email update canceled.');
+});
+
+// capture the reply
+bot.on('message', async (msg) => {
+  const tgId = String(msg.from.id);
+  const state = userStates[tgId];
+  if (!state) return;                // no active edit
+  if (!msg.text) return;             // non-text message
+  if (msg.text.startsWith('/')) return; // ignore commands
+
+  // ensure it's a reply to our prompt (prevents false positives)
+  if (state.replyTo && (!msg.reply_to_message || msg.reply_to_message.message_id !== state.replyTo)) {
+    return;
+  }
+
+  if (state.field === 'email') {
+    const email = msg.text.trim();
+    if (!isLikelyEmail(email)) {
+      return bot.sendMessage(msg.chat.id, '❌ Invalid email. Please include both "@" and "."');
+    }
+    await saveUserProfile(tgId, { email });
+    delete userStates[tgId];
+    bot.sendMessage(msg.chat.id, `✅ Email updated to: ${email}`);
+  }
+});
+
+
+
+// ==== MY EVENTS ====
+bot.onText(/\/myevents/, async (msg)=>{
+  const tgId = String(msg.from.id);
+  const events = await getUserEvents(tgId);
+  if(!events.length) return bot.sendMessage(msg.chat.id,'📭 You are not registered for any events.');
+
+  for (const e of events) {
+    const dateStr = new Date(e.datetime).toLocaleString();
+    await bot.sendMessage(msg.chat.id,
+      `📅${e.name} — ${dateStr} — ${e.price ? `${e.price} USD` : 'Free'}\n/event_detail_${e.id} to see details\n/deregister_${e.id} to leave the event`
+    );
+  }
+});
+
+// ==== DEREGISTER ====
+bot.onText(/\/deregister_(\d+)/, async (msg, match) => {
+  const eventId = parseInt(match[1], 10);
+  const tgId = String(msg.from.id);
+  await pool.query('DELETE FROM registrations WHERE event_id=$1 AND telegram_user_id=$2', [eventId, tgId]);
+  await bot.sendMessage(msg.chat.id, `❌ You have been deregistered from event ${eventId}.`);
+});
+
+// ==== TICKET VIEW ====
+
+
+
+bot.onText(/\/ticket/, async (msg)=>{
+
+const profile = await getUserProfile(tgId);
+if (!profile?.has_paid) {
+  return bot.sendMessage(msg.chat.id, '💳 You need to complete payment before accessing your tickets.');
+}
+
+  const tgId = String(msg.from.id);
+  const username = msg.from.username || '';
+  const events = await getUserEvents(tgId);
+  if(!events.length) return bot.sendMessage(msg.chat.id,'📭 Not registered for events.');
+
+  events.forEach(e=>{
+    const dateStr = new Date(e.datetime).toLocaleString();
+    const ticketText = 
+      `🎫 Ticket for event: ${e.name}\n` +
+      `🆔 Ticket ID: ${e.id}\n` +
+      `👤 Username: @${username}\n` +
+      `📅 Date/Time: ${dateStr}\n` +
+      `💰 Price: ${e.price ? `${e.price} USD` : 'Free'}\n` +
+      `📌 Show this ticket at the entrance/staff.\n` +
+      `/event_detail_${e.id}`;
+    bot.sendMessage(msg.chat.id, ticketText);
+  });
+});
+
+// ==== EVENT DETAIL ====
+bot.onText(/\/event_detail_(\d+)/, async (msg, match)=>{
+  const eventId = parseInt(match[1],10);
+  const res = await pool.query('SELECT * FROM events WHERE id=$1',[eventId]);
+  const event = res.rows[0];
+  if(!event) return bot.sendMessage(msg.chat.id,'⚠️ Event not found.');
+  const dateStr = new Date(event.datetime).toLocaleString();
+  let text = `📌 Event: ${event.name}\nCity: ${event.city}\nDate/Time: ${dateStr}\nMin/Max attendees: ${event.min_attendees}/${event.max_attendees}\nConfirmed: ${event.is_confirmed ? '✅' : '⌛'}\nDescription: ${event.description || 'N/A'}\nVenue: ${event.venue || 'N/A'}\nBasic perk: ${event.basic_perk || 'N/A'}\nAdvanced perk: ${event.advanced_perk || 'N/A'}`;
+  bot.sendMessage(msg.chat.id,text);
+});
+
+// Keep legacy see_event_detail working
+bot.onText(/\/see_event_detail_(\d+)/, async (msg, match)=>{
+  const eventId = parseInt(match[1],10);
+  const res = await pool.query('SELECT * FROM events WHERE id=$1',[eventId]);
+  const event = res.rows[0];
+  if(!event) return bot.sendMessage(msg.chat.id,'⚠️ Event not found.');
+  const dateStr = new Date(event.datetime).toLocaleString();
+  let text = `📌 Event: ${event.name}\nCity: ${event.city}\nDate/Time: ${dateStr}\nMin/Max attendees: ${event.min_attendees}/${event.max_attendees}\nConfirmed: ${event.is_confirmed ? '✅' : '⌛'}\nDescription: ${event.description || 'N/A'}\nVenue: ${event.venue || 'N/A'}\nBasic perk: ${event.basic_perk || 'N/A'}\nAdvanced perk: ${event.advanced_perk || 'N/A'}`;
+  bot.sendMessage(msg.chat.id,text);
+});
+
+// ==== SHOW EVENTS (USER CITY) ====
+async function showEvents(chatId, city) {
+  const events = await getOpenEventsByCity(city);
+  if (!events.length) return bot.sendMessage(chatId, `📭 No upcoming events in ${city}.`);
+
+  const opts = { reply_markup: { inline_keyboard: [] } };
+  let text = `📅 Upcoming events in ${city}:\n`;
+
+  events.forEach(e => {
+    const dateStr = new Date(e.datetime).toLocaleString();
+    text += `\n• ${e.name} — ${dateStr} — ${e.price ? `${e.price} DKK` : 'Free'}`;
+    opts.reply_markup.inline_keyboard.push([
+      { text: 'Details', callback_data: `details_${e.id}` },
+      { text: 'Register', callback_data: `register_${e.id}` }
+    ]);
+  });
+
+  bot.sendMessage(chatId, text, opts);
+}
+
+// ==== SHOW ATTENDEES ====
+async function showAttendees(chatId, eventId, messageId = null) {
+  const { rows: regs } = await pool.query(`
+    SELECT r.id, r.telegram_username,
+           r.has_arrived, r.voucher_applied,
+           r.basic_perk_applied, r.advanced_perk_applied
+    FROM registrations r
+    JOIN user_profiles u ON u.telegram_user_id = r.telegram_user_id
+    WHERE r.event_id=$1
+    ORDER BY r.id ASC
+  `, [eventId]);
+
+  if (!regs.length) {
+    return messageId
+      ? bot.editMessageText('📭 No attendees yet.', { chat_id: chatId, message_id: messageId }).catch(()=>{})
+      : bot.sendMessage(chatId, '📭 No attendees yet.');
+  }
+
+  // HEADER row
+  const headerRow = [
+    { text: 'Guest', callback_data: 'noop_header_guest' },
+    { text: 'Arr', callback_data: 'noop_header_arr' },
+    { text: 'Vouch', callback_data: 'noop_header_vouch' },
+    { text: 'Basic', callback_data: 'noop_header_basic' },
+    { text: 'Advance', callback_data: 'noop_header_advance' },
+  ];
+
+  // ATTENDEE rows
+  const attendeeRows = regs.map(r => ([
+    { text: `@${r.telegram_username}`, callback_data: `noop_${r.id}` },
+    { text: r.has_arrived ? '✅' : '❌', callback_data: `toggle_${r.id}_has_arrived` },
+    { text: r.voucher_applied ? '✅' : '❌', callback_data: `toggle_${r.id}_voucher_applied` },
+    { text: r.basic_perk_applied ? '✅' : '❌', callback_data: `toggle_${r.id}_basic_perk_applied` },
+    { text: r.advanced_perk_applied ? '✅' : '❌', callback_data: `toggle_${r.id}_advanced_perk_applied` },
+  ]));
+
+  const inline_keyboard = [headerRow, ...attendeeRows];
+
+  const opts = { reply_markup: { inline_keyboard } };
+
+  if (messageId) {
+    await bot.editMessageText(`👥 Attendees for event ID ${eventId}:`, {
+      chat_id: chatId,
+      message_id: messageId,
+      reply_markup: opts.reply_markup
+    }).catch(()=>{});
+  } else {
+    await bot.sendMessage(chatId, `👥 Attendees for event ID ${eventId}:`, opts);
+  }
+}
+
+
+// ==== EVENT ADMIN (ORGANIZER) ====
+async function ensureOrganizer(chatId, tgId) {
+  const profile = await getUserProfile(tgId);
+  if (!profile) {
+    await bot.sendMessage(chatId, '⚠️ You are not registered. Use /user_edit to complete your profile.');
+    return null;
+  }
+  if (profile.role !== 'organizer') {
+    await bot.sendMessage(chatId, '🚫 Access denied: Organizer role required.');
+    return null;
+  }
+  if (!profile.group_id) {
+    await bot.sendMessage(chatId, '⚠️ You are not assigned to any group.');
+    return null;
+  }
+  return profile;
+}
+
+async function showOrganizerEvents(chatId, groupId) {
+  const { rows: events } = await pool.query(
+    `SELECT id, name, datetime, is_confirmed
+     FROM events
+     WHERE group_id = $1
+     ORDER BY datetime ASC`,
+    [groupId]
+  );
+
+  if (!events.length) {
+    return bot.sendMessage(chatId, '📭 No events for your group yet.');
+  }
+
+  for (const e of events) {
+    const dateStr = new Date(e.datetime).toLocaleString();
+    const opts = {
+      reply_markup: {
+        inline_keyboard: [[
+          { text: 'Show Attendees', callback_data: `showattendees_${e.id}` }
+        ]]
+      }
+    };
+    await bot.sendMessage(
+      chatId,
+      `📅 ${e.name} — ${dateStr}\nConfirmed: ${e.is_confirmed ? '✅' : '⌛'}`,
+      opts
+    );
+  }
+}
+
+bot.onText(/\/event_admin|\/user_admin/, async (msg) => {
+  const chatId = msg.chat.id;
+  const tgId = String(msg.from.id);
+
+  const profile = await ensureOrganizer(chatId, tgId);
+  if (!profile) return;
+
+  await showOrganizerEvents(chatId, profile.group_id);
+});
+
+
+// ==== CALLBACK QUERIES ====
+bot.on('callback_query', async (query) => {
+  const data = query.data;
+  const chatId = query.message.chat.id;
+  const tgId = String(query.from.id);
+
+
+// --- IGNORE NOOP BUTTONS ---
+if (data.startsWith('noop_')) {
+  try { await bot.answerCallbackQuery(query.id); } catch {}
+  return;
+}
+
+
+  // --- CITY SELECTION ---
+  if (data.startsWith('city_')) {
+    const city = data.split('_')[1];
+    await showEvents(chatId, city);
+    return;
+  }
+
+  // --- TOGGLE FIELDS (Organizer only) ---
+  if (data.startsWith('toggle_')) {
+    const prof = await getUserProfile(tgId);
+    if (prof?.role !== 'organizer') {
+      try {
+        await bot.answerCallbackQuery(query.id, { text: 'Organizer role required', show_alert: true });
+      } catch {}
+      return;
+    }
+
+    const parts = data.split('_'); // ['toggle', regId, 'field', ...]
+    const regId = parseInt(parts[1], 10);
+    const field = parts.slice(2).join('_');
+
+    // Validate field name
+    const allowedFields = ['has_arrived', 'voucher_applied', 'basic_perk_applied', 'advanced_perk_applied'];
+    if (!allowedFields.includes(field)) return;
+
+    // Get current value
+    const currentRes = await pool.query(`SELECT ${field} FROM registrations WHERE id=$1`, [regId]);
+    if (!currentRes.rows.length) return;
+    const current = currentRes.rows[0][field];
+    const newValue = !current;
+
+    // Update DB
+    await pool.query(`UPDATE registrations SET ${field}=$1 WHERE id=$2`, [newValue, regId]);
+
+    // Refresh attendee list in-place
+    const eventRes = await pool.query('SELECT event_id FROM registrations WHERE id=$1', [regId]);
+    const eventId = eventRes.rows[0]?.event_id;
+    if (!eventId) return;
+
+    await showAttendees(chatId, eventId, query.message.message_id);
+
+    try { await bot.answerCallbackQuery(query.id); } catch {} // remove loading spinner
+    return;
+  }
+
+  // --- EVENT DETAILS ---
+  if (data.startsWith('details_')) {
+    const eventId = parseInt(data.split('_')[1], 10);
+    const res = await pool.query('SELECT * FROM events WHERE id=$1', [eventId]);
+    const event = res.rows[0];
+    if (!event) return bot.sendMessage(chatId, '⚠️ Event not found.');
+    const dateStr = new Date(event.datetime).toLocaleString();
+    const text = `📌 Event: ${event.name}\nCity: ${event.city}\nDate/Time: ${dateStr}\nMin/Max attendees: ${event.min_attendees}/${event.max_attendees}\nConfirmed: ${event.is_confirmed ? '✅' : '⌛'}\nDescription: ${event.description || 'N/A'}\nVenue: ${event.venue || 'N/A'}\nBasic perk: ${event.basic_perk || 'N/A'}\nAdvanced perk: ${event.advanced_perk || 'N/A'}`;
+    await bot.sendMessage(chatId, text);
+    return;
+  }
+
+  // --- REGISTER ---
+  if (data.startsWith('register_')) {
+    const eventId = parseInt(data.split('_')[1], 10);
+    const profile = await getUserProfile(tgId);
+    const res = await registerUser(eventId, tgId, profile?.telegram_username || '', profile?.email, profile?.wallet_address);
+    await bot.sendMessage(chatId, res.statusMsg);
+    return;
+  }
+
+  // --- SHOW ATTENDEES (Organizer only) ---
+  if (data.startsWith('showattendees_')) {
+    const prof = await getUserProfile(tgId);
+    if (prof?.role !== 'organizer') {
+      try { await bot.answerCallbackQuery(query.id, { text: 'Organizer role required', show_alert: true }); } catch {}
+      return;
+    }
+    const eventId = parseInt(data.split('_')[1], 10);
+    await showAttendees(chatId, eventId);
+    return;
+  }
+});
 // ==== PAY COMMAND ====
 bot.onText(/\/pay_(\d+)/, async (msg, match) => {
   const chatId = msg.chat.id;
