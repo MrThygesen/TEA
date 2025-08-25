@@ -4,7 +4,7 @@ const { Pool } = pkg;
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: { rejectUnauthorized: false },
 });
 
 export default async function handler(req, res) {
@@ -14,31 +14,33 @@ export default async function handler(req, res) {
 
   const client = await pool.connect();
   try {
-    // === EVENTS TABLE ===
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS events (
-        id SERIAL PRIMARY KEY,
-        group_id INTEGER,
-        name TEXT NOT NULL,
-        city TEXT NOT NULL,
-        datetime TIMESTAMPTZ NOT NULL,
-        min_attendees INTEGER DEFAULT 1,
-        max_attendees INTEGER DEFAULT 40,
-        is_confirmed BOOLEAN DEFAULT FALSE,
-        description TEXT,
-        details TEXT,
-        venue TEXT,
-        basic_perk TEXT,
-        advanced_perk TEXT,
-        tag1 TEXT,
-        tag2 TEXT,
-        tag3 TEXT,
-        image_url TEXT,
-        price TEXT,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
+    console.log('🚀 Starting database initialization...');
+
+    // === EVENTS TABLE ===await client.query(`
+  CREATE TABLE IF NOT EXISTS events (
+    id SERIAL PRIMARY KEY,
+    group_id INTEGER,
+    name TEXT NOT NULL,
+    city TEXT NOT NULL,
+    datetime TIMESTAMPTZ NOT NULL,
+    min_attendees INTEGER DEFAULT 1,
+    max_attendees INTEGER DEFAULT 40,
+    is_confirmed BOOLEAN DEFAULT FALSE,
+    description TEXT,
+    details TEXT,
+    venue TEXT,
+    basic_perk TEXT,
+    advanced_perk TEXT,
+    tag1 TEXT,
+    tag2 TEXT,
+    tag3 TEXT,
+    image_url TEXT,
+    price NUMERIC(10,2) DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+    console.log('✔ Events table created/ensured');
 
     // Trigger for updated_at
     await client.query(`
@@ -57,6 +59,7 @@ export default async function handler(req, res) {
       FOR EACH ROW
       EXECUTE FUNCTION update_updated_at_column();
     `);
+    console.log('✔ Trigger for events.updated_at ensured');
 
     // === USER PROFILES TABLE ===
     await client.query(`
@@ -73,6 +76,7 @@ export default async function handler(req, res) {
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    console.log('✔ User profiles table created/ensured');
 
     // === REGISTRATIONS TABLE ===
     await client.query(`
@@ -92,9 +96,11 @@ export default async function handler(req, res) {
         validated_by TEXT,
         validated_at TIMESTAMPTZ,
         has_paid BOOLEAN DEFAULT FALSE,
+        paid_at TIMESTAMPTZ,
         UNIQUE (event_id, telegram_user_id)
       );
     `);
+    console.log('✔ Registrations table created/ensured');
 
     // === INVITATIONS TABLE ===
     await client.query(`
@@ -109,6 +115,7 @@ export default async function handler(req, res) {
         timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    console.log('✔ Invitations table created/ensured');
 
     // === EMAIL SUBSCRIBERS TABLE ===
     await client.query(`
@@ -118,14 +125,17 @@ export default async function handler(req, res) {
         subscribed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    console.log('✔ User emails table created/ensured');
 
     // === City index ===
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_events_city
       ON events(LOWER(city));
     `);
+    console.log('✔ Index for events.city ensured');
 
     res.status(200).json({ message: '✅ Database initialized/updated successfully' });
+    console.log('🎉 Database initialized/updated successfully!');
   } catch (err) {
     console.error('❌ Init DB error:', err);
     res.status(500).json({ error: err.message });
