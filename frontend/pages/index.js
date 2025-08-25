@@ -15,27 +15,33 @@ function DynamicEventCard({ event }) {
 
   return (
     <>
-      <div className="border border-zinc-700 rounded-lg p-4 text-left bg-zinc-800 shadow">
+      <div className="border border-zinc-700 rounded-lg p-4 text-left bg-zinc-800 shadow flex flex-col justify-between">
+        {/* Image */}
         <img
           src={event.image_url || '/default-event.jpg'}
           alt={event.name}
           className="w-full h-40 object-cover rounded mb-3"
         />
+
+        {/* Title & Description */}
         <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
         <p className="text-sm mb-2">
-          {event.description?.split(' ').slice(0, 150).join(' ')}...
+          {event.description?.split(' ').slice(0, 30).join(' ')}...
         </p>
+
+        {/* Tags */}
         <div className="flex flex-wrap gap-1 mb-2">
-          {[event.tag1, event.tag2, event.tag3].filter(Boolean).map((tag, i) => (
-            <span key={i} className="bg-blue-700 text-xs px-2 py-1 rounded">
-              {tag}
-            </span>
-          ))}
+          {[event.tag1, event.tag2, event.tag3]
+            .filter(Boolean)
+            .map((tag, i) => (
+              <span key={i} className="bg-blue-700 text-xs px-2 py-1 rounded">
+                {tag}
+              </span>
+            ))}
         </div>
-        <p className="text-xs text-gray-400 mb-2">
-          Registered: {event.registered_users || 0}
-        </p>
-        <div className="flex justify-between">
+
+        {/* Action buttons */}
+        <div className="flex justify-between items-center mt-auto mb-2">
           <button
             onClick={() => setShowModal(true)}
             className="text-blue-400 hover:underline text-sm"
@@ -48,10 +54,16 @@ function DynamicEventCard({ event }) {
           >
             Register
           </button>
-
-         <div>
-   <p className="text-xs text-gray-400 mb-2">   Price: {event.price ? `${event.price} USD` : 'Free'}  </p>
         </div>
+
+        {/* Bottom line: Price and Registered Users */}
+        <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
+          <span>
+            💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}
+          </span>
+          <span>
+            👥 {event.registered_users || 0} Registered
+          </span>
         </div>
       </div>
 
@@ -90,6 +102,7 @@ function DynamicEventCard({ event }) {
     </>
   )
 }
+
 
 export default function Home() {
   const { isConnected, address } = useAccount()

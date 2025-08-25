@@ -16,6 +16,7 @@ export default async function handler(req, res) {
         e.tag1,
         e.tag2,
         e.tag3,
+        e.price,
         e.image_url,
         COALESCE(COUNT(r.id), 0)::int AS registered_users
       FROM events e
@@ -24,7 +25,7 @@ export default async function handler(req, res) {
       WHERE e.datetime > NOW()
       GROUP BY 
         e.id, e.name, e.city, e.datetime, e.description, e.venue, 
-        e.basic_perk, e.advanced_perk, e.tag1, e.tag2, e.tag3, e.image_url
+        e.basic_perk, e.advanced_perk, e.tag1, e.tag2, e.tag3, e.price, e.image_url
       ORDER BY e.datetime ASC
       LIMIT 50
     `)
