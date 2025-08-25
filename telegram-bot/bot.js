@@ -215,11 +215,6 @@ bot.onText(/\/events/, async (msg)=>{
   bot.sendMessage(chatId,'📍 Select your city:',opts);
 });
 
-// helper (simple check as requested)
-function isLikelyEmail(s) {
-  return typeof s === 'string' && s.includes('@') && s.includes('.')
-}
-
 bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const tgId = String(msg.from.id);
