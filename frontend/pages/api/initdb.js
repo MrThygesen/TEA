@@ -16,7 +16,9 @@ export default async function handler(req, res) {
   try {
     console.log('🚀 Starting database initialization...');
 
-    // === EVENTS TABLE ===await client.query(`
+    // === EVENTS TABLE ===
+
+await client.query(`
   CREATE TABLE IF NOT EXISTS events (
     id SERIAL PRIMARY KEY,
     group_id INTEGER,
