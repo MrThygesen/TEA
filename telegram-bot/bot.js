@@ -11,25 +11,7 @@ dotenv.config();
 const { Pool } = pkg;
 
 
-  const verificationUrl = `${process.env.PUBLIC_URL}/verify-email?tgId=${tgId}&token=${token}`;
-
-  const msg = {
-    to: email,
-    from: process.env.FROM_EMAIL || 'no-reply@yourdomain.com',
-    subject: 'Confirm your email',
-    html: `
-      <p>Hi!</p>
-      <p>Please confirm your email by clicking the link below:</p>
-      <p><a href="${verificationUrl}">Confirm Email</a></p>
-      <p>This link will expire in 24 hours.</p>
-    `,
-  };
-}
-
-
-//  end of confirmation email 
-
-// ==== CONFIG ====
+ ==== CONFIG ====
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 if (!BOT_TOKEN) { console.error('❌ TELEGRAM_BOT_TOKEN missing'); process.exit(1); }
@@ -244,11 +226,11 @@ bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
     profile = await getUserProfile(tgId);
   }
 
-  // Inline email support: /user_edit you@example.com
-  const inlineEmail = (match && match[1]) ? match[1].trim() : null;
+  // Check for inline email: /user_edit you@example.com
+  const inlineEmail = match?.[1]?.trim();
   if (inlineEmail) {
     if (!isLikelyEmail(inlineEmail)) {
-      return bot.sendMessage(chatId, '❌ Invalid email. Please include both "@" and "."');
+      return bot.sendMessage(chatId, '❌ Invalid email. Must include "@" and "."');
     }
 
     await saveUserProfile(tgId, { email: inlineEmail });
