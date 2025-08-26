@@ -522,7 +522,7 @@ function EventCreator() {
           description: '',
           details: '',
           venue: '',
-          venue_type: 
+          venue_type: '',
           basic_perk: '',
           advanced_perk: '',
           tag1: '',
