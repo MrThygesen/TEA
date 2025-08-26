@@ -11,18 +11,6 @@ dotenv.config();
 const { Pool } = pkg;
 
 
-async function sendEmailVerification(tgId, email) {
-  const token = generateEmailToken();
-  const expiresAt = new Date(Date.now() + 24*60*60*1000); // 24h expiration
-
-  await pool.query(
-    `INSERT INTO email_verification_tokens (telegram_user_id, email, token, expires_at)
-     VALUES ($1, $2, $3, $4)
-     ON CONFLICT (telegram_user_id)
-     DO UPDATE SET email = EXCLUDED.email, token = EXCLUDED.token, expires_at = EXCLUDED.expires_at`,
-    [tgId, email, token, expiresAt]
-  );
-
   const verificationUrl = `${process.env.PUBLIC_URL}/verify-email?tgId=${tgId}&token=${token}`;
 
   const msg = {
@@ -36,15 +24,8 @@ async function sendEmailVerification(tgId, email) {
       <p>This link will expire in 24 hours.</p>
     `,
   };
-
-  await sgMail.send(msg);
-  return token;
 }
 
-
-function generateEmailToken() {
-  return crypto.randomBytes(20).toString('hex'); // 40-character token
-}
 
 //  end of confirmation email 
 
@@ -251,31 +232,32 @@ bot.onText(/\/events/, async (msg)=>{
   bot.sendMessage(chatId,'📍 Select your city:',opts);
 });
 
+// ==== /user_edit command ====
 bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const tgId = String(msg.from.id);
 
+  // Fetch or create user profile
   let profile = await getUserProfile(tgId);
   if (!profile) {
     await saveUserProfile(tgId, { telegram_username: msg.from.username || '' });
     profile = await getUserProfile(tgId);
   }
 
-  // Support: /user_edit you@example.com
+  // Inline email support: /user_edit you@example.com
   const inlineEmail = (match && match[1]) ? match[1].trim() : null;
   if (inlineEmail) {
-  if (!isLikelyEmail(inlineEmail)) {
-    return bot.sendMessage(chatId, '❌ Invalid email. Please include both "@" and "."');
+    if (!isLikelyEmail(inlineEmail)) {
+      return bot.sendMessage(chatId, '❌ Invalid email. Please include both "@" and "."');
+    }
+
+    await saveUserProfile(tgId, { email: inlineEmail });
+    await sendEmailVerification(tgId, inlineEmail);
+
+    return bot.sendMessage(chatId, `✅ Email updated to: ${inlineEmail}. Please check your inbox to verify.`);
   }
-  await saveUserProfile(tgId, { email: inlineEmail });
-  
-  // ✅ Send verification email
-  await sendEmailVerification(tgId, inlineEmail);
 
-  return bot.sendMessage(chatId, `✅ Email updated to: ${inlineEmail}. Please check your inbox to verify.`);
-}
-
-  // Ask the user to reply with Force Reply (creates an input field)
+  // No inline email: prompt user to reply
   const prompt = await bot.sendMessage(
     chatId,
     `📧 Current email: ${profile?.email || 'N/A'}\n` +
@@ -283,17 +265,18 @@ bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
     { reply_markup: { force_reply: true, input_field_placeholder: 'you@example.com' } }
   );
 
-  // track only the reply to this prompt
+  // Track user state for reply
   userStates[tgId] = { step: 'editingProfile', field: 'email', replyTo: prompt.message_id };
 });
 
-// optional: let the user cancel the edit
+// ==== Cancel email update ====
 bot.onText(/\/cancel/, async (msg) => {
-  delete userStates[String(msg.from.id)];
+  const tgId = String(msg.from.id);
+  delete userStates[tgId];
   bot.sendMessage(msg.chat.id, '✖️ Email update canceled.');
 });
 
-// capture the reply
+// ==== Capture reply to /user_edit prompt ====
 bot.on('message', async (msg) => {
   const tgId = String(msg.from.id);
   const state = userStates[tgId];
@@ -301,7 +284,7 @@ bot.on('message', async (msg) => {
   if (!msg.text) return;             // non-text message
   if (msg.text.startsWith('/')) return; // ignore commands
 
-  // ensure it's a reply to our prompt (prevents false positives)
+  // Ensure reply is to the correct message
   if (state.replyTo && (!msg.reply_to_message || msg.reply_to_message.message_id !== state.replyTo)) {
     return;
   }
@@ -311,9 +294,12 @@ bot.on('message', async (msg) => {
     if (!isLikelyEmail(email)) {
       return bot.sendMessage(msg.chat.id, '❌ Invalid email. Please include both "@" and "."');
     }
+
     await saveUserProfile(tgId, { email });
+    await sendEmailVerification(tgId, email); // ✅ Always send verification
+
     delete userStates[tgId];
-    bot.sendMessage(msg.chat.id, `✅ Email updated to: ${email}`);
+    bot.sendMessage(msg.chat.id, `✅ Email updated to: ${email}. Please check your inbox to verify.`);
   }
 });
 
