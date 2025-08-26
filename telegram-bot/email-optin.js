@@ -41,7 +41,11 @@ export async function sendEmailVerification(tgId, email) {
     [tgId, email, token, expiresAt]
   );
 
-  const verificationUrl = `${PUBLIC_URL}/verify-email?tgId=${tgId}&token=${token}`;
+  //const verificationUrl = `${PUBLIC_URL}/verify-email?tgId=${tgId}&token=${token}`;
+
+  const verificationUrl = `${PUBLIC_URL}/api/verify-email?tgId=${tgId}&token=${token}`;
+
+
 
   const msg = {
     to: email,
