@@ -341,15 +341,65 @@ bot.onText(/\/event_detail_(\d+)/, async (msg, match)=>{
   bot.sendMessage(msg.chat.id,text);
 });
 
-// Keep legacy see_event_detail working
-bot.onText(/\/see_event_detail_(\d+)/, async (msg, match)=>{
-  const eventId = parseInt(match[1],10);
-  const res = await pool.query('SELECT * FROM events WHERE id=$1',[eventId]);
-  const event = res.rows[0];
-  if(!event) return bot.sendMessage(msg.chat.id,'⚠️ Event not found.');
-  const dateStr = new Date(event.datetime).toLocaleString();
-  let text = `📌 Event: ${event.name}\nCity: ${event.city}\nDate/Time: ${dateStr}\nMin/Max attendees: ${event.min_attendees}/${event.max_attendees}\nConfirmed: ${event.is_confirmed ? '✅' : '⌛'}\nDescription: ${event.description || 'N/A'}\nVenue: ${event.venue || 'N/A'}\nBasic perk: ${event.basic_perk || 'N/A'}\nAdvanced perk: ${event.advanced_perk || 'N/A'}`;
-  bot.sendMessage(msg.chat.id,text);
+
+// ==== EVENT ADMIN (ORGANIZER) ====
+bot.onText(/\/event_admin/, async (msg) => {
+  const chatId = msg.chat.id;
+  const tgId = String(msg.from.id);
+
+  try {
+    const profile = await getUserProfile(tgId);
+    if (!profile || profile.role !== 'organizer') {
+      return bot.sendMessage(chatId, '❌ You are not assigned as an organizer.');
+    }
+
+    const groupId = profile.group_id;
+    if (!groupId) {
+      return bot.sendMessage(chatId, '❌ You are not assigned to any group. Ask admin to assign you.');
+    }
+
+    // Fetch events for this organizer's group
+    const { rows: events } = await pool.query(
+      `SELECT e.id, e.name, e.datetime, e.is_confirmed, e.min_attendees,
+              COUNT(r.id) FILTER (WHERE r.has_arrived = TRUE) AS arrived_count
+       FROM events e
+       LEFT JOIN registrations r ON r.event_id = e.id
+       WHERE e.group_id = $1
+       GROUP BY e.id
+       ORDER BY e.datetime ASC`,
+      [groupId]
+    );
+
+    if (!events.length) {
+      return bot.sendMessage(chatId, '📭 No events for your group yet.');
+    }
+
+    for (const e of events) {
+      const dateStr = new Date(e.datetime).toLocaleString();
+
+      const keyboard = [
+        [{ text: '👥 Show Attendees', callback_data: `showattendees_${e.id}` }]
+      ];
+
+      if (Number(e.arrived_count) >= Number(e.min_attendees)) {
+        keyboard.push([{ text: '🎁 Activate Perks', callback_data: `activate_perks_${e.id}` }]);
+      } else {
+        keyboard.push([{
+          text: `⏳ Perks locked: ${e.arrived_count}/${e.min_attendees} arrived`,
+          callback_data: 'noop_perks_locked'
+        }]);
+      }
+
+      await bot.sendMessage(
+        chatId,
+        `📅 ${e.name} — ${dateStr}\nConfirmed: ${e.is_confirmed ? '✅' : '⌛'}`,
+        { reply_markup: { inline_keyboard: keyboard } }
+      );
+    }
+  } catch (err) {
+    console.error('❌ /event_admin error:', err);
+    bot.sendMessage(chatId, '❌ Failed to fetch your events. Try again later.');
+  }
 });
 
 // ==== SHOW EVENTS (USER CITY) ====
