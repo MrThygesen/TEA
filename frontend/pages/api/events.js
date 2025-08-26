@@ -26,30 +26,23 @@ export default async function handler(req, res) {
   try {
     // Insert event with group_id = id in a single transaction
     const result = await pool.query(`
-      INSERT INTO events
-        (name, city, datetime, min_attendees, max_attendees, is_confirmed,
-         description, details, venue, basic_perk, advanced_perk, tag1, tag2, tag3, price, image_url, group_id)
-      VALUES
-        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, $16, DEFAULT)
-      RETURNING id
+INSERT INTO events
+  (name, city, datetime, min_attendees, max_attendees, is_confirmed,
+   description, details, venue, venue_type, basic_perk, advanced_perk,
+   tag1, tag2, tag3, price, image_url, group_id)
+VALUES
+  ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,DEFAULT)
+RETURNING id
     `, [
-      name,
-      city,
-      new Date(datetime).toISOString(),
-      min_attendees ?? 1,
-      max_attendees ?? 40,
-      is_confirmed ?? false,
-      description || null,
-      details || null,
-      venue || null,
-      basic_perk || null,
-      advanced_perk || null,
-      tag1 || null,
-      tag2 || null,
-      tag3 || null,
-      price || null,
-      image_url || null
-    ]);
+  name, city, new Date(datetime).toISOString(),
+  min_attendees ?? 1, max_attendees ?? 40, is_confirmed ?? false,
+  description || null, details || null,
+  venue || null, venue_type || null, // added
+  basic_perk || null, advanced_perk || null,
+  tag1 || null, tag2 || null, tag3 || null,
+  price || null, image_url || null
+]
+);
 
     const newId = result.rows[0].id;
 
@@ -89,9 +82,9 @@ export default async function handler(req, res) {
       const result = await pool.query(
         `UPDATE events
         SET group_id=$1, name=$2, city=$3, datetime=$4, min_attendees=$5, max_attendees=$6, is_confirmed=$7,
-     description=$8, details=$9, venue=$10, basic_perk=$11, advanced_perk=$12,
-     tag1=$13, tag2=$14, tag3=$15, price=$16, image_url=$17, updated_at=NOW() 
-WHERE id=$18
+    description=$8, details=$9, venue=$10, venue_type=$11, basic_perk=$12, advanced_perk=$13,
+    tag1=$14, tag2=$15, tag3=$16, price=$17, image_url=$18, updated_at=NOW()
+WHERE id=$19
          RETURNING *`,
         [
           group_id,

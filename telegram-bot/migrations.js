@@ -19,6 +19,7 @@ export async function runMigrations() {
         description TEXT,
         details TEXT,
         venue TEXT,
+        venue_type TEXT, -- NEW column
         basic_perk TEXT,
         advanced_perk TEXT,
         image_url TEXT,
@@ -29,6 +30,7 @@ export async function runMigrations() {
 
     // Ensure new columns exist with correct types
     const eventColumns = [
+      { name: 'venue_type', type: 'TEXT' }, // NEW
       { name: 'tag1', type: 'TEXT' },
       { name: 'tag2', type: 'TEXT' },
       { name: 'tag3', type: 'TEXT' },
@@ -39,14 +41,12 @@ export async function runMigrations() {
       await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ${col.name} ${col.type};`);
     }
 
-    // If price exists as TEXT in old DB, convert to NUMERIC
+    // Convert price to NUMERIC if needed
     await pool.query(`
       ALTER TABLE events
       ALTER COLUMN price TYPE NUMERIC(10,2)
       USING price::NUMERIC;
-    `).catch(() => {
-      // Ignore if column already NUMERIC
-    });
+    `).catch(() => {});
 
     // Trigger for updated_at
     await pool.query(`
@@ -102,7 +102,7 @@ export async function runMigrations() {
       );
     `);
 
-    // Add new columns to registrations safely
+    // Add optional payment tracking
     await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS has_paid BOOLEAN DEFAULT FALSE;`);
     await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;`);
 
@@ -129,7 +129,7 @@ export async function runMigrations() {
       );
     `);
 
-    // Index for city filtering
+    // === Index for city filtering ===
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_events_city
       ON events(LOWER(city));
@@ -144,7 +144,6 @@ export async function runMigrations() {
   }
 }
 
-// Allow standalone execution: `node migrations.js`
 if (import.meta.url === `file://${process.argv[1]}`) {
   runMigrations();
 }

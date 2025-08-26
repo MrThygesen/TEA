@@ -302,24 +302,23 @@ bot.onText(/\/deregister_(\d+)/, async (msg, match) => {
 });
 
 // ==== TICKET VIEW ====
-
-
-
-bot.onText(/\/ticket/, async (msg)=>{
-
-const profile = await getUserProfile(tgId);
-if (!profile?.has_paid) {
-  return bot.sendMessage(msg.chat.id, '💳 You need to complete payment before accessing your tickets.');
-}
-
-  const tgId = String(msg.from.id);
+bot.onText(/\/ticket/, async (msg) => {
+  const tgId = String(msg.from.id);  // ✅ declare first
   const username = msg.from.username || '';
-  const events = await getUserEvents(tgId);
-  if(!events.length) return bot.sendMessage(msg.chat.id,'📭 Not registered for events.');
 
-  events.forEach(e=>{
+  const profile = await getUserProfile(tgId);
+  if (!profile?.has_paid) {
+    return bot.sendMessage(msg.chat.id, '💳 You need to complete payment before accessing your tickets.');
+  }
+
+  const events = await getUserEvents(tgId);
+  if (!events.length) {
+    return bot.sendMessage(msg.chat.id, '📭 Not registered for events.');
+  }
+
+  events.forEach(e => {
     const dateStr = new Date(e.datetime).toLocaleString();
-    const ticketText = 
+    const ticketText =
       `🎫 Ticket for event: ${e.name}\n` +
       `🆔 Ticket ID: ${e.id}\n` +
       `👤 Username: @${username}\n` +
@@ -426,29 +425,15 @@ async function showAttendees(chatId, eventId, messageId = null) {
 
 
 // ==== EVENT ADMIN (ORGANIZER) ====
-async function ensureOrganizer(chatId, tgId) {
-  const profile = await getUserProfile(tgId);
-  if (!profile) {
-    await bot.sendMessage(chatId, '⚠️ You are not registered. Use /user_edit to complete your profile.');
-    return null;
-  }
-  if (profile.role !== 'organizer') {
-    await bot.sendMessage(chatId, '🚫 Access denied: Organizer role required.');
-    return null;
-  }
-  if (!profile.group_id) {
-    await bot.sendMessage(chatId, '⚠️ You are not assigned to any group.');
-    return null;
-  }
-  return profile;
-}
-
 async function showOrganizerEvents(chatId, groupId) {
   const { rows: events } = await pool.query(
-    `SELECT id, name, datetime, is_confirmed
-     FROM events
-     WHERE group_id = $1
-     ORDER BY datetime ASC`,
+    `SELECT e.id, e.name, e.datetime, e.is_confirmed, e.min_attendees,
+            COUNT(r.id) FILTER (WHERE r.has_arrived = TRUE) AS arrived_count
+     FROM events e
+     LEFT JOIN registrations r ON r.event_id = e.id
+     WHERE e.group_id = $1
+     GROUP BY e.id
+     ORDER BY e.datetime ASC`,
     [groupId]
   );
 
@@ -458,13 +443,24 @@ async function showOrganizerEvents(chatId, groupId) {
 
   for (const e of events) {
     const dateStr = new Date(e.datetime).toLocaleString();
-    const opts = {
-      reply_markup: {
-        inline_keyboard: [[
-          { text: 'Show Attendees', callback_data: `showattendees_${e.id}` }
-        ]]
-      }
-    };
+
+    // Default keyboard: show attendees
+    const keyboard = [
+      [{ text: '👥 Show Attendees', callback_data: `showattendees_${e.id}` }]
+    ];
+
+    // Add perks button or locked status
+    if (Number(e.arrived_count) >= Number(e.min_attendees)) {
+      keyboard.push([{ text: '🎁 Activate Perks', callback_data: `activate_perks_${e.id}` }]);
+    } else {
+      keyboard.push([{
+        text: `⏳ Perks locked: ${e.arrived_count}/${e.min_attendees} arrived`,
+        callback_data: 'noop_perks_locked'
+      }]);
+    }
+
+    const opts = { reply_markup: { inline_keyboard: keyboard } };
+
     await bot.sendMessage(
       chatId,
       `📅 ${e.name} — ${dateStr}\nConfirmed: ${e.is_confirmed ? '✅' : '⌛'}`,
@@ -472,17 +468,6 @@ async function showOrganizerEvents(chatId, groupId) {
     );
   }
 }
-
-bot.onText(/\/event_admin|\/user_admin/, async (msg) => {
-  const chatId = msg.chat.id;
-  const tgId = String(msg.from.id);
-
-  const profile = await ensureOrganizer(chatId, tgId);
-  if (!profile) return;
-
-  await showOrganizerEvents(chatId, profile.group_id);
-});
-
 
 // ==== CALLBACK QUERIES ====
 bot.on('callback_query', async (query) => {

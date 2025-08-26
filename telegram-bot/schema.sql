@@ -1,7 +1,7 @@
 -- === EVENTS TABLE ===
 CREATE TABLE IF NOT EXISTS events (
   id SERIAL PRIMARY KEY,
-  group_id INTEGER,
+  group_id INTEGER, -- matches id type
   name TEXT NOT NULL,
   city TEXT NOT NULL,
   datetime TIMESTAMPTZ NOT NULL,
@@ -11,32 +11,17 @@ CREATE TABLE IF NOT EXISTS events (
   description TEXT,
   details TEXT,
   venue TEXT,
+  venue_type TEXT, -- NEW: type of venue (restaurant, bar, cafe, etc.)
   basic_perk TEXT,
   advanced_perk TEXT,
   tag1 TEXT,
   tag2 TEXT,
   tag3 TEXT,
+  price NUMERIC(10, 2) DEFAULT 0,
   image_url TEXT,
-  price TEXT,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
-
--- Trigger for updated_at
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = CURRENT_TIMESTAMP;
-  RETURN NEW;
-END;
-$$ language 'plpgsql';
-
-DROP TRIGGER IF EXISTS set_updated_at ON events;
-CREATE TRIGGER set_updated_at
-BEFORE UPDATE ON events
-FOR EACH ROW
-EXECUTE FUNCTION update_updated_at_column();
-
 
 -- === USER PROFILES TABLE ===
 CREATE TABLE IF NOT EXISTS user_profiles (
@@ -69,6 +54,7 @@ CREATE TABLE IF NOT EXISTS registrations (
   validated_by TEXT,
   validated_at TIMESTAMPTZ,
   has_paid BOOLEAN DEFAULT FALSE,
+  paid_at TIMESTAMPTZ,
   UNIQUE (event_id, telegram_user_id)
 );
 
@@ -84,13 +70,14 @@ CREATE TABLE IF NOT EXISTS invitations (
   timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
--- === EMAIL SUBSCRIBERS TABLE ===
+-- === USER EMAILS TABLE ===
 CREATE TABLE IF NOT EXISTS user_emails (
   telegram_user_id TEXT PRIMARY KEY,
   email TEXT NOT NULL,
   subscribed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
--- Index for city filtering
-CREATE INDEX IF NOT EXISTS idx_events_city ON events(LOWER(city));
+-- === Indexes ===
+CREATE INDEX IF NOT EXISTS idx_events_city
+ON events(LOWER(city));
 

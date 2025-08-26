@@ -17,31 +17,31 @@ export default async function handler(req, res) {
     console.log('🚀 Starting database initialization...');
 
     // === EVENTS TABLE ===
-
-await client.query(`
-  CREATE TABLE IF NOT EXISTS events (
-    id SERIAL PRIMARY KEY,
-    group_id INTEGER,
-    name TEXT NOT NULL,
-    city TEXT NOT NULL,
-    datetime TIMESTAMPTZ NOT NULL,
-    min_attendees INTEGER DEFAULT 1,
-    max_attendees INTEGER DEFAULT 40,
-    is_confirmed BOOLEAN DEFAULT FALSE,
-    description TEXT,
-    details TEXT,
-    venue TEXT,
-    basic_perk TEXT,
-    advanced_perk TEXT,
-    tag1 TEXT,
-    tag2 TEXT,
-    tag3 TEXT,
-    image_url TEXT,
-    price NUMERIC(10,2) DEFAULT 0,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-  );
-`);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS events (
+        id SERIAL PRIMARY KEY,
+        group_id INTEGER,
+        name TEXT NOT NULL,
+        city TEXT NOT NULL,
+        datetime TIMESTAMPTZ NOT NULL,
+        min_attendees INTEGER DEFAULT 1,
+        max_attendees INTEGER DEFAULT 40,
+        is_confirmed BOOLEAN DEFAULT FALSE,
+        description TEXT,
+        details TEXT,
+        venue TEXT,
+        venue_type TEXT, -- NEW column
+        basic_perk TEXT,
+        advanced_perk TEXT,
+        tag1 TEXT,
+        tag2 TEXT,
+        tag3 TEXT,
+        image_url TEXT,
+        price NUMERIC(10,2) DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
     console.log('✔ Events table created/ensured');
 
     // Trigger for updated_at

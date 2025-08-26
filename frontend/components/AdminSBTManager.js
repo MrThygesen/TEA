@@ -441,25 +441,26 @@ function SetRoleForm() {
 }
 
 function EventCreator() {
-  const [event, setEvent] = useState({
-    id: '',
-    name: '',
-    city: '',
-    datetime: '',
-    min_attendees: 1,
-    max_attendees: 40,
-    is_confirmed: false,
-    description: '',
-    details: '',
-    venue: '',
-    basic_perk: '',
-    advanced_perk: '',
-    tag1: '',
-    tag2: '',
-    tag3: '',
-    price: '',   
-    image_url: ''
-  })
+ const [event, setEvent] = useState({
+  id: '',
+  name: '',
+  city: '',
+  datetime: '',
+  min_attendees: 1,
+  max_attendees: 40,
+  is_confirmed: false,
+  description: '',
+  details: '',
+  venue: '',
+  venue_type: '', // added
+  basic_perk: '',
+  advanced_perk: '',
+  tag1: '',
+  tag2: '',
+  tag3: '',
+  price: '',
+  image_url: ''
+});
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
@@ -521,6 +522,7 @@ function EventCreator() {
           description: '',
           details: '',
           venue: '',
+          venue_type: 
           basic_perk: '',
           advanced_perk: '',
           tag1: '',
@@ -563,7 +565,10 @@ function EventCreator() {
       <textarea placeholder="Description" value={event.description} onChange={e => handleChange('description', e.target.value)} className={inputClass('description')} />
       <textarea placeholder="Details" value={event.details} onChange={e => handleChange('details', e.target.value)} className={inputClass('details')} />
       <input type="text" placeholder="Venue" value={event.venue} onChange={e => handleChange('venue', e.target.value)} className={inputClass('venue')} />
-      <input type="text" placeholder="Basic Perk" value={event.basic_perk} onChange={e => handleChange('basic_perk', e.target.value)} className={inputClass('basic_perk')} />
+    
+<input type="text" placeholder="Venue Type (e.g., restaurant, bar, cafe)" value={event.venue_type} onChange={e => handleChange('venue_type', e.target.value)}
+  className={inputClass('venue_type')} />
+  <input type="text" placeholder="Basic Perk" value={event.basic_perk} onChange={e => handleChange('basic_perk', e.target.value)} className={inputClass('basic_perk')} />
       <input type="text" placeholder="Advanced Perk" value={event.advanced_perk} onChange={e => handleChange('advanced_perk', e.target.value)} className={inputClass('advanced_perk')} />
       <input type="text" placeholder="Tag1" value={event.tag1} onChange={e => handleChange('tag1', e.target.value)} className={inputClass('tag1')} />
       <input type="text" placeholder="Tag2" value={event.tag2} onChange={e => handleChange('tag2', e.target.value)} className={inputClass('tag2')} />
