@@ -11,7 +11,7 @@ dotenv.config();
 const { Pool } = pkg;
 
 
- ==== CONFIG ====
+// ==== CONFIG ====
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 if (!BOT_TOKEN) { console.error('❌ TELEGRAM_BOT_TOKEN missing'); process.exit(1); }
@@ -109,43 +109,71 @@ async function notifyEventConfirmedViaApi(eventId, eventName, eventCity, eventDa
 
 // ==== REGISTRATION ====
 async function registerUser(eventId, tgId, username, email, wallet) {
-  const regCheck = await pool.query('SELECT * FROM registrations WHERE event_id=$1 AND telegram_user_id=$2', [eventId,tgId]);
-  const alreadyRegistered = regCheck.rows.length>0;
+  // Check if user already registered
+  const regCheck = await pool.query(
+    'SELECT * FROM registrations WHERE event_id=$1 AND telegram_user_id=$2',
+    [eventId, tgId]
+  );
+  const alreadyRegistered = regCheck.rows.length > 0;
 
-  const eventRes = await pool.query('SELECT name,min_attendees,max_attendees,is_confirmed FROM events WHERE id=$1',[eventId]);
+  // Fetch event info
+  const eventRes = await pool.query(
+    'SELECT name, city, datetime, min_attendees, max_attendees, is_confirmed FROM events WHERE id=$1',
+    [eventId]
+  );
   const event = eventRes.rows[0];
-  if(!event) return { statusMsg:'⚠️ Event not found.', confirmed:false };
+  if (!event) return { statusMsg: '⚠️ Event not found.', confirmed: false };
 
-  const countRes = await pool.query('SELECT COUNT(*)::int AS count FROM registrations WHERE event_id=$1',[eventId]);
-  const count = countRes.rows[0]?.count||0;
-  if(event.max_attendees && !alreadyRegistered && count>=event.max_attendees) return { statusMsg:'⚠️ Sorry, this event is full.', confirmed:false };
+  // Count current registrations
+  const countRes = await pool.query(
+    'SELECT COUNT(*)::int AS count FROM registrations WHERE event_id=$1',
+    [eventId]
+  );
+  const count = countRes.rows[0]?.count || 0;
 
-  if(!alreadyRegistered){
+  if (event.max_attendees && !alreadyRegistered && count >= event.max_attendees) {
+    return { statusMsg: '⚠️ Sorry, this event is full.', confirmed: false };
+  }
+
+  // Insert registration if new
+  if (!alreadyRegistered) {
     await pool.query(
-      `INSERT INTO registrations (event_id,telegram_user_id,telegram_username,email,wallet_address)
-       VALUES ($1,$2,$3,$4,$5) ON CONFLICT (event_id,telegram_user_id) DO NOTHING`,
-      [eventId,tgId,username,email,wallet||null]
+      `INSERT INTO registrations (event_id, telegram_user_id, telegram_username, email, wallet_address)
+       VALUES ($1, $2, $3, $4, $5) ON CONFLICT (event_id, telegram_user_id) DO NOTHING`,
+      [eventId, tgId, username, email, wallet || null]
     );
   }
 
-  const newCountRes = await pool.query('SELECT COUNT(*)::int AS count FROM registrations WHERE event_id=$1',[eventId]);
-  const newCount = newCountRes.rows[0]?.count||0;
-  let statusMsg = `👥 ${newCount} people registered.\n`;
-  if(alreadyRegistered) statusMsg = `ℹ️ You have already registered.\n${statusMsg}`;
+  // Updated registration count
+  const newCountRes = await pool.query(
+    'SELECT COUNT(*)::int AS count FROM registrations WHERE event_id=$1',
+    [eventId]
+  );
+  const newCount = newCountRes.rows[0]?.count || 0;
 
-  if(!event.is_confirmed && newCount>=event.min_attendees){
-    await pool.query('UPDATE events SET is_confirmed=TRUE WHERE id=$1',[eventId]);
-    statusMsg += '✅ Event now confirmed!';
+  let statusMsg = alreadyRegistered
+    ? `ℹ️ You have already registered.\n👥 ${newCount} people registered.`
+    : `👥 ${newCount} people registered.`;
 
-    const detailsRes = await pool.query('SELECT name,city,datetime FROM events WHERE id=$1',[eventId]);
+  // Confirm event if min_attendees reached
+  if (!event.is_confirmed && newCount >= event.min_attendees) {
+    await pool.query('UPDATE events SET is_confirmed=TRUE WHERE id=$1', [eventId]);
+    statusMsg += '\n✅ Event now confirmed!';
+
+    // Fetch event details for email
+    const detailsRes = await pool.query('SELECT name, city, datetime FROM events WHERE id=$1', [eventId]);
     const details = detailsRes.rows[0];
     const eventDateTime = details ? new Date(details.datetime).toLocaleString() : '';
-    await sendEventConfirmed(eventId);  
-  } else if(!event.is_confirmed){
-    statusMsg += '⌛ Awaiting confirmation.';
-  } else { statusMsg += '✅ Already confirmed.'; }
 
-  return { confirmed:newCount>=event.min_attendees, eventName:event.name, statusMsg };
+    // Send confirmation emails to all registered users
+    await sendEventConfirmed(eventId, details.name, details.city, eventDateTime);
+  } else if (!event.is_confirmed) {
+    statusMsg += '\n⌛ Awaiting confirmation.';
+  } else {
+    statusMsg += '\n✅ Already confirmed.';
+  }
+
+  return { confirmed: newCount >= event.min_attendees, eventName: event.name, statusMsg };
 }
 
 // ==== TICKET TOKEN ====
@@ -649,14 +677,20 @@ bot.onText(/\/pay_(\d+)/, async (msg, match) => {
       return bot.sendMessage(chatId, '💳 Payment is already marked for this event.');
     }
 
+    // Mark payment as completed
     await pool.query(
-      `UPDATE registrations
-       SET has_paid=TRUE, paid_at=NOW()
-       WHERE event_id=$1 AND telegram_user_id=$2`,
+      `UPDATE registrations SET has_paid=TRUE, paid_at=NOW() WHERE event_id=$1 AND telegram_user_id=$2`,
       [eventId, tgId]
     );
 
-    bot.sendMessage(chatId, `✅ Payment recorded for event ID ${eventId}. Thank you!`);
+    // Fetch event name for email
+    const eventRes = await pool.query('SELECT name FROM events WHERE id=$1', [eventId]);
+    const event = eventRes.rows[0];
+
+    // Send payment confirmation email
+    if (event) await sendPaymentConfirmed(eventId, event.name, tgId);
+
+    bot.sendMessage(chatId, `✅ Payment recorded for event "${event.name}". Thank you!`);
   } catch (err) {
     console.error('❌ /pay error:', err);
     bot.sendMessage(chatId, '❌ Failed to update payment. Try again later.');
