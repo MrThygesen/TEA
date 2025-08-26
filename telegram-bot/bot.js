@@ -12,7 +12,7 @@ const { Pool } = pkg;
 
 
 // ==== CONFIG ====
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+//sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 if (!BOT_TOKEN) { console.error('❌ TELEGRAM_BOT_TOKEN missing'); process.exit(1); }
 if (!process.env.DATABASE_URL) { console.error('❌ DATABASE_URL missing'); process.exit(1); }
@@ -82,30 +82,6 @@ async function getUserEvents(tgId) {
   return res.rows;
 }
 
-// ==== EMAIL NOTIFICATIONS ====
-async function notifyEventConfirmedViaApi(eventId, eventName, eventCity, eventDateTime) {
-  try {
-    const regRes = await pool.query(
-      'SELECT email, wallet_address, telegram_username FROM registrations WHERE event_id=$1 AND email IS NOT NULL',
-      [eventId]
-    );
-    const attendees = regRes.rows;
-    if (!attendees.length) return;
-
-    await Promise.all(attendees.map(async (attendee) => {
-      const msg = {
-        to: attendee.email,
-        from: 'no-reply@teanet.xyz',
-        subject: `Event Confirmed: ${eventName}`,
-        text: `Hi ${attendee.telegram_username || ''},\n\nYour event "${eventName}" is now confirmed! 🎉\nDate/Time: ${eventDateTime || 'TBA'}\nCity: ${eventCity || 'TBA'}`
-      };
-      await sgMail.send(msg);
-    }));
-    console.log(`📧 Event confirmation sent to ${attendees.length} attendees`);
-  } catch (err) {
-    console.error('❌ Failed to send event confirmation via SendGrid', err);
-  }
-}
 
 // ==== REGISTRATION ====
 async function registerUser(eventId, tgId, username, email, wallet) {
