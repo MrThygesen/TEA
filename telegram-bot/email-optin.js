@@ -15,7 +15,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-const FROM_EMAIL = process.env.FROM_EMAIL || 'no-reply@yourdomain.com';
+const FROM_EMAIL = process.env.FROM_EMAIL || 'no-reply@teanet.xyz';
 const PUBLIC_URL = process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || 'https://example.onrender.com';
 
 // ==== HELPER: EMAIL CHECK ====
