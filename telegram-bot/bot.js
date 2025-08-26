@@ -10,6 +10,44 @@ import crypto from 'crypto';
 dotenv.config();
 const { Pool } = pkg;
 
+
+async function sendEmailVerification(tgId, email) {
+  const token = generateEmailToken();
+  const expiresAt = new Date(Date.now() + 24*60*60*1000); // 24h expiration
+
+  await pool.query(
+    `INSERT INTO email_verification_tokens (telegram_user_id, email, token, expires_at)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (telegram_user_id)
+     DO UPDATE SET email = EXCLUDED.email, token = EXCLUDED.token, expires_at = EXCLUDED.expires_at`,
+    [tgId, email, token, expiresAt]
+  );
+
+  const verificationUrl = `${process.env.PUBLIC_URL}/verify-email?tgId=${tgId}&token=${token}`;
+
+  const msg = {
+    to: email,
+    from: process.env.FROM_EMAIL || 'no-reply@yourdomain.com',
+    subject: 'Confirm your email',
+    html: `
+      <p>Hi!</p>
+      <p>Please confirm your email by clicking the link below:</p>
+      <p><a href="${verificationUrl}">Confirm Email</a></p>
+      <p>This link will expire in 24 hours.</p>
+    `,
+  };
+
+  await sgMail.send(msg);
+  return token;
+}
+
+
+function generateEmailToken() {
+  return crypto.randomBytes(20).toString('hex'); // 40-character token
+}
+
+//  end of confirmation email 
+
 // ==== CONFIG ====
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -228,12 +266,16 @@ bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
   // Support: /user_edit you@example.com
   const inlineEmail = (match && match[1]) ? match[1].trim() : null;
   if (inlineEmail) {
-    if (!isLikelyEmail(inlineEmail)) {
-      return bot.sendMessage(chatId, '❌ Invalid email. Please include both "@" and "."');
-    }
-    await saveUserProfile(tgId, { email: inlineEmail });
-    return bot.sendMessage(chatId, `✅ Email updated to: ${inlineEmail}`);
+  if (!isLikelyEmail(inlineEmail)) {
+    return bot.sendMessage(chatId, '❌ Invalid email. Please include both "@" and "."');
   }
+  await saveUserProfile(tgId, { email: inlineEmail });
+  
+  // ✅ Send verification email
+  await sendEmailVerification(tgId, inlineEmail);
+
+  return bot.sendMessage(chatId, `✅ Email updated to: ${inlineEmail}. Please check your inbox to verify.`);
+}
 
   // Ask the user to reply with Force Reply (creates an input field)
   const prompt = await bot.sendMessage(
@@ -280,16 +322,24 @@ bot.on('message', async (msg) => {
 
 
 // ==== MY EVENTS ====
-bot.onText(/\/myevents/, async (msg)=>{
+bot.onText(/\/myevents/, async (msg) => {
   const tgId = String(msg.from.id);
   const events = await getUserEvents(tgId);
-  if(!events.length) return bot.sendMessage(msg.chat.id,'📭 You are not registered for any events.');
+  if (!events.length) {
+    return bot.sendMessage(msg.chat.id, '📭 You are not registered for any events.');
+  }
 
   for (const e of events) {
     const dateStr = new Date(e.datetime).toLocaleString();
-    await bot.sendMessage(msg.chat.id,
-      `📅${e.name} — ${dateStr} — ${e.price ? `${e.price} USD` : 'Free'}\n/event_detail_${e.id} to see details\n/deregister_${e.id} to leave the event`
-    );
+    const paymentStatus = e.has_paid ? '✅ Paid' : '💳 Not Paid';
+    const text =
+      `📅 ${e.name} — ${dateStr} — ${e.price ? `${e.price} USD` : 'Free'}\n` +
+      `Status: ${paymentStatus}\n` +
+      `/event_detail_${e.id} to see details\n` +
+      `/deregister_${e.id} to leave the event` +
+      (e.price && !e.has_paid ? `\n/pay_${e.id} to complete payment` : '');
+      
+    await bot.sendMessage(msg.chat.id, text);
   }
 });
 
@@ -303,20 +353,23 @@ bot.onText(/\/deregister_(\d+)/, async (msg, match) => {
 
 // ==== TICKET VIEW ====
 bot.onText(/\/ticket/, async (msg) => {
-  const tgId = String(msg.from.id);  // ✅ declare first
+  const tgId = String(msg.from.id);
   const username = msg.from.username || '';
 
-  const profile = await getUserProfile(tgId);
-  if (!profile?.has_paid) {
-    return bot.sendMessage(msg.chat.id, '💳 You need to complete payment before accessing your tickets.');
-  }
-
+  // Get all registered events for this user
   const events = await getUserEvents(tgId);
   if (!events.length) {
-    return bot.sendMessage(msg.chat.id, '📭 Not registered for events.');
+    return bot.sendMessage(msg.chat.id, '📭 Not registered for any events.');
   }
 
-  events.forEach(e => {
+  // Filter only events that have been paid
+  const paidEvents = events.filter(e => e.has_paid);
+  if (!paidEvents.length) {
+    return bot.sendMessage(msg.chat.id, '💳 You have not completed payment for any events yet.');
+  }
+
+  // Send ticket for each paid event
+  for (const e of paidEvents) {
     const dateStr = new Date(e.datetime).toLocaleString();
     const ticketText =
       `🎫 Ticket for event: ${e.name}\n` +
@@ -326,10 +379,9 @@ bot.onText(/\/ticket/, async (msg) => {
       `💰 Price: ${e.price ? `${e.price} USD` : 'Free'}\n` +
       `📌 Show this ticket at the entrance/staff.\n` +
       `/event_detail_${e.id}`;
-    bot.sendMessage(msg.chat.id, ticketText);
-  });
+    await bot.sendMessage(msg.chat.id, ticketText);
+  }
 });
-
 // ==== EVENT DETAIL ====
 bot.onText(/\/event_detail_(\d+)/, async (msg, match)=>{
   const eventId = parseInt(match[1],10);

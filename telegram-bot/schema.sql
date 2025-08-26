@@ -77,6 +77,18 @@ CREATE TABLE IF NOT EXISTS user_emails (
   subscribed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
+
+-- Email verification tokens for double opt-in
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
+  telegram_user_id TEXT PRIMARY KEY REFERENCES user_profiles(telegram_user_id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  token TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  expires_at TIMESTAMPTZ NOT NULL
+);
+
+
+
 -- === Indexes ===
 CREATE INDEX IF NOT EXISTS idx_events_city
 ON events(LOWER(city));

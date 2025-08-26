@@ -2,7 +2,7 @@
 import { pool } from './lib/postgres.js';
 
 export async function runMigrations() {
-  console.log('🚀 Running safe migrations...');
+  console.log('🚀 Running migrations...');
 
   try {
     // === EVENTS TABLE ===
@@ -19,34 +19,18 @@ export async function runMigrations() {
         description TEXT,
         details TEXT,
         venue TEXT,
-        venue_type TEXT, -- NEW column
+        venue_type TEXT,
         basic_perk TEXT,
         advanced_perk TEXT,
+        tag1 TEXT,
+        tag2 TEXT,
+        tag3 TEXT,
+        price NUMERIC(10,2) DEFAULT 0,
         image_url TEXT,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `);
-
-    // Ensure new columns exist with correct types
-    const eventColumns = [
-      { name: 'venue_type', type: 'TEXT' }, // NEW
-      { name: 'tag1', type: 'TEXT' },
-      { name: 'tag2', type: 'TEXT' },
-      { name: 'tag3', type: 'TEXT' },
-      { name: 'price', type: 'NUMERIC(10,2) DEFAULT 0' }
-    ];
-
-    for (const col of eventColumns) {
-      await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ${col.name} ${col.type};`);
-    }
-
-    // Convert price to NUMERIC if needed
-    await pool.query(`
-      ALTER TABLE events
-      ALTER COLUMN price TYPE NUMERIC(10,2)
-      USING price::NUMERIC;
-    `).catch(() => {});
 
     // Trigger for updated_at
     await pool.query(`
@@ -56,7 +40,7 @@ export async function runMigrations() {
         NEW.updated_at = CURRENT_TIMESTAMP;
         RETURN NEW;
       END;
-      $$ language 'plpgsql';
+      $$ LANGUAGE 'plpgsql';
 
       DROP TRIGGER IF EXISTS set_updated_at ON events;
       CREATE TRIGGER set_updated_at
@@ -98,13 +82,11 @@ export async function runMigrations() {
         ticket_validated BOOLEAN DEFAULT FALSE,
         validated_by TEXT,
         validated_at TIMESTAMPTZ,
+        has_paid BOOLEAN DEFAULT FALSE,
+        paid_at TIMESTAMPTZ,
         UNIQUE (event_id, telegram_user_id)
       );
     `);
-
-    // Add optional payment tracking
-    await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS has_paid BOOLEAN DEFAULT FALSE;`);
-    await pool.query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;`);
 
     // === INVITATIONS TABLE ===
     await pool.query(`
@@ -120,7 +102,7 @@ export async function runMigrations() {
       );
     `);
 
-    // === EMAIL SUBSCRIBERS TABLE ===
+    // === USER EMAILS TABLE ===
     await pool.query(`
       CREATE TABLE IF NOT EXISTS user_emails (
         telegram_user_id TEXT PRIMARY KEY,
@@ -129,13 +111,24 @@ export async function runMigrations() {
       );
     `);
 
-    // === Index for city filtering ===
+    // === EMAIL VERIFICATION TOKENS TABLE ===
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS email_verification_tokens (
+        telegram_user_id TEXT PRIMARY KEY REFERENCES user_profiles(telegram_user_id) ON DELETE CASCADE,
+        email TEXT NOT NULL,
+        token TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMPTZ NOT NULL
+      );
+    `);
+
+    // === Indexes ===
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_events_city
       ON events(LOWER(city));
     `);
 
-    console.log('✅ Migrations complete and schema is up-to-date!');
+    console.log('✅ Migrations complete!');
   } catch (err) {
     console.error('❌ Migration error:', err);
     process.exit(1);

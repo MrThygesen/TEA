@@ -14,7 +14,7 @@ export default async function handler(req, res) {
 
   const client = await pool.connect();
   try {
-    console.log('🚀 Starting database initialization...');
+    console.log('🚀 Initializing database...');
 
     // === EVENTS TABLE ===
     await client.query(`
@@ -30,19 +30,18 @@ export default async function handler(req, res) {
         description TEXT,
         details TEXT,
         venue TEXT,
-        venue_type TEXT, -- NEW column
+        venue_type TEXT,
         basic_perk TEXT,
         advanced_perk TEXT,
         tag1 TEXT,
         tag2 TEXT,
         tag3 TEXT,
-        image_url TEXT,
         price NUMERIC(10,2) DEFAULT 0,
+        image_url TEXT,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✔ Events table created/ensured');
 
     // Trigger for updated_at
     await client.query(`
@@ -52,7 +51,7 @@ export default async function handler(req, res) {
         NEW.updated_at = CURRENT_TIMESTAMP;
         RETURN NEW;
       END;
-      $$ language 'plpgsql';
+      $$ LANGUAGE 'plpgsql';
     `);
     await client.query(`DROP TRIGGER IF EXISTS set_updated_at ON events;`);
     await client.query(`
@@ -61,7 +60,6 @@ export default async function handler(req, res) {
       FOR EACH ROW
       EXECUTE FUNCTION update_updated_at_column();
     `);
-    console.log('✔ Trigger for events.updated_at ensured');
 
     // === USER PROFILES TABLE ===
     await client.query(`
@@ -78,7 +76,6 @@ export default async function handler(req, res) {
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✔ User profiles table created/ensured');
 
     // === REGISTRATIONS TABLE ===
     await client.query(`
@@ -102,7 +99,6 @@ export default async function handler(req, res) {
         UNIQUE (event_id, telegram_user_id)
       );
     `);
-    console.log('✔ Registrations table created/ensured');
 
     // === INVITATIONS TABLE ===
     await client.query(`
@@ -117,9 +113,8 @@ export default async function handler(req, res) {
         timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✔ Invitations table created/ensured');
 
-    // === EMAIL SUBSCRIBERS TABLE ===
+    // === USER EMAILS TABLE ===
     await client.query(`
       CREATE TABLE IF NOT EXISTS user_emails (
         telegram_user_id TEXT PRIMARY KEY,
@@ -127,17 +122,26 @@ export default async function handler(req, res) {
         subscribed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✔ User emails table created/ensured');
 
-    // === City index ===
+    // === EMAIL VERIFICATION TOKENS TABLE ===
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS email_verification_tokens (
+        telegram_user_id TEXT PRIMARY KEY REFERENCES user_profiles(telegram_user_id) ON DELETE CASCADE,
+        email TEXT NOT NULL,
+        token TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMPTZ NOT NULL
+      );
+    `);
+
+    // === Indexes ===
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_events_city
       ON events(LOWER(city));
     `);
-    console.log('✔ Index for events.city ensured');
 
-    res.status(200).json({ message: '✅ Database initialized/updated successfully' });
-    console.log('🎉 Database initialized/updated successfully!');
+    res.status(200).json({ message: '✅ Database initialized successfully' });
+    console.log('🎉 Database initialized successfully!');
   } catch (err) {
     console.error('❌ Init DB error:', err);
     res.status(500).json({ error: err.message });
