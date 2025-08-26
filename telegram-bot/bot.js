@@ -4,8 +4,8 @@ import pkg from 'pg';
 import dotenv from 'dotenv';
 import express from 'express';
 import { runMigrations } from './migrations.js';
-import sgMail from '@sendgrid/mail';
-import crypto from 'crypto';
+import { sendEmailVerification, sendEventConfirmed, sendPaymentConfirmed, isLikelyEmail } from './email-optin.js';
+
 
 dotenv.config();
 const { Pool } = pkg;
@@ -177,7 +177,7 @@ async function registerUser(eventId, tgId, username, email, wallet) {
     const detailsRes = await pool.query('SELECT name,city,datetime FROM events WHERE id=$1',[eventId]);
     const details = detailsRes.rows[0];
     const eventDateTime = details ? new Date(details.datetime).toLocaleString() : '';
-    await notifyEventConfirmedViaApi(eventId,event.name,details?.city,eventDateTime);
+    await sendEventConfirmed(eventId);  
   } else if(!event.is_confirmed){
     statusMsg += '⌛ Awaiting confirmation.';
   } else { statusMsg += '✅ Already confirmed.'; }
@@ -200,9 +200,7 @@ function generateTicketToken(eventId, tgId, guestUsername) {
 }
 
 // ==== HELPER: EMAIL CHECK ====
-function isLikelyEmail(s) {
-  return typeof s === 'string' && s.includes('@') && s.includes('.');
-}
+
 
 // ==== COMMANDS (/start, /help, /myid, /events, /user_edit, /cancel, /message capture, /myevents, /deregister, /ticket, /event_detail) ====
 // ==== COMMANDS ====
