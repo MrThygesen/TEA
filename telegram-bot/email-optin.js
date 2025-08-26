@@ -42,7 +42,11 @@ export async function sendEmailVerification(tgId, email) {
   );
 
   // Generate a link to the frontend page, not the API
-  const verificationUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/verify-email?tgId=${tgId}&token=${token}`;
+//  const verificationUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/verify-email?tgId=${tgId}&token=${token}`;
+
+const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?tgId=${tgId}&token=${token}`;
+
+
 
   const msg = {
     to: email,
