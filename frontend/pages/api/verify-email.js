@@ -1,14 +1,15 @@
+// pages/api/verify-email.js
 import { pool } from '../../lib/postgres.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
-    return res.status(405).send('Method Not Allowed');
+    return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
   const { tgId, token } = req.query;
 
   if (!tgId || !token) {
-    return res.status(400).send('Invalid link');
+    return res.status(400).json({ error: 'Invalid link' });
   }
 
   try {
@@ -19,7 +20,7 @@ export default async function handler(req, res) {
     );
 
     if (rows.length === 0) {
-      return res.status(400).send('Invalid or expired token');
+      return res.status(400).json({ error: 'Invalid or expired token' });
     }
 
     const email = rows[0].email;
@@ -36,10 +37,10 @@ export default async function handler(req, res) {
       [tgId]
     );
 
-    return res.status(200).send('✅ Email verified successfully!');
+    return res.status(200).json({ success: true, message: '✅ Email verified successfully!' });
   } catch (error) {
     console.error('Verification error:', error);
-    return res.status(500).send('Server error, please try again later.');
+    return res.status(500).json({ error: 'Server error, please try again later.' });
   }
 }
 

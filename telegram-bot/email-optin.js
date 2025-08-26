@@ -41,13 +41,8 @@ export async function sendEmailVerification(tgId, email) {
     [tgId, email, token, expiresAt]
   );
 
-  //const verificationUrl = `${PUBLIC_URL}/verify-email?tgId=${tgId}&token=${token}`;
-  //const verificationUrl = `${PUBLIC_URL}/api/verify-email?tgId=${tgId}&token=${token}`;
-//const verifyLink = `${process.env.NEXT_PUBLIC_BASE_URL}/verify-email?tgId=${tgId}&token=${token}`;
-const verificationUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/verify-email?tgId=${tgId}&token=${token}`;
-
- 
-
+  // Generate a link to the frontend page, not the API
+  const verificationUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/verify-email?tgId=${tgId}&token=${token}`;
 
   const msg = {
     to: email,
@@ -60,7 +55,6 @@ const verificationUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/verify-email?tgId=$
       <p>This link will expire in 24 hours.</p>
     `,
   };
-
 
   await sgMail.send(msg);
   console.log(`📧 Verification email sent to ${email}`);
