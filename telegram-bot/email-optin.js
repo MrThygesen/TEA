@@ -42,9 +42,10 @@ export async function sendEmailVerification(tgId, email) {
   );
 
   //const verificationUrl = `${PUBLIC_URL}/verify-email?tgId=${tgId}&token=${token}`;
+  //const verificationUrl = `${PUBLIC_URL}/api/verify-email?tgId=${tgId}&token=${token}`;
 
-  const verificationUrl = `${PUBLIC_URL}/api/verify-email?tgId=${tgId}&token=${token}`;
-
+const verifyLink = `${process.env.NEXT_PUBLIC_BASE_URL}/verify-email?tgId=${tgId}&token=${token}`;
+ 
 
 
   const msg = {
