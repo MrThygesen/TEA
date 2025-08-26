@@ -1,6 +1,10 @@
 import { pool } from '../../lib/postgres.js';
 
 export default async function handler(req, res) {
+  if (req.method !== 'GET') {
+    return res.status(405).send('Method Not Allowed');
+  }
+
   const { tgId, token } = req.query;
 
   if (!tgId || !token) {
@@ -9,12 +13,12 @@ export default async function handler(req, res) {
 
   try {
     const { rows } = await pool.query(
-      `SELECT * FROM email_verification_tokens
+      `SELECT email FROM email_verification_tokens
        WHERE telegram_user_id=$1 AND token=$2 AND expires_at > NOW()`,
       [tgId, token]
     );
 
-    if (!rows.length) {
+    if (rows.length === 0) {
       return res.status(400).send('Invalid or expired token');
     }
 
@@ -32,10 +36,10 @@ export default async function handler(req, res) {
       [tgId]
     );
 
-    res.status(200).send('✅ Email verified successfully!');
+    return res.status(200).send('✅ Email verified successfully!');
   } catch (error) {
     console.error('Verification error:', error);
-    res.status(500).send('Server error, please try again later.');
+    return res.status(500).send('Server error, please try again later.');
   }
 }
 
