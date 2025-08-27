@@ -683,37 +683,49 @@
       }
     });
     // ==== PAY COMMAND ====
-    bot.onText(/\/pay (\d+)/, async (msg, match) => {
-      const chatId = msg.chat.id;
-      const eventId = match[1];
+// ==== PAY COMMAND ====
+bot.onText(/\/pay (\d+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const eventId = match[1];
 
-      try {
-        const { rows } = await pool.query('SELECT name, price FROM events WHERE id=$1', [eventId]);
-        if (!rows.length) return bot.sendMessage(chatId, '❌ Event not found');
+  try {
+    const { rows } = await pool.query(
+      'SELECT name, price FROM events WHERE id=$1',
+      [eventId]
+    );
+    if (!rows.length) {
+      return bot.sendMessage(chatId, '❌ Event not found');
+    }
 
-        const event = rows[0];
-        const session = await stripe.checkout.sessions.create({
-          mode: 'payment',
-          payment_method_types: ['card'],
-          line_items: [{
-            price_data: {
-              currency: 'usd',
-              product_data: { name: event.name },
-              unit_amount: Math.round(Number(event.price) * 100),
-            },
-            quantity: 1,
-          }],
-          success_url: `${process.env.FRONTEND_URL}/success?event=${eventId}`,
-          cancel_url: `${process.env.FRONTEND_URL}/cancel?event=${eventId}`,
-          metadata: { eventId, telegramId: chatId },
-        });
+    const event = rows[0];
 
-        bot.sendMessage(chatId, `💳 Complete your payment here: ${session.url}`);
-      } catch (err) {
-        console.error(err);
-        bot.sendMessage(chatId, '⚠️ Payment setup failed, please try again later.');
-      }
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: { name: event.name },
+            unit_amount: Math.round(Number(event.price) * 100),
+          },
+          quantity: 1,
+        },
+      ],
+      success_url: `${process.env.FRONTEND_URL}/success?event=${eventId}`,
+      cancel_url: `${process.env.FRONTEND_URL}/cancel?event=${eventId}`,
+      metadata: {
+        telegram_chat_id: chatId,
+        event_id: eventId,
+      },
     });
+
+    bot.sendMessage(chatId, `💳 Complete your payment here: ${session.url}`);
+  } catch (err) {
+    console.error('Error creating Stripe session:', err);
+    bot.sendMessage(chatId, '⚠️ Payment setup failed, please try again later.');
+  }
+});
 
     // ==== EXPRESS WEBHOOK ====
     app.post(`/webhook/${BOT_TOKEN}`, (req, res) => {
