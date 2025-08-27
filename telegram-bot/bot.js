@@ -553,58 +553,35 @@
     }
 
     // ==== CALLBACK QUERIES ====
-    bot.on('callback_query', async (query) => {
-      const data = query.data;
-      const chatId = query.message.chat.id;
-      const tgId = String(query.from.id);
+// ==== CALLBACK QUERIES ====
+bot.on('callback_query', async (query) => {
+  const data = query.data;
+  const chatId = query.message.chat.id;
+  const tgId = String(query.from.id);
 
-
+  try {
     // --- IGNORE NOOP BUTTONS ---
     if (data.startsWith('noop_')) {
       try { await bot.answerCallbackQuery(query.id); } catch {}
       return;
     }
 
+    // --- CITY SELECTION ---
+    if (data.startsWith('city_')) {
+      const city = data.split('_')[1];
+      await showEvents(chatId, city);
+      return;
+    }
 
-      // --- CITY SELECTION ---
-      if (data.startsWith('city_')) {
-        const city = data.split('_')[1];
-        await showEvents(chatId, city);
-        return;
-      }
-
-      // --- TOGGLE FIELDS (Organizer only) ---
-      if (data.startsWith('toggle_')) {
-        const prof = await getUserProfile(tgId);
-        if (prof?.role !== 'organizer') {
-          try {
-            await bot.answerCallbackQuery(query.id, { text: 'Organizer role required', show_alert: true });
-          } catch {}
-          return;
-        }
-
-        const parts = data.split('_'); // ['toggle', regId, 'field', ...]
-        const regId = parseInt(parts[1], 10);
-        const field = parts.slice(2).join('_');
-
-        // Validate field name
-        const allowedFields = ['has_arrived', 'voucher_applied', 'basic_perk_applied', 'advanced_perk_applied'];
-        if (!allowedFields.includes(field)) return;
-
-        // Get current value
-        const currentRes = await pool.query(`SELECT ${field} FROM registrations WHERE id=$1`, [regId]);
-        if (!currentRes.rows.length) return;
-        const current = currentRes.rows[0][field];
-        const newValue = !current;
-
-
-
-    //handle payment
+    // --- PAYMENT HANDLER (FIXED POSITION) ---
     if (data.startsWith('pay_')) {
       const eventId = data.split('_')[1];
       try {
         const { rows } = await pool.query('SELECT name, price FROM events WHERE id=$1', [eventId]);
-        if (!rows.length) return bot.sendMessage(chatId, '❌ Event not found');
+        if (!rows.length) {
+          await bot.answerCallbackQuery(query.id, { text: 'Event not found ❌', show_alert: true });
+          return;
+        }
 
         const event = rows[0];
         const session = await stripe.checkout.sessions.create({
@@ -626,104 +603,86 @@
         await bot.sendMessage(chatId, `💳 Complete your payment here:\n${session.url}`);
         await bot.answerCallbackQuery(query.id);
       } catch (err) {
-        console.error(err);
-        await bot.answerCallbackQuery(query.id, { text: 'Payment setup failed', show_alert: true });
+        console.error('Stripe error:', err);
+        await bot.answerCallbackQuery(query.id, { text: 'Payment setup failed ⚠️', show_alert: true });
       }
       return;
     }
 
-
-
-
-        // Update DB
-        await pool.query(`UPDATE registrations SET ${field}=$1 WHERE id=$2`, [newValue, regId]);
-
-        // Refresh attendee list in-place
-        const eventRes = await pool.query('SELECT event_id FROM registrations WHERE id=$1', [regId]);
-        const eventId = eventRes.rows[0]?.event_id;
-        if (!eventId) return;
-
-        await showAttendees(chatId, eventId, query.message.message_id);
-
-        try { await bot.answerCallbackQuery(query.id); } catch {} // remove loading spinner
+    // --- TOGGLE FIELDS (Organizer only) ---
+    if (data.startsWith('toggle_')) {
+      const prof = await getUserProfile(tgId);
+      if (prof?.role !== 'organizer') {
+        try {
+          await bot.answerCallbackQuery(query.id, { text: 'Organizer role required', show_alert: true });
+        } catch {}
         return;
       }
 
-      // --- EVENT DETAILS ---
-      if (data.startsWith('details_')) {
-        const eventId = parseInt(data.split('_')[1], 10);
-        const res = await pool.query('SELECT * FROM events WHERE id=$1', [eventId]);
-        const event = res.rows[0];
-        if (!event) return bot.sendMessage(chatId, '⚠️ Event not found.');
-        const dateStr = new Date(event.datetime).toLocaleString();
-        const text = `📌 Event: ${event.name}\nCity: ${event.city}\nDate/Time: ${dateStr}\nMin/Max attendees: ${event.min_attendees}/${event.max_attendees}\nConfirmed: ${event.is_confirmed ? '✅' : '⌛'}\nDescription: ${event.description || 'N/A'}\nVenue: ${event.venue || 'N/A'}\nBasic perk: ${event.basic_perk || 'N/A'}\nAdvanced perk: ${event.advanced_perk || 'N/A'}`;
-        await bot.sendMessage(chatId, text);
-        return;
-      }
+      const parts = data.split('_');
+      const regId = parseInt(parts[1], 10);
+      const field = parts.slice(2).join('_');
 
-      // --- REGISTER ---
-      if (data.startsWith('register_')) {
-        const eventId = parseInt(data.split('_')[1], 10);
-        const profile = await getUserProfile(tgId);
-        const res = await registerUser(eventId, tgId, profile?.telegram_username || '', profile?.email, profile?.wallet_address);
-        await bot.sendMessage(chatId, res.statusMsg);
-        return;
-      }
+      const allowedFields = ['has_arrived', 'voucher_applied', 'basic_perk_applied', 'advanced_perk_applied'];
+      if (!allowedFields.includes(field)) return;
 
-      // --- SHOW ATTENDEES (Organizer only) ---
-      if (data.startsWith('showattendees_')) {
-        const prof = await getUserProfile(tgId);
-        if (prof?.role !== 'organizer') {
-          try { await bot.answerCallbackQuery(query.id, { text: 'Organizer role required', show_alert: true }); } catch {}
-          return;
-        }
-        const eventId = parseInt(data.split('_')[1], 10);
-        await showAttendees(chatId, eventId);
-        return;
-      }
-    });
-    // ==== PAY COMMAND ====
-// ==== PAY COMMAND ====
-bot.onText(/\/pay (\d+)/, async (msg, match) => {
-  const chatId = msg.chat.id;
-  const eventId = match[1];
+      const currentRes = await pool.query(`SELECT ${field} FROM registrations WHERE id=$1`, [regId]);
+      if (!currentRes.rows.length) return;
+      const current = currentRes.rows[0][field];
+      const newValue = !current;
 
-  try {
-    const { rows } = await pool.query(
-      'SELECT name, price FROM events WHERE id=$1',
-      [eventId]
-    );
-    if (!rows.length) {
-      return bot.sendMessage(chatId, '❌ Event not found');
+      await pool.query(`UPDATE registrations SET ${field}=$1 WHERE id=$2`, [newValue, regId]);
+
+      const eventRes = await pool.query('SELECT event_id FROM registrations WHERE id=$1', [regId]);
+      const eventId = eventRes.rows[0]?.event_id;
+      if (!eventId) return;
+
+      await showAttendees(chatId, eventId, query.message.message_id);
+
+      try { await bot.answerCallbackQuery(query.id); } catch {}
+      return;
     }
 
-    const event = rows[0];
+    // --- EVENT DETAILS ---
+    if (data.startsWith('details_')) {
+      const eventId = parseInt(data.split('_')[1], 10);
+      const res = await pool.query('SELECT * FROM events WHERE id=$1', [eventId]);
+      const event = res.rows[0];
+      if (!event) {
+        await bot.sendMessage(chatId, '⚠️ Event not found.');
+        return;
+      }
+      const dateStr = new Date(event.datetime).toLocaleString();
+      const text = `📌 Event: ${event.name}\nCity: ${event.city}\nDate/Time: ${dateStr}\nMin/Max attendees: ${event.min_attendees}/${event.max_attendees}\nConfirmed: ${event.is_confirmed ? '✅' : '⌛'}\nDescription: ${event.description || 'N/A'}\nVenue: ${event.venue || 'N/A'}\nBasic perk: ${event.basic_perk || 'N/A'}\nAdvanced perk: ${event.advanced_perk || 'N/A'}`;
+      await bot.sendMessage(chatId, text);
+      return;
+    }
 
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: { name: event.name },
-            unit_amount: Math.round(Number(event.price) * 100),
-          },
-          quantity: 1,
-        },
-      ],
-      success_url: `${process.env.FRONTEND_URL}/success?event=${eventId}`,
-      cancel_url: `${process.env.FRONTEND_URL}/cancel?event=${eventId}`,
-      metadata: {
-        telegram_chat_id: chatId,
-        event_id: eventId,
-      },
-    });
+    // --- REGISTER ---
+    if (data.startsWith('register_')) {
+      const eventId = parseInt(data.split('_')[1], 10);
+      const profile = await getUserProfile(tgId);
+      const res = await registerUser(eventId, tgId, profile?.telegram_username || '', profile?.email, profile?.wallet_address);
+      await bot.sendMessage(chatId, res.statusMsg);
+      return;
+    }
 
-    bot.sendMessage(chatId, `💳 Complete your payment here: ${session.url}`);
-  } catch (err) {
-    console.error('Error creating Stripe session:', err);
-    bot.sendMessage(chatId, '⚠️ Payment setup failed, please try again later.');
+    // --- SHOW ATTENDEES (Organizer only) ---
+    if (data.startsWith('showattendees_')) {
+      const prof = await getUserProfile(tgId);
+      if (prof?.role !== 'organizer') {
+        try {
+          await bot.answerCallbackQuery(query.id, { text: 'Organizer role required', show_alert: true });
+        } catch {}
+        return;
+      }
+      const eventId = parseInt(data.split('_')[1], 10);
+      await showAttendees(chatId, eventId);
+      return;
+    }
+  } catch (error) {
+    console.error('Callback query error:', error);
+    await bot.answerCallbackQuery(query.id, { text: '⚠️ Something went wrong', show_alert: true });
   }
 });
 
