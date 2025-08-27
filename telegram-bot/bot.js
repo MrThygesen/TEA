@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import express from 'express';
 import { runMigrations } from './migrations.js';
 import { sendEmailVerification, sendEventConfirmed, sendPaymentConfirmed, isLikelyEmail } from './email-optin.js';
+import Stripe from 'stripe';
 
 
 dotenv.config();
@@ -13,6 +14,7 @@ const { Pool } = pkg;
 
 // ==== CONFIG ====
 //sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 if (!BOT_TOKEN) { console.error('❌ TELEGRAM_BOT_TOKEN missing'); process.exit(1); }
 if (!process.env.DATABASE_URL) { console.error('❌ DATABASE_URL missing'); process.exit(1); }
@@ -634,42 +636,35 @@ if (data.startsWith('noop_')) {
   }
 });
 // ==== PAY COMMAND ====
-bot.onText(/\/pay_(\d+)/, async (msg, match) => {
+bot.onText(/\/pay (\d+)/, async (msg, match) => {
   const chatId = msg.chat.id;
-  const tgId = String(msg.from.id);
-  const eventId = parseInt(match[1], 10);
+  const eventId = match[1];
 
   try {
-    const reg = await pool.query(
-      `SELECT id, has_paid FROM registrations WHERE event_id=$1 AND telegram_user_id=$2`,
-      [eventId, tgId]
-    );
+    const { rows } = await pool.query('SELECT name, price FROM events WHERE id=$1', [eventId]);
+    if (!rows.length) return bot.sendMessage(chatId, '❌ Event not found');
 
-    if (!reg.rows.length) {
-      return bot.sendMessage(chatId, '⚠️ You are not registered for this event.');
-    }
+    const event = rows[0];
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          product_data: { name: event.name },
+          unit_amount: Math.round(Number(event.price) * 100),
+        },
+        quantity: 1,
+      }],
+      success_url: `${process.env.FRONTEND_URL}/success?event=${eventId}`,
+      cancel_url: `${process.env.FRONTEND_URL}/cancel?event=${eventId}`,
+      metadata: { eventId, telegramId: chatId },
+    });
 
-    if (reg.rows[0].has_paid) {
-      return bot.sendMessage(chatId, '💳 Payment is already marked for this event.');
-    }
-
-    // Mark payment as completed
-    await pool.query(
-      `UPDATE registrations SET has_paid=TRUE, paid_at=NOW() WHERE event_id=$1 AND telegram_user_id=$2`,
-      [eventId, tgId]
-    );
-
-    // Fetch event name for email
-    const eventRes = await pool.query('SELECT name FROM events WHERE id=$1', [eventId]);
-    const event = eventRes.rows[0];
-
-    // Send payment confirmation email
-    if (event) await sendPaymentConfirmed(eventId, event.name, tgId);
-
-    bot.sendMessage(chatId, `✅ Payment recorded for event "${event.name}". Thank you!`);
+    bot.sendMessage(chatId, `💳 Complete your payment here: ${session.url}`);
   } catch (err) {
-    console.error('❌ /pay error:', err);
-    bot.sendMessage(chatId, '❌ Failed to update payment. Try again later.');
+    console.error(err);
+    bot.sendMessage(chatId, '⚠️ Payment setup failed, please try again later.');
   }
 });
 
