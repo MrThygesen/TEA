@@ -46,6 +46,7 @@ export async function sendEmailVerification(tgId, email) {
 
 const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?tgId=${tgId}&token=${token}`;
 
+//const verificationUrl = `tea-liart.vercel.app//verify-email?tgId=${tgId}&token=${token}`;
 
 
   const msg = {
