@@ -301,19 +301,28 @@ bot.onText(/\/myevents/, async (msg) => {
     return bot.sendMessage(msg.chat.id, '📭 You are not registered for any events.');
   }
 
-  for (const e of events) {
-    const dateStr = new Date(e.datetime).toLocaleString();
-    const paymentStatus = e.has_paid ? '✅ Paid' : '💳 Not Paid';
-    const text =
-      `📅 ${e.name} — ${dateStr} — ${e.price ? `${e.price} USD` : 'Free'}\n` +
-      `Status: ${paymentStatus}\n` +
-      `/event_detail_${e.id} to see details\n` +
-      `/deregister_${e.id} to leave the event` +
-      (e.price && !e.has_paid ? `\n/pay_${e.id} to complete payment` : '');
-      
-    await bot.sendMessage(msg.chat.id, text);
+ for (const e of events) {
+  const dateStr = new Date(e.datetime).toLocaleString();
+  const text = `📅 ${e.name} — ${dateStr} — ${e.price ? `${e.price} USD` : 'Free'}\n` +
+               `Status: ${e.has_paid ? '✅ Paid' : '💳 Not Paid'}`;
+  
+  const buttons = [
+    [{ text: '📄 Details', callback_data: `details_${e.id}` }],
+    [{ text: '❌ Deregister', callback_data: `deregister_${e.id}` }]
+  ];
+  
+  if (e.price && !e.has_paid) {
+    buttons.push([{ text: '💳 Pay Now', callback_data: `pay_${e.id}` }]);
   }
-});
+
+  await bot.sendMessage(msg.chat.id, text, {
+    reply_markup: { inline_keyboard: buttons }
+  });
+}
+
+
+
+
 
 // ==== DEREGISTER ====
 bot.onText(/\/deregister_(\d+)/, async (msg, match) => {
@@ -587,6 +596,44 @@ if (data.startsWith('noop_')) {
     if (!currentRes.rows.length) return;
     const current = currentRes.rows[0][field];
     const newValue = !current;
+
+
+
+//handle payment
+if (data.startsWith('pay_')) {
+  const eventId = data.split('_')[1];
+  try {
+    const { rows } = await pool.query('SELECT name, price FROM events WHERE id=$1', [eventId]);
+    if (!rows.length) return bot.sendMessage(chatId, '❌ Event not found');
+
+    const event = rows[0];
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          product_data: { name: event.name },
+          unit_amount: Math.round(Number(event.price) * 100),
+        },
+        quantity: 1,
+      }],
+      success_url: `${process.env.FRONTEND_URL}/success?event=${eventId}`,
+      cancel_url: `${process.env.FRONTEND_URL}/cancel?event=${eventId}`,
+      metadata: { eventId, telegramId: chatId },
+    });
+
+    await bot.sendMessage(chatId, `💳 Complete your payment here:\n${session.url}`);
+    await bot.answerCallbackQuery(query.id);
+  } catch (err) {
+    console.error(err);
+    await bot.answerCallbackQuery(query.id, { text: 'Payment setup failed', show_alert: true });
+  }
+  return;
+}
+
+
+
 
     // Update DB
     await pool.query(`UPDATE registrations SET ${field}=$1 WHERE id=$2`, [newValue, regId]);
