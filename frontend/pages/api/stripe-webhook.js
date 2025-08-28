@@ -1,3 +1,4 @@
+// pages/api/stripe-webhook.js
 import Stripe from 'stripe';
 import { buffer } from 'micro';
 import { pool } from '../../lib/postgres.js';
@@ -12,33 +13,56 @@ export default async function handler(req, res) {
   const sig = req.headers['stripe-signature'];
   const buf = await buffer(req);
 
-  try {
-    const event = stripe.webhooks.constructEvent(buf, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  let event;
 
+  try {
+    event = stripe.webhooks.constructEvent(buf, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.error('❌ Webhook signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  try {
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
 
       const telegramUserId = session.metadata?.telegram_user_id;
       const eventId = session.metadata?.event_id;
+      const email = session.metadata?.email || null;
 
-      if (telegramUserId && eventId) {
-        await pool.query(
-          `UPDATE registrations 
-           SET has_paid = TRUE, paid_at = NOW()
-           WHERE event_id = $1 AND telegram_user_id = $2`,
-          [eventId, telegramUserId]
-        );
+      if (!telegramUserId || !eventId) {
+        console.warn('⚠ Missing metadata:', session.id);
+        return res.status(400).send('Missing metadata');
+      }
 
-        console.log(`✅ Payment confirmed for event ${eventId}, user ${telegramUserId}`);
+      // Ensure registration exists (in case user did not pre-register)
+      await pool.query(
+        `INSERT INTO registrations (event_id, telegram_user_id, email)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (event_id, telegram_user_id) DO NOTHING`,
+        [eventId, telegramUserId, email]
+      );
+
+      // Update payment status
+      const result = await pool.query(
+        `UPDATE registrations
+         SET has_paid = TRUE, paid_at = NOW()
+         WHERE event_id = $1 AND telegram_user_id = $2
+         RETURNING *`,
+        [eventId, telegramUserId]
+      );
+
+      if (result.rowCount > 0) {
+        console.log(`✅ Payment recorded for event ${eventId}, user ${telegramUserId}`);
       } else {
-        console.warn('⚠ Missing metadata for session:', session.id);
+        console.warn(`⚠ Could not update payment for event ${eventId}, user ${telegramUserId}`);
       }
     }
 
     res.status(200).send('Webhook received');
   } catch (err) {
-    console.error('Webhook error:', err);
-    res.status(400).send(`Webhook Error: ${err.message}`);
+    console.error('❌ Error processing webhook:', err);
+    res.status(500).send('Internal Server Error');
   }
 }
 
