@@ -28,12 +28,13 @@ export default async function handler(req, res) {
     // Insert event with group_id = id in a single transaction
     const result = await pool.query(`
 INSERT INTO events
-  (id, group_id, name, city, datetime, min_attendees, max_attendees, is_confirmed,
+  (name, city, datetime, min_attendees, max_attendees, is_confirmed,
    description, details, venue, venue_type, basic_perk, advanced_perk,
    tag1, tag2, tag3, price, image_url)
 VALUES
-  (DEFAULT, DEFAULT, $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
-RETURNING *
+  ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+RETURNING id
+
 
     `, [
   name, city, new Date(datetime).toISOString(),
