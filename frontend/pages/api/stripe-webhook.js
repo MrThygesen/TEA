@@ -14,7 +14,6 @@ export default async function handler(req, res) {
   const buf = await buffer(req);
 
   let event;
-
   try {
     event = stripe.webhooks.constructEvent(buf, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
@@ -35,7 +34,7 @@ export default async function handler(req, res) {
         return res.status(400).send('Missing metadata');
       }
 
-      // Ensure registration exists (in case user did not pre-register)
+      // Ensure registration exists
       await pool.query(
         `INSERT INTO registrations (event_id, telegram_user_id, email)
          VALUES ($1, $2, $3)
