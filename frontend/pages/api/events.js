@@ -1,3 +1,4 @@
+//pages/api/events.js
 import { pool } from '../../lib/postgres.js'
 
 export default async function handler(req, res) {
@@ -27,12 +28,13 @@ export default async function handler(req, res) {
     // Insert event with group_id = id in a single transaction
     const result = await pool.query(`
 INSERT INTO events
-  (name, city, datetime, min_attendees, max_attendees, is_confirmed,
+  (id, group_id, name, city, datetime, min_attendees, max_attendees, is_confirmed,
    description, details, venue, venue_type, basic_perk, advanced_perk,
-   tag1, tag2, tag3, price, image_url, group_id)
+   tag1, tag2, tag3, price, image_url)
 VALUES
-  ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,DEFAULT)
-RETURNING id
+  (DEFAULT, DEFAULT, $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+RETURNING *
+
     `, [
   name, city, new Date(datetime).toISOString(),
   min_attendees ?? 1, max_attendees ?? 40, is_confirmed ?? false,
