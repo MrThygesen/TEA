@@ -1,4 +1,3 @@
-// pages/api/stripe-webhook.js
 import Stripe from 'stripe';
 import { buffer } from 'micro';
 import { pool } from '../../lib/postgres.js';
@@ -25,12 +24,11 @@ export default async function handler(req, res) {
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
 
-      const telegramUserId = session.metadata?.telegram_user_id;
-      const eventId = session.metadata?.event_id;
-      const email = session.metadata?.email || null;
+      const telegramUserId = session.metadata?.telegramId; // <--- match Stripe metadata
+      const eventId = session.metadata?.eventId;           // <--- match Stripe metadata
 
       if (!telegramUserId || !eventId) {
-        console.warn('⚠ Missing metadata:', session.id);
+        console.warn('⚠ Missing metadata:', session.id, session.metadata);
         return res.status(400).send('Missing metadata');
       }
 
@@ -39,7 +37,7 @@ export default async function handler(req, res) {
         `INSERT INTO registrations (event_id, telegram_user_id, email)
          VALUES ($1, $2, $3)
          ON CONFLICT (event_id, telegram_user_id) DO NOTHING`,
-        [eventId, telegramUserId, email]
+        [eventId, telegramUserId, session.customer_details?.email || null]
       );
 
       // Update payment status
