@@ -1,3 +1,5 @@
+//create-checkout-session.js
+
 import Stripe from 'stripe';
 import { pool } from '../../lib/postgres';
 
@@ -14,22 +16,29 @@ export default async function handler(req, res) {
 
     const event = rows[0];
 
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      customer_email: email,
-      payment_method_types: ['card'],
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          product_data: { name: event.name },
-          unit_amount: Math.round(Number(event.price) * 100), // convert to cents
-        },
-        quantity: 1,
-      }],
-      success_url: `${process.env.FRONTEND_URL}/success?event=${eventId}`,
-      cancel_url: `${process.env.FRONTEND_URL}/cancel?event=${eventId}`,
-      metadata: { eventId, email },
-    });
+const { eventId, email, telegramUserId } = req.body; // <-- include from client request
+
+const session = await stripe.checkout.sessions.create({
+  mode: 'payment',
+  customer_email: email,
+  payment_method_types: ['card'],
+  line_items: [{
+    price_data: {
+      currency: 'usd',
+      product_data: { name: event.name },
+      unit_amount: Math.round(Number(event.price) * 100),
+    },
+    quantity: 1,
+  }],
+  success_url: `${process.env.FRONTEND_URL}/success?event=${eventId}`,
+  cancel_url: `${process.env.FRONTEND_URL}/cancel?event=${eventId}`,
+  metadata: {
+    event_id: eventId,             // fix naming to match webhook
+    telegram_user_id: telegramUserId, // pass the right identifier
+    email
+  },
+});
+
 
     res.status(200).json({ id: session.id, url: session.url });
   } catch (err) {
