@@ -228,13 +228,17 @@ export default function Home() {
           </div>
 
           <img src="/tea.png" alt="TEA Project Logo" className="w-24 h-24 object-contain" />
-          <h1 className="text-4xl font-bold text-blue-400 text-left">WELCOME TO THE TEA NETWORK</h1>
+          <h1 className="text-4xl font-bold text-blue-400 text-left">WELCOME TO THE EDGE NETWORK</h1>
           <p className="text-left text-gray-400 mb-6">
-            We’re the club for social and/or business meetings. The TEA Network operates in
-            the cafe, bar, restaurant domain. Meet connections, enjoy perks, and expand your
-            network. The TEA NETWORK is Telegram centric for booking and guestlist management.
+
+We organize networking events in cafes, bars, and restaurants for various business and after-work events. 
+You will get to meet and expand your business and social network. 
           </p>
           <p>
+
+
+
+
             <a href="https://youtu.be/5QSHQ26JMm8" className="text-blue-400 hover:underline" target="_blank">
               Learn more about the TEA network (Video)
             </a>
