@@ -267,16 +267,6 @@ export default function Home() {
           )}
         </section>
 
-        {/* ---------------- Telegram Info ---------------- */}
-        <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg">
-          <h2 className="text-2xl font-semibold mb-4 text-blue-400 text-center">
-            We use our own Telegram-bot for onboarding to each event.
-          </h2>
-          <p className="text-left text-gray-400 mb-6">
-            Register that you are joining the specific event through our Telegram-Bot and wait
-            for the bot to confirm the event.
-          </p>
-        </section>
 
 {/* ---------------- Event Flow Explanation ---------------- */}
 <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg">
@@ -286,21 +276,29 @@ export default function Home() {
     <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow">
       <h3 className="text-lg font-bold mb-2 text-yellow-400">1. Prebook</h3>
       <p className="text-gray-300 text-sm">
-        Tell us you're coming for a social or business meetup. Ticket booking opens once enough interest is confirmed.
-      </p>
+        Tell us you're coming for a social or business meetup. Ticket booking opens once enough interest is confirmed. 
+   </p>
+
+      <p className="text-gray-300 text-sm">  Prebook and give us a heads up through your account here, or use our telegram message bot. </p>
+
+
+
     </div>
     {/* Box 2 */}
     <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow">
       <h3 className="text-lg font-bold mb-2 text-green-400">2. Book</h3>
       <p className="text-gray-300 text-sm">
-        Ticket booking is enabled once a minimum number of guests have signed up. Secure your spot.
-      </p>
+       Tickets are released when a minimum number of guests have signed up. Its a strict requirement to buy the ticket in advance. Secure your spot.
+      </p> 
+  <p className="text-gray-300 text-sm"> You book and pay for your ticket here or through our telegram message bot.
+
+      </p> 
     </div>
     {/* Box 3 */}
     <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow">
       <h3 className="text-lg font-bold mb-2 text-blue-400">3. Show Up</h3>
       <p className="text-gray-300 text-sm">
-        Get registered on the guestlist, meet new people, place your order, and enjoy a free perk served on the side.
+        Get registered on the digital guestlist, meet new people, place your order, and enjoy a free perk served on the side.
       </p>
     </div>
   </div>
