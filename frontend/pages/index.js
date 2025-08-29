@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useAccount } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
-import AdminSBTManager from '../components/AdminSBTManager'
 import WebAccessSBT from '../components/WebAccessSBT'
 
 /* ---------------------------
@@ -111,17 +110,11 @@ function DynamicEventCard({ event }) {
    Main Home Component
 ---------------------------- */
 export default function Home() {
-  const { isConnected, address } = useAccount()
+  const { isConnected } = useAccount()
   const [events, setEvents] = useState([])
   const [selectedTag, setSelectedTag] = useState('')
   const [selectedCity, setSelectedCity] = useState('')
   const [selectedVenueType, setSelectedVenueType] = useState('')
-  const [showEmailModal, setShowEmailModal] = useState(false)
-  const [email, setEmail] = useState('')
-  const [emailStatus, setEmailStatus] = useState('')
-  const [isLoadingEmail, setIsLoadingEmail] = useState(false)
-  const [showAmoyInfo, setShowAmoyInfo] = useState(false)
-  const [showFullRoadmap, setShowFullRoadmap] = useState(false)
 
   // --- Load events ---
   useEffect(() => {
@@ -130,43 +123,6 @@ export default function Home() {
       .then(setEvents)
       .catch(() => setEvents([]))
   }, [])
-
-  // --- Load email if already saved ---
-  useEffect(() => {
-    fetch('/api/email-optin')
-      .then(res => res.json())
-      .then(data => { if (data.email) setEmail(data.email) })
-      .catch(() => {})
-  }, [])
-
-  const handleSaveEmail = async () => {
-    setIsLoadingEmail(true)
-    try {
-      const res = await fetch('/api/email-optin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      })
-      setEmailStatus(res.ok ? 'Saved' : 'Error saving email')
-    } catch {
-      setEmailStatus('Error saving email')
-    }
-    setIsLoadingEmail(false)
-  }
-
-  const handleDeleteEmail = async () => {
-    setIsLoadingEmail(true)
-    try {
-      const res = await fetch(`/api/email-optin`, { method: 'DELETE' })
-      if (res.ok) {
-        setEmail('')
-        setEmailStatus('Deleted')
-      }
-    } catch {
-      setEmailStatus('Error deleting email')
-    }
-    setIsLoadingEmail(false)
-  }
 
   const filteredEvents = events.filter((e) => {
     const tagMatch = selectedTag ? [e.tag1, e.tag2, e.tag3].includes(selectedTag) : true
@@ -188,20 +144,12 @@ export default function Home() {
 
           <div className="flex gap-3 items-center">
             <ConnectButton />
-            {email && (
-              <Link
-                href="/account"
-                className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold transition"
-              >
-                My Account
-              </Link>
-            )}
-            <button
-              onClick={() => setShowEmailModal(true)}
+            <Link
+              href="/account"
               className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition"
             >
-              📧 Email Notifications
-            </button>
+              Login / My Account
+            </Link>
           </div>
         </header>
 
@@ -248,45 +196,6 @@ export default function Home() {
             </div>
           )}
         </section>
-
-        {/* Email Modal */}
-        {showEmailModal && (
-          <div
-            className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
-            onClick={() => setShowEmailModal(false)}
-          >
-            <div
-              className="bg-zinc-900 rounded-lg max-w-md w-full p-6"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h2 className="text-xl font-bold mb-4">Email Notifications</h2>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Your email"
-                className="w-full p-2 rounded mb-3 text-black"
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={handleSaveEmail}
-                  disabled={isLoadingEmail}
-                  className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  Save
-                </button>
-                <button
-                  onClick={handleDeleteEmail}
-                  disabled={isLoadingEmail}
-                  className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white"
-                >
-                  Delete
-                </button>
-              </div>
-              {emailStatus && <p className="mt-2 text-sm">{emailStatus}</p>}
-            </div>
-          </div>
-        )}
       </div>
     </main>
   )
