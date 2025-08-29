@@ -268,7 +268,7 @@ export default function Home() {
         </section>
 
 
-{/* ---------------- Event Flow Explanation ---------------- */}
+{/* ---------------- Event Flow Explanation (Concise) ---------------- */}
 <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg">
   <h2 className="text-2xl font-semibold mb-6 text-center text-blue-400">How It Works</h2>
   <div className="grid md:grid-cols-3 gap-6 text-left">
@@ -276,34 +276,33 @@ export default function Home() {
     <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow">
       <h3 className="text-lg font-bold mb-2 text-yellow-400">1. Prebook</h3>
       <p className="text-gray-300 text-sm">
-        Tell us you're coming for a social or business meetup. Ticket booking opens once enough interest is confirmed. 
-   </p>
-
-      <p className="text-gray-300 text-sm">  Prebook and give us a heads up through your account here, or use our telegram message bot. </p>
-
-
-
+        Tell us you’re coming for a social or business meetup. Booking opens once interest is confirmed.
+      </p>
+      <p className="text-gray-300 text-sm">
+        Prebook via your account 💬 or our telegram bot 📬
+      </p>
     </div>
+
     {/* Box 2 */}
     <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow">
       <h3 className="text-lg font-bold mb-2 text-green-400">2. Book</h3>
       <p className="text-gray-300 text-sm">
-       Tickets are released when a minimum number of guests have signed up. Its a strict requirement to buy the ticket in advance. Secure your spot.
-      </p> 
-  <p className="text-gray-300 text-sm"> You book and pay for your ticket here or through our telegram message bot.
-
-      </p> 
+        Tickets are released after a minimum sign‑up. Buy in advance to secure your spot.
+      </p>
+      <p className="text-gray-300 text-sm">
+        Book and pay here or via the telegram bot 📮
+      </p>
     </div>
+
     {/* Box 3 */}
     <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow">
       <h3 className="text-lg font-bold mb-2 text-blue-400">3. Show Up</h3>
       <p className="text-gray-300 text-sm">
-        Get registered on the digital guestlist, meet new people, place your order, and enjoy a free perk served on the side.
+        Check in on the digital guestlist, meet people, place orders, and enjoy a free perk.
       </p>
     </div>
   </div>
 </section>
-
 
         {/* ---------------- Dynamic Event Grid ---------------- */}
         <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg">
