@@ -338,49 +338,18 @@ You will get to meet and expand your business and social network.
           )}
         </section>
 
-        {/* ---------------- Wallet Info / Amoy ---------------- */}
-        <div className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-6 border shadow-lg">
-          <h2 className="text-2xl font-bold mb-4 text-center text-blue-400">Web3 Wallet User</h2>
-          <p className="text-left text-gray-300 mb-4">
-            After the event is confirmed with minimum guests, the web3 user has to claim the
-            deal and collect the Event Access Card, which serves as a ticket to the real-life
-            extended perk at the venue.
-          </p>
-          <div className="text-center">
-            <button
-              onClick={() => setShowAmoyInfo(prev => !prev)}
-              className="text-blue-400 hover:underline text-sm"
-            >
-              {showAmoyInfo ? 'Hide Amoy Network Setup' : '📘 How to add Amoy to your wallet'}
-            </button>
-
-            {showAmoyInfo && (
-              <div className="mt-4 text-sm text-left bg-zinc-800 border border-zinc-600 rounded-lg p-4 max-w-md mx-auto">
-                <p className="mb-2">To add the Amoy network to your wallet, start with Add Custom Network:</p>
-                <ul className="list-disc list-inside text-gray-300 space-y-1">
-                  <li><strong>Network Name:</strong> Polygon Amoy Testnet</li>
-                  <li><strong>New RPC URL:</strong> https://rpc-amoy.polygon.technology/</li>
-                  <li><strong>Chain ID:</strong> 80002</li>
-                  <li><strong>Currency Symbol:</strong> POL</li>
-                  <li><strong>Block Explorer URL:</strong> https://amoy.polygonscan.com/</li>
-                  <li><strong>Polygon Amoy Coins:</strong> contact us to request</li>
-                </ul>
-              </div>
-            )}
-          </div>
-        </div>
-
         {/* ---------------- EDGE Network Info ---------------- */}
         <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg text-center space-y-4">
-          <h2 className="text-3xl font-bold text-blue-400">EDGE NETWORK (EXTENDED INFO):</h2>
+          <h2 className="text-3xl font-bold text-blue-400">EDGE NETWORK </h2>
           <p className="text-left text-gray-300 mb-4">
-            We are a community-driven network designed to unlock real-life perks and expand your network.
+            Edge Network connects the venue partners and guests with maximum benfits for all.
           </p>
           <p className="text-left text-gray-300 mb-4">
-            EDGE NETWORK helps you connect friendships, business, dating — and enjoy discounted drinks. We provide the deal and coordinate between users and partners.
+            EDGE NETWORK helps you connect friendships, business, dating — and enjoy discounted drinks. 
+            We provide the deal and coordinate between guests and partners. Join the EDGE Network and its mission getting people and business together 
           </p>
           <p className="text-left text-gray-300 mb-4">
-            Come alone or bring friends — it’s all open.
+            Everybody is welcome.
           </p>
         </section>
 
