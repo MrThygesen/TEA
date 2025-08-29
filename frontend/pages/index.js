@@ -276,7 +276,7 @@ export default function Home() {
     <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow">
       <h3 className="text-lg font-bold mb-2 text-yellow-400">1. Prebook</h3>
       <p className="text-gray-300 text-sm">
-        Tell us you’re coming for a social or business meetup. Booking opens once interest is confirmed.
+        Tell us you’re coming for a social or business meetup.
       </p>
       <p className="text-gray-300 text-sm">
         Prebook via your account 💬 or our telegram bot 📬
@@ -297,8 +297,8 @@ export default function Home() {
     {/* Box 3 */}
     <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow">
       <h3 className="text-lg font-bold mb-2 text-blue-400">3. Show Up</h3>
-      <p className="text-gray-300 text-sm">
-        Check in on the digital guestlist, meet people, place orders, and enjoy a free perk.
+      <p className="text-gray-300 text-sm"> 
+        Meet the network according to agreed time, get on the digital guestlist, place your standard orders, and enjoy a free perk from the venue.
       </p>
     </div>
   </div>
