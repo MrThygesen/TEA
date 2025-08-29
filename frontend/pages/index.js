@@ -277,10 +277,8 @@ You will get to meet and expand your business and social network.
     <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow">
       <h3 className="text-lg font-bold mb-2 text-yellow-400">1. Prebook</h3>
       <p className="text-gray-300 text-sm">
-   Sign up and show your interest and receive a notification, when the event is confirmed.
-   </p> <p className="text-gray-300 text-sm">  Prebook and give us a heads up through your account here, or use our telegram message bot. </p>
-
-
+   Sign up and show your interest in the event, and receive a notification, when the event is confirmed and open for booking.
+   </p> 
 
     </div>
     {/* Box 2 */}
@@ -288,7 +286,7 @@ You will get to meet and expand your business and social network.
       <h3 className="text-lg font-bold mb-2 text-green-400">2. Book</h3>
       <p className="text-gray-300 text-sm">
 
-        Purchase your ticket for the venue to get your perks. Its a strict requirement to buy the ticket in advance.
+        Purchase your ticket for the venue to meet your network and get your perks. Buy tickets early.
       </p> 
   <p className="text-gray-300 text-sm"> Book here or use the telegram message bot.
 
