@@ -276,7 +276,7 @@ export default function Home() {
     <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow">
       <h3 className="text-lg font-bold mb-2 text-yellow-400">1. Prebook</h3>
       <p className="text-gray-300 text-sm">
-        Tell us you’re coming for a social or business meetup.
+        Tell us you’re coming for a social or business meeting at our venue partner.
       </p>
       <p className="text-gray-300 text-sm">
         Prebook via your account 💬 or our telegram bot 📬
