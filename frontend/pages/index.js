@@ -277,7 +277,8 @@ You will get to meet and expand your business and social network.
     <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow">
       <h3 className="text-lg font-bold mb-2 text-yellow-400">1. Prebook</h3>
       <p className="text-gray-300 text-sm">
-   Sign up and show your interest in the event, and receive a notification, when the event is confirmed and open for booking.
+
+   Sign up for EDGE network- and show your interest in the event. You will receive a notification, when the event is confirmed and open for ticket purchase.
    </p> 
 
     </div>
@@ -287,9 +288,6 @@ You will get to meet and expand your business and social network.
       <p className="text-gray-300 text-sm">
 
         Purchase your ticket for the venue to meet your network and get your perks. Buy tickets early.
-      </p> 
-  <p className="text-gray-300 text-sm"> Book here or use the telegram message bot.
-
       </p> 
     </div>
     {/* Box 3 */}
