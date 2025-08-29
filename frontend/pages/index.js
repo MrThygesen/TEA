@@ -9,6 +9,8 @@ import WebAccessSBT from '../components/WebAccessSBT'
 /* ---------------------------
    Dynamic Event Card Component
 ---------------------------- */
+
+
 function DynamicEventCard({ event }) {
   const [showModal, setShowModal] = useState(false)
   const telegramLink = `https://t.me/TeaIsHereBot?start=${event.id}`
@@ -129,6 +131,7 @@ export default function Home() {
   const [showFullRoadmap, setShowFullRoadmap] = useState(false)
   const [emailFormStatus, setEmailFormStatus] = useState(null)
 
+
   // --- Fetch events ---
   useEffect(() => {
     fetch('/api/dump')
@@ -234,6 +237,10 @@ export default function Home() {
             the cafe, bar, restaurant domain. Meet connections, enjoy perks, and expand your
             network. The TEA NETWORK is Telegram centric for booking and guestlist management.
           </p>
+
+
+
+
           <p>
             <a href="https://youtu.be/5QSHQ26JMm8" className="text-blue-400 hover:underline" target="_blank">
               Learn more about the TEA network (Video)
@@ -242,6 +249,18 @@ export default function Home() {
 
           <div className="flex gap-3 items-center">
             <ConnectButton />
+
+
+
+ {isConnected && (
+    <>
+      <Link
+        href="/account"
+        className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold transition"
+      >
+        My Account
+      </Link>
+
             {isConnected && (
               <button
                 onClick={() => setShowEmailModal(true)}
