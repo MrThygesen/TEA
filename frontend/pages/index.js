@@ -227,20 +227,17 @@ export default function Home() {
             </svg>
           </div>
 
-          <img src="/tea.png" alt="TEA Project Logo" className="w-24 h-24 object-contain" />
+          <img src="/tea.png" alt="EDGE Project Logo" className="w-24 h-24 object-contain" />
           <h1 className="text-4xl font-bold text-blue-400 text-left">WELCOME TO THE EDGE NETWORK</h1>
           <p className="text-left text-gray-400 mb-6">
 
-We organize networking events in cafes, bars, and restaurants for various business and after-work events. 
+We organize networking events in cafes, bars, and restaurants for business and after-work events. 
 You will get to meet and expand your business and social network. 
+
           </p>
           <p>
-
-
-
-
             <a href="https://youtu.be/5QSHQ26JMm8" className="text-blue-400 hover:underline" target="_blank">
-              Learn more about the TEA network (Video)
+              Learn more about the EDGE network (Video)
             </a>
           </p>
 
@@ -280,10 +277,8 @@ You will get to meet and expand your business and social network.
     <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow">
       <h3 className="text-lg font-bold mb-2 text-yellow-400">1. Prebook</h3>
       <p className="text-gray-300 text-sm">
-        Tell us you're coming for a social or business meetup. Ticket booking opens once enough interest is confirmed. 
-   </p>
-
-      <p className="text-gray-300 text-sm">  Prebook and give us a heads up through your account here, or use our telegram message bot. </p>
+   Sign up and show your interest and receive a notification, when the event is confirmed.
+   </p> <p className="text-gray-300 text-sm">  Prebook and give us a heads up through your account here, or use our telegram message bot. </p>
 
 
 
@@ -292,9 +287,10 @@ You will get to meet and expand your business and social network.
     <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow">
       <h3 className="text-lg font-bold mb-2 text-green-400">2. Book</h3>
       <p className="text-gray-300 text-sm">
-       Tickets are released when a minimum number of guests have signed up. Its a strict requirement to buy the ticket in advance. Secure your spot.
+
+        Purchase your ticket for the venue to get your perks. Its a strict requirement to buy the ticket in advance.
       </p> 
-  <p className="text-gray-300 text-sm"> You book and pay for your ticket here or through our telegram message bot.
+  <p className="text-gray-300 text-sm"> Book here or use the telegram message bot.
 
       </p> 
     </div>
@@ -302,7 +298,7 @@ You will get to meet and expand your business and social network.
     <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow">
       <h3 className="text-lg font-bold mb-2 text-blue-400">3. Show Up</h3>
       <p className="text-gray-300 text-sm">
-        Get registered on the digital guestlist, meet new people, place your order, and enjoy a free perk served on the side.
+        Get registered on the digital guestlist, meet new people, place your order, and enjoy the mystery perk served on the side.
       </p>
     </div>
   </div>
@@ -378,14 +374,14 @@ You will get to meet and expand your business and social network.
           </div>
         </div>
 
-        {/* ---------------- TEA Network Info ---------------- */}
+        {/* ---------------- EDGE Network Info ---------------- */}
         <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg text-center space-y-4">
-          <h2 className="text-3xl font-bold text-blue-400">TEA NETWORK (EXTENDED INFO):</h2>
+          <h2 className="text-3xl font-bold text-blue-400">EDGE NETWORK (EXTENDED INFO):</h2>
           <p className="text-left text-gray-300 mb-4">
             We are a community-driven network designed to unlock real-life perks and expand your network.
           </p>
           <p className="text-left text-gray-300 mb-4">
-            TEA NETWORK helps you connect friendships, business, dating — and enjoy discounted drinks. We provide the deal and coordinate between users and partners.
+            EDGE NETWORK helps you connect friendships, business, dating — and enjoy discounted drinks. We provide the deal and coordinate between users and partners.
           </p>
           <p className="text-left text-gray-300 mb-4">
             Come alone or bring friends — it’s all open.
@@ -420,7 +416,7 @@ You will get to meet and expand your business and social network.
         {/* ---------------- Footer ---------------- */}
         <footer className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-6 border shadow-lg text-center">
           <p className="text-sm text-gray-400">
-            © 2025 TEA Network. All rights reserved.
+            © 2025 EDGE Network. All rights reserved.
           </p>
         </footer>
 
