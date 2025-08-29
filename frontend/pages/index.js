@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useAccount } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
-import WebAccessSBT from '../components/WebAccessSBT'
+import AdminSBTManager from '../components/AdminSBTManager'
+//import WebAccessSBT from '../components/WebAccessSBT'
+import LoginModal from '../components/LoginModal' // user login modal
 
 /* ---------------------------
    Dynamic Event Card Component
@@ -81,7 +83,6 @@ function DynamicEventCard({ event }) {
               {new Date(event.datetime).toLocaleString()} @ {event.venue} ({event.venue_type || 'N/A'})
             </p>
             <p className="mb-4">{event.details}</p>
-
             {event.basic_perk && (
               <p className="text-sm text-gray-300">
                 <strong>Basic Perk:</strong> {event.basic_perk}
@@ -92,7 +93,6 @@ function DynamicEventCard({ event }) {
                 <strong>Advanced Perk:</strong> {event.advanced_perk}
               </p>
             )}
-
             <button
               onClick={() => setShowModal(false)}
               className="mt-6 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
@@ -110,19 +110,68 @@ function DynamicEventCard({ event }) {
    Main Home Component
 ---------------------------- */
 export default function Home() {
-  const { isConnected } = useAccount()
+  const { isConnected, address } = useAccount()
+  const isAdmin = address?.toLowerCase() === process.env.NEXT_PUBLIC_ADMIN?.toLowerCase()
+
+  // Event filters
   const [events, setEvents] = useState([])
   const [selectedTag, setSelectedTag] = useState('')
   const [selectedCity, setSelectedCity] = useState('')
   const [selectedVenueType, setSelectedVenueType] = useState('')
 
-  // --- Load events ---
+  // User login state
+  const [showLogin, setShowLogin] = useState(false)
+  const [user, setUser] = useState(null)
+
+  // Email state
+  const [showEmailModal, setShowEmailModal] = useState(false)
+  const [email, setEmail] = useState('')
+  const [emailStatus, setEmailStatus] = useState('')
+  const [isLoadingEmail, setIsLoadingEmail] = useState(false)
+
+  // UI states
+  const [showAmoyInfo, setShowAmoyInfo] = useState(false)
+  const [showFullRoadmap, setShowFullRoadmap] = useState(false)
+
+  // Load events
   useEffect(() => {
     fetch('/api/dump')
-      .then((res) => res.json())
+      .then(res => res.json())
       .then(setEvents)
       .catch(() => setEvents([]))
   }, [])
+
+  // Load email for wallet user
+  useEffect(() => {
+    if (address) {
+      fetch(`/api/email-optin?wallet=${address}`)
+        .then(res => res.json())
+        .then(data => { if (data.email) setEmail(data.email) })
+        .catch(() => {})
+    } else {
+      setEmail('')
+      setEmailStatus('')
+    }
+  }, [address])
+
+  const handleLoginSuccess = (userData) => {
+    setUser(userData)
+  }
+
+  const handleSaveEmail = async () => {
+    setIsLoadingEmail(true)
+    try {
+      const res = await fetch('/api/email-optin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, wallet: address }),
+      })
+      setEmailStatus(res.ok ? 'Saved' : 'Error saving email')
+    } catch {
+      setEmailStatus('Error saving email')
+    }
+    setIsLoadingEmail(false)
+  }
 
   const filteredEvents = events.filter((e) => {
     const tagMatch = selectedTag ? [e.tag1, e.tag2, e.tag3].includes(selectedTag) : true
@@ -134,6 +183,8 @@ export default function Home() {
   return (
     <main className="bg-black text-white min-h-screen flex flex-col items-center py-12 px-4">
       <div className="w-full max-w-3xl space-y-10">
+
+
         {/* HEADER */}
         <header className="relative bg-zinc-900 border-zinc-700 rounded-3xl p-8 flex flex-col items-center space-y-4 border">
           <img src="/tea.png" alt="TEA Project Logo" className="w-24 h-24 object-contain" />
@@ -144,19 +195,90 @@ export default function Home() {
 
           <div className="flex gap-3 items-center">
             <ConnectButton />
-            <Link
-              href="/account"
-              className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition"
-            >
-              Login / My Account
-            </Link>
+            {user ? (
+              <Link
+                href="/account"
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition"
+              >
+                My Account ({user.username})
+              </Link>
+            ) : (
+              <button
+                onClick={() => setShowLogin(true)}
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition"
+              >
+                Login
+              </button>
+            )}
+            {isConnected && (
+              <button
+                onClick={() => setShowEmailModal(true)}
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition"
+              >
+                📧 Email Notifications
+              </button>
+            )}
           </div>
+          {isConnected && (
+            <p className="text-sm break-words text-center max-w-xs font-mono">
+              Connected as: {address}
+            </p>
+          )}
+
+
+
+{/* ---------------- Event Flow Explanation ---------------- */}
+<section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg">
+  <h2 className="text-2xl font-semibold mb-6 text-center text-blue-400">How It Works</h2>
+  <div className="grid md:grid-cols-3 gap-6 text-left">
+    {/* Box 1 */}
+    <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow">
+      <h3 className="text-lg font-bold mb-2 text-yellow-400">1. Prebook</h3>
+      <p className="text-gray-300 text-sm">
+        Tell us you're coming for a social or business meetup. Ticket booking opens once enough interest is confirmed. 
+   </p>
+
+      <p className="text-gray-300 text-sm">  Prebook and give us a heads up through your account here, or use our telegram message bot. </p>
+
+
+
+    </div>
+    {/* Box 2 */}
+    <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow">
+      <h3 className="text-lg font-bold mb-2 text-green-400">2. Book</h3>
+      <p className="text-gray-300 text-sm">
+       Tickets are released when a minimum number of guests have signed up. Its a strict requirement to buy the ticket in advance. Secure your spot.
+      </p> 
+  <p className="text-gray-300 text-sm"> You book and pay for your ticket here or through our telegram message bot.
+
+      </p> 
+    </div>
+    {/* Box 3 */}
+    <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow">
+      <h3 className="text-lg font-bold mb-2 text-blue-400">3. Show Up</h3>
+      <p className="text-gray-300 text-sm">
+        Get registered on the digital guestlist, meet new people, place your order, and enjoy a free perk served on the side.
+      </p>
+    </div>
+  </div>
+</section>
+
+
+
         </header>
+
+        {/* Login Modal */}
+        {showLogin && (
+          <LoginModal
+            onClose={() => setShowLogin(false)}
+            onLoginSuccess={handleLoginSuccess}
+          />
+        )}
 
         {/* SBT Section */}
         <section>
           {isConnected ? (
-            <WebAccessSBT darkMode={true} />
+            isAdmin ? <AdminSBTManager darkMode={true} /> : <WebAccessSBT darkMode={true} />
           ) : (
             <p className="text-center text-gray-400 text-sm">
               Connect your wallet to claim your Event Access Card.
