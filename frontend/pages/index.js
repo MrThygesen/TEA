@@ -247,12 +247,9 @@ export default function Home() {
             </a>
           </p>
 
-          <div className="flex gap-3 items-center">
-            <ConnectButton />
-
-
-
- {isConnected && (
+       <div className="flex gap-3 items-center">
+  <ConnectButton />
+  {isConnected && (
     <>
       <Link
         href="/account"
@@ -260,16 +257,15 @@ export default function Home() {
       >
         My Account
       </Link>
-
-            {isConnected && (
-              <button
-                onClick={() => setShowEmailModal(true)}
-                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition"
-              >
-                📧 Email Notifications
-              </button>
-            )}
-          </div>
+      <button
+        onClick={() => setShowEmailModal(true)}
+        className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition"
+      >
+        📧 Email Notifications
+      </button>
+    </>
+  )}
+</div>
           {isConnected && (
             <p className="text-sm break-words text-center max-w-xs font-mono">
               Connected as: {address}
