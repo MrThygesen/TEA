@@ -566,8 +566,20 @@ function EventCreator() {
       <textarea placeholder="Details" value={event.details} onChange={e => handleChange('details', e.target.value)} className={inputClass('details')} />
       <input type="text" placeholder="Venue" value={event.venue} onChange={e => handleChange('venue', e.target.value)} className={inputClass('venue')} />
     
-<input type="text" placeholder="Venue Type (e.g., restaurant, bar, cafe)" value={event.venue_type} onChange={e => handleChange('venue_type', e.target.value)}
-  className={inputClass('venue_type')} />
+<select
+  value={event.venue_type}
+  onChange={e => handleChange('venue_type', e.target.value)}
+  className={inputClass('venue_type')}
+>
+  <option value="">Select Venue Type</option>
+  <option value="Business">Business</option>
+  <option value="Entrepreneur">Entrepreneur</option>
+  <option value="Concerts">Concerts</option>
+  <option value="Romance">Romance</option>
+  <option value="Social">Social</option>
+</select>
+{errors.venue_type && <p className="text-red-500 text-sm">{errors.venue_type}</p>}
+
   <input type="text" placeholder="Basic Perk" value={event.basic_perk} onChange={e => handleChange('basic_perk', e.target.value)} className={inputClass('basic_perk')} />
       <input type="text" placeholder="Advanced Perk" value={event.advanced_perk} onChange={e => handleChange('advanced_perk', e.target.value)} className={inputClass('advanced_perk')} />
       <input type="text" placeholder="Tag1" value={event.tag1} onChange={e => handleChange('tag1', e.target.value)} className={inputClass('tag1')} />

@@ -229,13 +229,17 @@ export default function Home() {
 
           <img src="/new.png" alt="EDGE Project Logo" className="w-24 h-24 object-contain" />
           <h1 className="text-4xl font-bold text-blue-400 text-left">WELCOME TO THE EDGE NETWORK</h1>
+
           <p className="text-left text-gray-400 mb-6">
+Our network is the spot where people, venues, and opportunities meet.
+Our guests receive curated experiences that blend business with social connections. 
+We are happy to make you happy and prosperous.
+          </p> 
 
-Our network is where people, venues, and opportunities meet.
-You get curated experiences that blend business with social connection.
-
-
-          </p>
+          <p className="text-left text-gray-400 mb-6">
+Register an account here on the web or through Telegram, and get started with signing up for events. 
+We charge a low fee to give you a valuable event experience. 
+         </p> 
           <p>
             <a href="https://youtu.be/5QSHQ26JMm8" className="text-blue-400 hover:underline" target="_blank">
               Learn more about the EDGE network (Video)
@@ -306,14 +310,7 @@ Show your interest in the event and sign up to hear when events are confirmed an
           <h2 className="text-2xl font-semibold mb-4 text-blue-400 text-center">Explore Events</h2>
 
           {/* Filters */}
-          <div className="flex gap-4 mb-6 justify-center">
-            <select className="bg-zinc-800 text-white p-2 rounded" onChange={(e) => setSelectedTag(e.target.value)}>
-              <option value="">All Tags</option>
-              {[...new Set(events.flatMap(e => [e.tag1, e.tag2, e.tag3]).filter(Boolean))].map((tag, i) => (
-                <option key={i} value={tag}>{tag}</option>
-              ))}
-            </select>
-
+          
             <select className="bg-zinc-800 text-white p-2 rounded" onChange={(e) => setSelectedCity(e.target.value)}>
               <option value="">All Cities</option>
               {[...new Set(events.map(e => e.city))].map((city, i) => (
@@ -337,6 +334,20 @@ Show your interest in the event and sign up to hear when events are confirmed an
             </div>
           )}
         </section>
+
+
+<section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg text-center">
+  <h2 className="text-2xl font-semibold mb-4 text-blue-400">Join us on Telegram</h2>
+  <p className="mb-4 text-gray-300"> We are also Telegram, and you can actually use the whole system for booking and tickets on telegram.</p>
+  <button
+    onClick={() => window.open('https://t.me/TeaIsHereBot', '_blank')}
+    className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-semibold transition"
+  >
+    Open Telegram
+  </button>
+</section>
+
+
 
         {/* ---------------- EDGE Network Info ---------------- */}
         <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg text-center space-y-4">
