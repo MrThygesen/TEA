@@ -20,12 +20,13 @@
     if (!process.env.DATABASE_URL) { console.error('❌ DATABASE_URL missing'); process.exit(1); }
 
     const PORT = process.env.PORT || 3000;
-    const PUBLIC_URL = process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL || 'https://example.onrender.com';
+    const PUBLIC_URL = process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL || 'https://edgy-dpnv.onrender.com';
 
     const pool = new Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: { rejectUnauthorized: false },
     });
+
 
     // Run migrations
     await runMigrations();
