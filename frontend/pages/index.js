@@ -231,9 +231,10 @@ export default function Home() {
           <h1 className="text-4xl font-bold text-blue-400 text-left">WELCOME TO THE EDGE NETWORK</h1>
 
           <p className="text-left text-gray-400 mb-6">
-Our network is the spot where people, venues, and opportunities meet.
-Our guests receive curated experiences that blend business with social connections. 
-We are happy to make you happy and prosperous.
+Our network is the spot where people, venues, and opportunities meet. Our guests receive curated experiences that blend business with social connections. We are happy to help you expanding your network and meet new connections in real life. </p>
+
+          <p className="text-left text-gray-400 mb-6">
+Register an account here, and get started with signing up for events. We charge a low fee to give you a valuable event experience with an extra surprise perk on the side. Sign up now and enjoy the fun. We also have a telegram bot to help you.  
           </p> 
 
           <p className="text-left text-gray-400 mb-6">
