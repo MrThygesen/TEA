@@ -346,7 +346,8 @@ Show your interest in the event and sign up to hear when events are confirmed an
         {/* ---------------- EDGE Network Info ---------------- */}
  <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg text-center">
   <h2 className="text-2xl font-semibold mb-4 text-blue-400">Join us on Telegram</h2>
-  <p className="mb-4 text-gray-300">Get instant updates, register for events, and chat with our team on Telegram.</p>
+  <p className="mb-4 text-gray-300">If your life is to short for web, we have built a telegram-bot (APP) where you can register, book, pay and show the coupon at the venue.</p>
+
   <button
     onClick={() => window.open('https://t.me/TeaIsHereBot', '_blank')}
     className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-semibold transition"
