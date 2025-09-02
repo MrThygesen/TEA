@@ -241,7 +241,7 @@ Register an account here on the web or through Telegram, and get started with si
 We charge a low fee to give you a valuable event experience. 
          </p> 
           <p>
-            <a href="https://youtu.be/5QSHQ26JMm8" className="text-blue-400 hover:underline" target="_blank">
+            <a href="https://www.youtube.com/watch?v=FN_sOmPuuec" className="text-blue-400 hover:underline" target="_blank">
               Learn more about the EDGE network (Video)
             </a>
           </p>
@@ -326,7 +326,7 @@ Show your interest in the event and sign up to hear when events are confirmed an
             </select>
 
             <select className="bg-zinc-800 text-white p-2 rounded" onChange={(e) => setSelectedVenueType(e.target.value)}>
-              <option value="">All Venue Types</option>
+              <option value="">Event Types</option>
               {[...new Set(events.map(e => e.venue_type).filter(Boolean))].map((type, i) => (
                 <option key={i} value={type}>{type}</option>
               ))}
