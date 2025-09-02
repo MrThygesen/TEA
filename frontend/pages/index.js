@@ -236,11 +236,7 @@ Our network is the spot where people, venues, and opportunities meet. Our guests
           <p className="text-left text-gray-400 mb-6">
 Register an account here, and get started with signing up for events. We charge a low fee to give you a valuable event experience with an extra surprise perk on the side. Sign up now and enjoy the fun. We also have a telegram bot to help you.  
           </p> 
-
-          <p className="text-left text-gray-400 mb-6">
-Register an account here on the web or through Telegram, and get started with signing up for events. 
-We charge a low fee to give you a valuable event experience. 
-         </p> 
+ 
           <p>
             <a href="https://www.youtube.com/watch?v=FN_sOmPuuec" className="text-blue-400 hover:underline" target="_blank">
               Learn more about the EDGE network (Video)
