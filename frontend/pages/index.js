@@ -447,13 +447,8 @@ Register an account here, and get started with signing up for events. We charge 
 
         {/* ---------------- SBT Section ---------------- */}
         <section>
-          {isAdmin ? (
-            <AdminSBTManager darkMode={true} />
-          ) : (
-            // Keep WebAccessSBT mounted only if you still want users to see SBT info; otherwise hide.
-            // <WebAccessSBT darkMode={true} /> 
-          )}
-        </section>
+  {isAdmin && <AdminSBTManager darkMode={true} />}
+</section>
 
 
 {/* ---------------- Event Flow Explanation ---------------- */}
