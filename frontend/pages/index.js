@@ -227,7 +227,7 @@ export default function Home() {
             </svg>
           </div>
 
-       //   <img src="/new.png" alt="EDGE Project Logo" className="w-24 h-24 object-contain" />
+ {/*         <img src="/new.png" alt="EDGE Project Logo" className="w-24 h-24 object-contain" /> */}
           <h1 className="text-4xl font-bold text-blue-400 text-left">EDGY EVENT PLATFORM</h1>
 
           <p className="text-left text-gray-400 mb-6">
