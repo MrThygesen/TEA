@@ -1,4 +1,5 @@
 // telegram-bot/migrations.js
+
 import { pool } from './lib/postgres.js';
 
 export async function runMigrations() {
@@ -32,7 +33,7 @@ export async function runMigrations() {
       );
     `);
 
-    // Trigger for updated_at
+    // Trigger for updated_at on events
     await pool.query(`
       CREATE OR REPLACE FUNCTION update_updated_at_column()
       RETURNS TRIGGER AS $$
@@ -51,19 +52,20 @@ export async function runMigrations() {
 
     // === USER PROFILES TABLE ===
     await pool.query(`
-     CREATE TABLE IF NOT EXISTS user_profiles (
-  telegram_user_id TEXT PRIMARY KEY,
-  telegram_username TEXT UNIQUE,
-  tier INTEGER DEFAULT 1 CHECK (tier IN (1, 2)),
-  email TEXT,
-  wallet_address TEXT,
-  city TEXT DEFAULT 'Copenhagen',
-  role TEXT DEFAULT 'user' CHECK (role IN ('user','organizer','admin')),
-  group_id INTEGER,
-  password_hash TEXT, -- <-- added here cleanly
-  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
+      CREATE TABLE IF NOT EXISTS user_profiles (
+        id SERIAL PRIMARY KEY,
+        telegram_user_id TEXT UNIQUE,
+        telegram_username TEXT UNIQUE,
+        tier INTEGER DEFAULT 1 CHECK (tier IN (1, 2)),
+        email TEXT UNIQUE,
+        wallet_address TEXT,
+        city TEXT DEFAULT 'Copenhagen',
+        role TEXT DEFAULT 'user' CHECK (role IN ('user','organizer','admin')),
+        group_id INTEGER,
+        password_hash TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
     // === REGISTRATIONS TABLE ===
@@ -71,7 +73,7 @@ export async function runMigrations() {
       CREATE TABLE IF NOT EXISTS registrations (
         id SERIAL PRIMARY KEY,
         event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-        telegram_user_id TEXT NOT NULL REFERENCES user_profiles(telegram_user_id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
         telegram_username TEXT,
         email TEXT,
         wallet_address TEXT,
@@ -85,7 +87,7 @@ export async function runMigrations() {
         validated_at TIMESTAMPTZ,
         has_paid BOOLEAN DEFAULT FALSE,
         paid_at TIMESTAMPTZ,
-        UNIQUE (event_id, telegram_user_id)
+        UNIQUE (event_id, user_id)
       );
     `);
 
@@ -106,7 +108,7 @@ export async function runMigrations() {
     // === USER EMAILS TABLE ===
     await pool.query(`
       CREATE TABLE IF NOT EXISTS user_emails (
-        telegram_user_id TEXT PRIMARY KEY,
+        user_id INTEGER PRIMARY KEY REFERENCES user_profiles(id) ON DELETE CASCADE,
         email TEXT NOT NULL,
         subscribed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
@@ -115,7 +117,7 @@ export async function runMigrations() {
     // === EMAIL VERIFICATION TOKENS TABLE ===
     await pool.query(`
       CREATE TABLE IF NOT EXISTS email_verification_tokens (
-        telegram_user_id TEXT PRIMARY KEY REFERENCES user_profiles(telegram_user_id) ON DELETE CASCADE,
+        user_id INTEGER PRIMARY KEY REFERENCES user_profiles(id) ON DELETE CASCADE,
         email TEXT NOT NULL,
         token TEXT NOT NULL,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
