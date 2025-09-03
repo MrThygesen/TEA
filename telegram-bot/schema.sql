@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   city TEXT DEFAULT 'Copenhagen',
   role TEXT DEFAULT 'user' CHECK (role IN ('user','organizer','admin')),
   group_id INTEGER,
+  password_hash TEXT, -- <-- added here cleanly
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );

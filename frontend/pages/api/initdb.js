@@ -63,18 +63,21 @@ export default async function handler(req, res) {
 
     // === USER PROFILES TABLE ===
     await client.query(`
-      CREATE TABLE IF NOT EXISTS user_profiles (
-        telegram_user_id TEXT PRIMARY KEY,
-        telegram_username TEXT UNIQUE,
-        tier INTEGER DEFAULT 1 CHECK (tier IN (1, 2)),
-        email TEXT,
-        wallet_address TEXT,
-        city TEXT DEFAULT 'Copenhagen',
-        role TEXT DEFAULT 'user' CHECK (role IN ('user','organizer','admin')),
-        group_id INTEGER,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-      );
+CREATE TABLE IF NOT EXISTS user_profiles (
+  telegram_user_id TEXT PRIMARY KEY,
+  telegram_username TEXT UNIQUE,
+  tier INTEGER DEFAULT 1 CHECK (tier IN (1, 2)),
+  email TEXT,
+  wallet_address TEXT,
+  city TEXT DEFAULT 'Copenhagen',
+  role TEXT DEFAULT 'user' CHECK (role IN ('user','organizer','admin')),
+  group_id INTEGER,
+  password_hash TEXT, -- <-- added here cleanly
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+
     `);
 
     // === REGISTRATIONS TABLE ===
@@ -149,4 +152,8 @@ export default async function handler(req, res) {
     client.release();
   }
 }
+
+
+
+
 
