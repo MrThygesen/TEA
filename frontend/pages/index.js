@@ -228,7 +228,7 @@ export default function Home() {
           </div>
 
           <img src="/new.png" alt="EDGE Project Logo" className="w-24 h-24 object-contain" />
-          <h1 className="text-4xl font-bold text-blue-400 text-left">WELCOME TO THE EDGE NETWORK</h1>
+          <h1 className="text-4xl font-bold text-blue-400 text-left">WELCOME TO THE EDGY EVENTS</h1>
 
           <p className="text-left text-gray-400 mb-6">
 Our network is the spot where people, venues, and opportunities meet. Our guests receive curated experiences that blend business with social connections. We are happy to help you expanding your network and meet new connections in real life. </p>
@@ -239,7 +239,7 @@ Register an account here, and get started with signing up for events. We charge 
  
           <p>
             <a href="https://www.youtube.com/watch?v=FN_sOmPuuec" className="text-blue-400 hover:underline" target="_blank">
-              Learn more about the EDGE network (Video)
+              Learn more about the EDGY (Video)
             </a>
           </p>
 
@@ -363,7 +363,7 @@ Show your interest in the event and sign up to hear when events are confirmed an
             <li>Q1 2026: Partner onboarding & growth</li>
             <li>Q2 2026: Loyalty rewards integration</li>
           </ul>
-          <div className="text-center mt-4- Main: “EDGE NETWORK: Where people, venues, and opportunities meet.”
+          <div className="text-center mt-4- Main: “EDGY: Where people, venues, and opportunities meet.”
 - Subhead: “Curated experiences that blend business with social connection.”
 We give your edge in networking, nightlife, and opportunity.">
             <button
