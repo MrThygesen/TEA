@@ -451,7 +451,7 @@ Register an account here, and get started with signing up for events. We charge 
             <AdminSBTManager darkMode={true} />
           ) : (
             // Keep WebAccessSBT mounted only if you still want users to see SBT info; otherwise hide.
-         {/*   <WebAccessSBT darkMode={true} /> */}
+            // <WebAccessSBT darkMode={true} /> 
           )}
         </section>
 
