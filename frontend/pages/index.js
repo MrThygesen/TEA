@@ -279,7 +279,7 @@ Register an account here, and get started with signing up for events. We charge 
     <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow">
       <h3 className="text-lg font-bold mb-2 text-yellow-400">1. Prebook</h3>
       <p className="text-gray-300 text-sm">
-Show your interest in the event and sign up to hear when events are confirmed and open for ticket purchase.
+Show your interest in the event and sign up to hear when events are confirmed and open for coupon purchase.
    </p> 
 
     </div>
@@ -288,7 +288,7 @@ Show your interest in the event and sign up to hear when events are confirmed an
       <h3 className="text-lg font-bold mb-2 text-green-400">2. Book</h3>
       <p className="text-gray-300 text-sm">
 
-        Purchase your ticket for the venue to meet your network and get your perks. Buy tickets early.
+        Purchase your coupon for the venue to meet your network and get your perks. Buy coupons early.
       </p> 
     </div>
     {/* Box 3 */}
