@@ -16,6 +16,7 @@
     "@wagmi/core": "^2.17.3",
     "@walletconnect/ethereum-provider": "^2.18.1",
     "alchemy-sdk": "^2.10.2",
+    "bcrypt": "^6.0.0",
     "ethers": "^6.15.0",
     "lucide-react": "^0.525.0",
     "micro": "^10.0.1",
