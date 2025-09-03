@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useAccount } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import AdminSBTManager from '../components/AdminSBTManager'
-//import WebAccessSBT from '../components/WebAccessSBT'
+import WebAccessSBT from '../components/WebAccessSBT'
 
 /* ---------------------------
    Helpers: Auth persistence
