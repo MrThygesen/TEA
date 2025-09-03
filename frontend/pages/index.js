@@ -228,7 +228,7 @@ export default function Home() {
           </div>
 
        //   <img src="/new.png" alt="EDGE Project Logo" className="w-24 h-24 object-contain" />
-          <h1 className="text-4xl font-bold text-blue-400 text-left">WELCOME TO EDGY EVENTS</h1>
+          <h1 className="text-4xl font-bold text-blue-400 text-left">EDGY EVENT PLATFORM</h1>
 
           <p className="text-left text-gray-400 mb-6">
 Our event platform and network is the spot where people, venues, and opportunities meet. Our guests receive curated experiences that blend business with social connections. We are happy to help you expanding your network and meet new connections in real life. </p>
@@ -357,11 +357,18 @@ Show your interest in the event and sign up to hear when events are confirmed an
         <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg">
           <h2 className="text-2xl font-semibold mb-4 text-center text-blue-400">Project Roadmap</h2>
           <ul className="list-disc list-inside space-y-2">
-            <li>Q2 2025: Initial blockchain architecture planning and development for SBT.</li>
-            <li>Q3 2025: Telegram registration & testnet launch</li>
-            <li>Q4 2025: Mainnet deployment & audits</li>
-            <li>Q1 2026: Partner onboarding & growth</li>
-            <li>Q2 2026: Loyalty rewards integration</li>
+           
+            <li>Q2 2025: Blockchain and SBT experiments </li>
+            <li>Q2 2025: BOT development </li>
+            <li>Q3 2025: planning of architecture ()Web2)      </li>
+            <li>Q3 2025: Web2 event platform design (Web2)     </li>
+            <li>Q3 2025: Web2 payment integration (Web2)       </li>
+            <li>Q3 2025: Web2 mail integration (Web2)          </li>
+            <li>Q3 2025: Web2 invite integration (Web2)        </li>
+            <li>Q4 2025: Partner onboarding & growth (Web2)    </li> 
+            <li>Q1 2026: Telegram BOT -market expansion (Web2) </li>
+            <li>Q2 2026: Telegram wallet integration (Web3)    </li>
+            <li>Q2 2026: loyalty-reward integration ()Web3)    </li>
           </ul>
           <div className="text-center mt-4- Main: “EDGY EVENTS: Where people, venues, and opportunities meet.”
 - Subhead: “Curated experiences that blend business with social connection.”
