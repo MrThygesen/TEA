@@ -1,22 +1,34 @@
-// pages/api/initdb.js
+// initdb.js
 import pkg from "pg";
-const { Pool } = pkg;
+import bcrypt from "bcrypt";
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
+const { Client } = pkg;
 
-export default async function handler(req, res) {
-  if (req.method !== "GET") {
-    return res.status(405).json({ error: "Method Not Allowed" });
-  }
+async function initDb() {
+  const client = new Client({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }, // adjust for local/dev
+  });
 
-  const client = await pool.connect();
+  await client.connect();
+
   try {
-    console.log("🚀 Initializing database...");
+    console.log("🚀 Resetting database...");
 
-    // === USER PROFILES ===
+    // Drop all tables first
+    await client.query(`
+      DROP TABLE IF EXISTS 
+        email_verification_tokens,
+        registrations,
+        invitations,
+        events,
+        user_emails,
+        user_profiles
+      CASCADE;
+    `);
+    console.log("✅ Old tables dropped");
+
+    // === USER PROFILES TABLE ===
     await client.query(`
       CREATE TABLE IF NOT EXISTS user_profiles (
         id SERIAL PRIMARY KEY,
@@ -48,7 +60,6 @@ export default async function handler(req, res) {
         )
       );
     `);
-
     await client.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_userid
       ON email_verification_tokens(user_id);
@@ -58,7 +69,7 @@ export default async function handler(req, res) {
       ON email_verification_tokens(telegram_user_id);
     `);
 
-    // === EVENTS ===
+    // === EVENTS TABLE ===
     await client.query(`
       CREATE TABLE IF NOT EXISTS events (
         id SERIAL PRIMARY KEY,
@@ -84,13 +95,12 @@ export default async function handler(req, res) {
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `);
-
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_events_city
       ON events(LOWER(city));
     `);
 
-    // === REGISTRATIONS ===
+    // === REGISTRATIONS TABLE ===
     await client.query(`
       CREATE TABLE IF NOT EXISTS registrations (
         id SERIAL PRIMARY KEY,
@@ -113,7 +123,7 @@ export default async function handler(req, res) {
       );
     `);
 
-    // === INVITATIONS ===
+    // === INVITATIONS TABLE ===
     await client.query(`
       CREATE TABLE IF NOT EXISTS invitations (
         id SERIAL PRIMARY KEY,
@@ -127,7 +137,7 @@ export default async function handler(req, res) {
       );
     `);
 
-    // === USER EMAILS ===
+    // === USER EMAILS TABLE ===
     await client.query(`
       CREATE TABLE IF NOT EXISTS user_emails (
         user_id INTEGER PRIMARY KEY REFERENCES user_profiles(id) ON DELETE CASCADE,
@@ -136,13 +146,64 @@ export default async function handler(req, res) {
       );
     `);
 
-    res.status(200).json({ message: "✅ Database initialized successfully" });
+    // === updated_at trigger function ===
+    await client.query(`
+      CREATE OR REPLACE FUNCTION update_updated_at_column()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.updated_at = CURRENT_TIMESTAMP;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE 'plpgsql';
+    `);
+
+    await client.query(`
+      DROP TRIGGER IF EXISTS set_updated_at_user_profiles ON user_profiles;
+      CREATE TRIGGER set_updated_at_user_profiles
+      BEFORE UPDATE ON user_profiles
+      FOR EACH ROW
+      EXECUTE FUNCTION update_updated_at_column();
+    `);
+
+    await client.query(`
+      DROP TRIGGER IF EXISTS set_updated_at_events ON events;
+      CREATE TRIGGER set_updated_at_events
+      BEFORE UPDATE ON events
+      FOR EACH ROW
+      EXECUTE FUNCTION update_updated_at_column();
+    `);
+
+    console.log("✅ updated_at triggers added");
+
+    // === Optional: seed default admin user ===
+    const passwordHash = await bcrypt.hash("admin123", 10);
+    await client.query(
+      `
+      INSERT INTO user_profiles
+        (telegram_user_id, telegram_username, tier, email, wallet_address, city, role, password_hash)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+    `,
+      [
+        "admin_telegram_id",
+        "admin_username",
+        2,
+        "admin@example.com",
+        "0x0000000000000000000000000000000000000000",
+        "Copenhagen",
+        "admin",
+        passwordHash,
+      ]
+    );
+
+    console.log("✅ Default admin user created");
+
     console.log("🎉 Database initialized successfully!");
   } catch (err) {
     console.error("❌ Init DB error:", err);
-    res.status(500).json({ error: err.message });
   } finally {
-    client.release();
+    await client.end();
   }
 }
+
+initDb();
 
