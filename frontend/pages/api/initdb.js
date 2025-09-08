@@ -1,18 +1,19 @@
+// pages/api/initdb.js
 import pkg from "pg";
-const { Pool } = pkg;
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+const { Client } = pkg;
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed. Use POST." });
   }
 
+  const client = new Client({ connectionString: process.env.DATABASE_URL });
+
   try {
-    // Drop all tables (if they exist)
-    await pool.query(`
+    await client.connect();
+
+    // Drop tables
+    await client.query(`
       DROP TABLE IF EXISTS 
         user_emails,
         invitations,
@@ -23,8 +24,8 @@ export default async function handler(req, res) {
       CASCADE;
     `);
 
-    // Create tables inline (copy of your schema.sql)
-    await pool.query(`
+    // Recreate tables
+    await client.query(`
       CREATE TABLE user_profiles (
         id SERIAL PRIMARY KEY,
         telegram_user_id TEXT UNIQUE,
@@ -125,24 +126,14 @@ export default async function handler(req, res) {
         RETURN NEW;
       END;
       $$ LANGUAGE 'plpgsql';
-
-      CREATE TRIGGER trg_update_user_profiles_updated_at
-      BEFORE UPDATE ON user_profiles
-      FOR EACH ROW
-      EXECUTE FUNCTION update_updated_at_column();
-
-      CREATE TRIGGER trg_update_events_updated_at
-      BEFORE UPDATE ON events
-      FOR EACH ROW
-      EXECUTE FUNCTION update_updated_at_column();
     `);
 
-    return res.status(200).json({ message: "Database initialized successfully." });
+    res.status(200).json({ success: true, message: "Database initialized." });
   } catch (err) {
-    console.error("Error initializing database:", err);
-    return res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ success: false, error: err.message });
   } finally {
-    await pool.end();
+    await client.end();
   }
 }
 
