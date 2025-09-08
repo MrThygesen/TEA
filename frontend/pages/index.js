@@ -25,7 +25,7 @@ function clearAuth() {
   try { localStorage.removeItem('edgy_auth_user') } catch (_) {}
 }
 
-/* ---------------------------
+/* ---------------------------½
    Dynamic Event Card Component
 ---------------------------- */
 function DynamicEventCard({ event }) {
@@ -539,64 +539,81 @@ Show your interest in the event and sign up to hear when events are confirmed an
           </section>
         )}
 
-        {/* ---------------- Dynamic Event Grid ---------------- */}
-        <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-semibold text-blue-400 text-center">Explore Events</h2>
-            {/* NEW: view toggle */}
-            <button
-              onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-              className="text-sm px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600"
-            >
-              {viewMode === 'grid' ? 'List view' : 'Grid view'}
-            </button>
-          </div>
+ {/* ---------------- Dynamic Event Grid ---------------- */}
+<section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg">
+  <div className="flex items-center justify-between mb-4">
+    <h2 className="text-2xl font-semibold text-blue-400 text-center">Explore Events</h2>
+    {/* View toggle */}
+    <button
+      onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+      className="text-sm px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600"
+    >
+      {viewMode === 'grid' ? 'List view' : 'Grid view'}
+    </button>
+  </div>
 
-          {/* Filters */}
-          <div className="flex gap-4 mb-6 justify-center">
-         {/*   <select className="bg-zinc-800 text-white p-2 rounded" onChange={(e) => setSelectedTag(e.target.value)}>
-              <option value="">All Tags</option>
-              {[...new Set(events.flatMap(e => [e.tag1, e.tag2, e.tag3]).filter(Boolean))].map((tag, i) => (
-                <option key={i} value={tag}>{tag}</option>
-              ))}
-            </select> */}
+  {/* Filters */}
+  <div className="flex gap-4 mb-6 justify-center">
+    {/* City Filter */}
+    <select
+      className="bg-zinc-800 text-white p-2 rounded"
+      onChange={(e) => setSelectedCity(e.target.value)}
+      value={selectedCity}
+    >
+      <option value="">All Cities</option>
+      {[...new Set((events || []).map(e => e.city).filter(Boolean))].map((city, i) => (
+        <option key={i} value={city}>{city}</option>
+      ))}
+    </select>
 
-            <select className="bg-zinc-800 text-white p-2 rounded" onChange={(e) => setSelectedCity(e.target.value)}>
-              <option value="">All Cities</option>
-              {[...new Set(events.map(e => e.city))].map((city, i) => (
-                <option key={i} value={city}>{city}</option>
-              ))}
-            </select>
+    {/* Venue Type Filter */}
+    <select
+      className="bg-zinc-800 text-white p-2 rounded"
+      onChange={(e) => setSelectedVenueType(e.target.value)}
+      value={selectedVenueType}
+    >
+      <option value="">Event Types</option>
+      {[...new Set((events || []).map(e => e.venue_type).filter(Boolean))].map((type, i) => (
+        <option key={i} value={type}>{type}</option>
+      ))}
+    </select>
+  </div>
 
-            <select className="bg-zinc-800 text-white p-2 rounded" onChange={(e) => setSelectedVenueType(e.target.value)}>
-              <option value="">Event Types</option>
-              {[...new Set(events.map(e => e.venue_type).filter(Boolean))].map((type, i) => (
-                <option key={i} value={type}>{type}</option>
-              ))}
-            </select>
-          </div>
+  {/* Filtered Events */}
+  {((events || []).filter((e) => {
+    const cityMatch = selectedCity ? e.city === selectedCity : true;
+    const venueMatch = selectedVenueType ? e.venue_type === selectedVenueType : true;
+    return cityMatch && venueMatch;
+  })).length === 0 ? (
+    <p className="text-center text-gray-400">No events match your filter.</p>
+  ) : viewMode === 'grid' ? (
+    <div className="grid md:grid-cols-3 gap-6">
+      {((events || []).filter((e) => {
+        const cityMatch = selectedCity ? e.city === selectedCity : true;
+        const venueMatch = selectedVenueType ? e.venue_type === selectedVenueType : true;
+        return cityMatch && venueMatch;
+      })).map(event => <DynamicEventCard key={event.id} event={event} />)}
+    </div>
+  ) : (
+    <div className="border border-zinc-700 rounded-lg overflow-hidden">
+      <div className="grid grid-cols-5 gap-2 items-center py-2 px-3 bg-zinc-800 text-xs uppercase tracking-wide text-gray-400">
+        <span>Type</span>
+        <span>Date</span>
+        <span>Name</span>
+        <span>City</span>
+        <span className="text-right">Preview</span>
+      </div>
+      {((events || []).filter((e) => {
+        const cityMatch = selectedCity ? e.city === selectedCity : true;
+        const venueMatch = selectedVenueType ? e.venue_type === selectedVenueType : true;
+        return cityMatch && venueMatch;
+      })).map(event => (
+        <EventListRow key={event.id} event={event} onPreview={() => alert(`Preview: ${event.name}`)} />
+      ))}
+    </div>
+  )}
+</section>
 
-          {filteredEvents.length === 0 ? (
-            <p className="text-center text-gray-400">No events match your filter.</p>
-          ) : viewMode === 'grid' ? (
-            <div className="grid md:grid-cols-3 gap-6">
-              {filteredEvents.map(event => <DynamicEventCard key={event.id} event={event} />)}
-            </div>
-          ) : (
-            <div className="border border-zinc-700 rounded-lg overflow-hidden">
-              <div className="grid grid-cols-5 gap-2 items-center py-2 px-3 bg-zinc-800 text-xs uppercase tracking-wide text-gray-400">
-                <span>Type</span>
-                <span>Date</span>
-                <span>Name</span>
-                <span>City</span>
-                <span className="text-right">Preview</span>
-              </div>
-              {filteredEvents.map(event => (
-                <EventListRow key={event.id} event={event} onPreview={() => alert(`Preview: ${event.name}`)} />
-              ))}
-            </div>
-          )}
-        </section>
 
         {/* ---------------- EDGE Network Info ---------------- */}
  <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg text-center">
