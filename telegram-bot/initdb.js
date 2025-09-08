@@ -1,18 +1,23 @@
-// pages/api/initdb.js
 import pkg from "pg";
 const { Client } = pkg;
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
+  const isDev = process.env.NODE_ENV === "development";
+
+  if (req.method !== "POST" && !(req.method === "GET" && isDev)) {
     return res.status(405).json({ error: "Method not allowed. Use POST." });
   }
 
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  const client = new Client({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }, // required for hosted Postgres
+  });
 
   try {
     await client.connect();
+    console.log("Connected to database with SSL.");
 
-    // --- Drop tables ---
+    // --- Drop all tables first ---
     await client.query(`
       DROP TABLE IF EXISTS 
         user_emails,
@@ -23,10 +28,12 @@ export default async function handler(req, res) {
         user_profiles
       CASCADE;
     `);
+    console.log("All tables dropped.");
 
-    // --- Create user_profiles ---
+    // --- Create tables ---
     await client.query(`
-      CREATE TABLE user_profiles (
+      -- USER PROFILES
+      CREATE TABLE IF NOT EXISTS user_profiles (
         id SERIAL PRIMARY KEY,
         telegram_user_id TEXT UNIQUE,
         telegram_username TEXT UNIQUE,
@@ -40,11 +47,9 @@ export default async function handler(req, res) {
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
-    `);
 
-    // --- Create email_verification_tokens ---
-    await client.query(`
-      CREATE TABLE email_verification_tokens (
+      -- EMAIL VERIFICATION TOKENS
+      CREATE TABLE IF NOT EXISTS email_verification_tokens (
         token TEXT PRIMARY KEY,
         user_id INTEGER REFERENCES user_profiles(id) ON DELETE CASCADE,
         telegram_user_id TEXT,
@@ -55,14 +60,14 @@ export default async function handler(req, res) {
           user_id IS NOT NULL OR telegram_user_id IS NOT NULL
         )
       );
-    `);
 
-    await client.query(`CREATE UNIQUE INDEX idx_email_verif_userid ON email_verification_tokens(user_id);`);
-    await client.query(`CREATE UNIQUE INDEX idx_email_verif_tgid ON email_verification_tokens(telegram_user_id);`);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_userid
+        ON email_verification_tokens(user_id);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_tgid
+        ON email_verification_tokens(telegram_user_id);
 
-    // --- Create events ---
-    await client.query(`
-      CREATE TABLE events (
+      -- EVENTS
+      CREATE TABLE IF NOT EXISTS events (
         id SERIAL PRIMARY KEY,
         group_id INTEGER,
         name TEXT NOT NULL,
@@ -85,13 +90,12 @@ export default async function handler(req, res) {
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
-    `);
 
-    await client.query(`CREATE INDEX idx_events_city ON events(LOWER(city));`);
+      CREATE INDEX IF NOT EXISTS idx_events_city
+        ON events(LOWER(city));
 
-    // --- Create registrations ---
-    await client.query(`
-      CREATE TABLE registrations (
+      -- REGISTRATIONS
+      CREATE TABLE IF NOT EXISTS registrations (
         id SERIAL PRIMARY KEY,
         event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
         user_id INTEGER NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
@@ -110,11 +114,9 @@ export default async function handler(req, res) {
         paid_at TIMESTAMPTZ,
         UNIQUE(event_id, user_id)
       );
-    `);
 
-    // --- Create invitations ---
-    await client.query(`
-      CREATE TABLE invitations (
+      -- INVITATIONS
+      CREATE TABLE IF NOT EXISTS invitations (
         id SERIAL PRIMARY KEY,
         event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
         inviter_id TEXT NOT NULL,
@@ -124,19 +126,15 @@ export default async function handler(req, res) {
         confirmed BOOLEAN DEFAULT FALSE,
         timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
-    `);
 
-    // --- Create user_emails ---
-    await client.query(`
-      CREATE TABLE user_emails (
+      -- USER EMAILS
+      CREATE TABLE IF NOT EXISTS user_emails (
         user_id INTEGER PRIMARY KEY REFERENCES user_profiles(id) ON DELETE CASCADE,
         email TEXT NOT NULL,
         subscribed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
-    `);
 
-    // --- Create trigger function ---
-    await client.query(`
+      -- TRIGGER FUNCTION
       CREATE OR REPLACE FUNCTION update_updated_at_column()
       RETURNS TRIGGER AS $$
       BEGIN
@@ -144,9 +142,22 @@ export default async function handler(req, res) {
         RETURN NEW;
       END;
       $$ LANGUAGE 'plpgsql';
+
+      -- ATTACH TRIGGERS
+      CREATE TRIGGER trg_update_user_profiles_updated_at
+      BEFORE UPDATE ON user_profiles
+      FOR EACH ROW
+      EXECUTE FUNCTION update_updated_at_column();
+
+      CREATE TRIGGER trg_update_events_updated_at
+      BEFORE UPDATE ON events
+      FOR EACH ROW
+      EXECUTE FUNCTION update_updated_at_column();
     `);
 
+    console.log("Database initialized successfully.");
     res.status(200).json({ success: true, message: "Database initialized successfully." });
+
   } catch (err) {
     console.error("InitDB error:", err);
     res.status(500).json({ success: false, error: err.message });
