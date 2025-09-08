@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 CREATE TABLE IF NOT EXISTS email_verification_tokens (
     token TEXT PRIMARY KEY,
     user_id INTEGER REFERENCES user_profiles(id) ON DELETE CASCADE,
-    telegram_user_id TEXT, -- FK removed for init ease
+    telegram_user_id TEXT,
     email TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMPTZ NOT NULL,
@@ -113,4 +113,15 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE 'plpgsql';
+
+-- ATTACH TRIGGER
+CREATE TRIGGER trg_update_user_profiles_updated_at
+BEFORE UPDATE ON user_profiles
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_update_events_updated_at
+BEFORE UPDATE ON events
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
 

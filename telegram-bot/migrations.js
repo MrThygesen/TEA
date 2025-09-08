@@ -1,31 +1,29 @@
+import fs from "fs";
+import path from "path";
 import pkg from "pg";
-const { Client } = pkg;
+const { Pool } = pkg;
 
-const client = new Client({
+const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-export async function runMigrations() {
+async function runMigration(fileName) {
   try {
-    await client.connect();
-    console.log("Connected to database for migrations.");
-
-    // Example migration: add a new column safely
-    await client.query(`
-      ALTER TABLE user_profiles
-      ADD COLUMN IF NOT EXISTS phone_number TEXT;
-    `);
-
-    // Example migration: add index
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_user_city ON user_profiles(LOWER(city));
-    `);
-
-    console.log("Migrations completed.");
+    console.log(`Running migration: ${fileName}`);
+    const migrationPath = path.join(process.cwd(), "migrations", fileName);
+    const sql = fs.readFileSync(migrationPath, "utf8");
+    await pool.query(sql);
+    console.log("Migration completed successfully.");
   } catch (err) {
-    console.error("Migration error:", err);
+    console.error("Error running migration:", err);
+    throw err;
   } finally {
-    await client.end();
+    await pool.end();
   }
 }
+
+// Example usage:
+// runMigration("001_add_column_to_user_profiles.sql");
+
+export default runMigration;
 
