@@ -13,7 +13,7 @@ import {
   sendEventConfirmed,
   sendPaymentConfirmed,
   isLikelyEmail,
-} from "../shared/email.js";
+} from "./email.js";
 
 
 dotenv.config();
