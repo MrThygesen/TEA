@@ -27,9 +27,11 @@ CREATE TABLE IF NOT EXISTS email_verification_tokens (
   )
 );
 
--- Optional unique constraints per user/telegram
-CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_userid ON email_verification_tokens(user_id);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_tgid ON email_verification_tokens(telegram_user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_userid
+  ON email_verification_tokens(user_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_tgid
+  ON email_verification_tokens(telegram_user_id);
 
 -- === EVENTS TABLE ===
 CREATE TABLE IF NOT EXISTS events (
@@ -56,7 +58,8 @@ CREATE TABLE IF NOT EXISTS events (
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_events_city ON events(LOWER(city));
+CREATE INDEX IF NOT EXISTS idx_events_city
+  ON events(LOWER(city));
 
 -- === REGISTRATIONS TABLE ===
 CREATE TABLE IF NOT EXISTS registrations (

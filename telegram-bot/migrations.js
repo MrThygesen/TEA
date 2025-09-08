@@ -1,12 +1,53 @@
 // telegram-bot/migrations.js
-
-import { pool } from './lib/postgres.js';
+import { pool } from "./lib/postgres.js";
 
 export async function runMigrations() {
-  console.log('🚀 Running migrations...');
+  console.log("🚀 Running migrations...");
 
   try {
-    // === EVENTS TABLE ===
+    // === USER PROFILES ===
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_profiles (
+        id SERIAL PRIMARY KEY,
+        telegram_user_id TEXT UNIQUE,
+        telegram_username TEXT UNIQUE,
+        tier INTEGER DEFAULT 1 CHECK (tier IN (1, 2)),
+        email TEXT UNIQUE,
+        wallet_address TEXT,
+        city TEXT DEFAULT 'Copenhagen',
+        role TEXT DEFAULT 'user' CHECK (role IN ('user','organizer','admin')),
+        group_id INTEGER,
+        password_hash TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // === EMAIL VERIFICATION TOKENS ===
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS email_verification_tokens (
+        token TEXT PRIMARY KEY,
+        user_id INTEGER REFERENCES user_profiles(id) ON DELETE CASCADE,
+        telegram_user_id TEXT REFERENCES user_profiles(telegram_user_id) ON DELETE CASCADE,
+        email TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMPTZ NOT NULL,
+        CONSTRAINT email_verif_user_or_telegram CHECK (
+          user_id IS NOT NULL OR telegram_user_id IS NOT NULL
+        )
+      );
+    `);
+
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_userid
+      ON email_verification_tokens(user_id);
+    `);
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_tgid
+      ON email_verification_tokens(telegram_user_id);
+    `);
+
+    // === EVENTS ===
     await pool.query(`
       CREATE TABLE IF NOT EXISTS events (
         id SERIAL PRIMARY KEY,
@@ -33,42 +74,12 @@ export async function runMigrations() {
       );
     `);
 
-    // Trigger for updated_at on events
     await pool.query(`
-      CREATE OR REPLACE FUNCTION update_updated_at_column()
-      RETURNS TRIGGER AS $$
-      BEGIN
-        NEW.updated_at = CURRENT_TIMESTAMP;
-        RETURN NEW;
-      END;
-      $$ LANGUAGE 'plpgsql';
-
-      DROP TRIGGER IF EXISTS set_updated_at ON events;
-      CREATE TRIGGER set_updated_at
-      BEFORE UPDATE ON events
-      FOR EACH ROW
-      EXECUTE FUNCTION update_updated_at_column();
+      CREATE INDEX IF NOT EXISTS idx_events_city
+      ON events(LOWER(city));
     `);
 
-    // === USER PROFILES TABLE ===
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS user_profiles (
-        id SERIAL PRIMARY KEY,
-        telegram_user_id TEXT UNIQUE,
-        telegram_username TEXT UNIQUE,
-        tier INTEGER DEFAULT 1 CHECK (tier IN (1, 2)),
-        email TEXT UNIQUE,
-        wallet_address TEXT,
-        city TEXT DEFAULT 'Copenhagen',
-        role TEXT DEFAULT 'user' CHECK (role IN ('user','organizer','admin')),
-        group_id INTEGER,
-        password_hash TEXT,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    // === REGISTRATIONS TABLE ===
+    // === REGISTRATIONS ===
     await pool.query(`
       CREATE TABLE IF NOT EXISTS registrations (
         id SERIAL PRIMARY KEY,
@@ -91,7 +102,7 @@ export async function runMigrations() {
       );
     `);
 
-    // === INVITATIONS TABLE ===
+    // === INVITATIONS ===
     await pool.query(`
       CREATE TABLE IF NOT EXISTS invitations (
         id SERIAL PRIMARY KEY,
@@ -105,7 +116,7 @@ export async function runMigrations() {
       );
     `);
 
-    // === USER EMAILS TABLE ===
+    // === USER EMAILS ===
     await pool.query(`
       CREATE TABLE IF NOT EXISTS user_emails (
         user_id INTEGER PRIMARY KEY REFERENCES user_profiles(id) ON DELETE CASCADE,
@@ -114,33 +125,9 @@ export async function runMigrations() {
       );
     `);
 
-    // === EMAIL VERIFICATION TOKENS TABLE ===
-await pool.query(`
-  CREATE TABLE IF NOT EXISTS email_verification_tokens (
-    token TEXT PRIMARY KEY,
-    user_id INTEGER REFERENCES user_profiles(id) ON DELETE CASCADE,
-    telegram_user_id TEXT REFERENCES user_profiles(telegram_user_id) ON DELETE CASCADE,
-    email TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMPTZ NOT NULL,
-    CONSTRAINT email_verif_user_or_telegram CHECK (
-      user_id IS NOT NULL OR telegram_user_id IS NOT NULL
-    )
-  );
-`);
-
-    // === Indexes ===
-await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_userid ON email_verification_tokens(user_id);`);
-await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_tgid ON email_verification_tokens(telegram_user_id);`);
-
-    await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_events_city
-      ON events(LOWER(city));
-    `);
-
-    console.log('✅ Migrations complete!');
+    console.log("✅ Migrations complete!");
   } catch (err) {
-    console.error('❌ Migration error:', err);
+    console.error("❌ Migration error:", err);
     process.exit(1);
   } finally {
     await pool.end();
