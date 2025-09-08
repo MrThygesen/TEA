@@ -118,16 +118,18 @@ export default async function handler(req, res) {
       );
     `);
 
-    // === USER EMAILS TABLE ===
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS user_emails (
-        telegram_user_id TEXT PRIMARY KEY,
-        email TEXT NOT NULL,
-        subscribed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
+// === USER EMAILS TABLE ===
+await client.query(`
+  CREATE TABLE IF NOT EXISTS user_emails (
+    user_id INTEGER PRIMARY KEY REFERENCES user_profiles(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    subscribed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+  );
+`);
 
-    // === EMAIL VERIFICATION TOKENS TABLE ===
+
+
+
     // === EMAIL VERIFICATION TOKENS TABLE ===
 await client.query(`
   CREATE TABLE IF NOT EXISTS email_verification_tokens (
