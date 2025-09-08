@@ -1,9 +1,10 @@
-// pages/api/initdb.js
 import pkg from "pg";
 const { Client } = pkg;
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
+  const isDev = process.env.NODE_ENV === "development";
+
+  if (req.method !== "POST" && !(req.method === "GET" && isDev)) {
     return res.status(405).json({ error: "Method not allowed. Use POST." });
   }
 
@@ -42,7 +43,7 @@ export default async function handler(req, res) {
       );
     `);
 
-    // --- Create email_verification_tokens ---
+    // --- Create remaining tables + indexes + trigger function ---
     await client.query(`
       CREATE TABLE email_verification_tokens (
         token TEXT PRIMARY KEY,
@@ -55,13 +56,9 @@ export default async function handler(req, res) {
           user_id IS NOT NULL OR telegram_user_id IS NOT NULL
         )
       );
-    `);
+      CREATE UNIQUE INDEX idx_email_verif_userid ON email_verification_tokens(user_id);
+      CREATE UNIQUE INDEX idx_email_verif_tgid ON email_verification_tokens(telegram_user_id);
 
-    await client.query(`CREATE UNIQUE INDEX idx_email_verif_userid ON email_verification_tokens(user_id);`);
-    await client.query(`CREATE UNIQUE INDEX idx_email_verif_tgid ON email_verification_tokens(telegram_user_id);`);
-
-    // --- Create events ---
-    await client.query(`
       CREATE TABLE events (
         id SERIAL PRIMARY KEY,
         group_id INTEGER,
@@ -85,12 +82,8 @@ export default async function handler(req, res) {
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
-    `);
+      CREATE INDEX idx_events_city ON events(LOWER(city));
 
-    await client.query(`CREATE INDEX idx_events_city ON events(LOWER(city));`);
-
-    // --- Create registrations ---
-    await client.query(`
       CREATE TABLE registrations (
         id SERIAL PRIMARY KEY,
         event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
@@ -110,10 +103,7 @@ export default async function handler(req, res) {
         paid_at TIMESTAMPTZ,
         UNIQUE(event_id, user_id)
       );
-    `);
 
-    // --- Create invitations ---
-    await client.query(`
       CREATE TABLE invitations (
         id SERIAL PRIMARY KEY,
         event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
@@ -124,19 +114,13 @@ export default async function handler(req, res) {
         confirmed BOOLEAN DEFAULT FALSE,
         timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
-    `);
 
-    // --- Create user_emails ---
-    await client.query(`
       CREATE TABLE user_emails (
         user_id INTEGER PRIMARY KEY REFERENCES user_profiles(id) ON DELETE CASCADE,
         email TEXT NOT NULL,
         subscribed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
-    `);
 
-    // --- Create trigger function ---
-    await client.query(`
       CREATE OR REPLACE FUNCTION update_updated_at_column()
       RETURNS TRIGGER AS $$
       BEGIN
@@ -144,6 +128,16 @@ export default async function handler(req, res) {
         RETURN NEW;
       END;
       $$ LANGUAGE 'plpgsql';
+
+      CREATE TRIGGER trg_update_user_profiles_updated_at
+      BEFORE UPDATE ON user_profiles
+      FOR EACH ROW
+      EXECUTE FUNCTION update_updated_at_column();
+
+      CREATE TRIGGER trg_update_events_updated_at
+      BEFORE UPDATE ON events
+      FOR EACH ROW
+      EXECUTE FUNCTION update_updated_at_column();
     `);
 
     res.status(200).json({ success: true, message: "Database initialized successfully." });
