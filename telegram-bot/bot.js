@@ -4,9 +4,17 @@ import pkg from 'pg';
 import dotenv from 'dotenv';
 import express from 'express';
 import { runMigrations } from './migrations.js';
-import { sendEmailVerification, sendEventConfirmed, sendPaymentConfirmed, isLikelyEmail } from './email-optin.js';
 import Stripe from 'stripe';
 import crypto from 'crypto';
+
+
+import {
+  sendEmailVerification,
+  sendEventConfirmed,
+  sendPaymentConfirmed,
+  isLikelyEmail,
+} from "../shared/email.js";
+
 
 dotenv.config();
 const { Pool } = pkg;

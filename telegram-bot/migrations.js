@@ -115,17 +115,24 @@ export async function runMigrations() {
     `);
 
     // === EMAIL VERIFICATION TOKENS TABLE ===
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS email_verification_tokens (
-        user_id INTEGER PRIMARY KEY REFERENCES user_profiles(id) ON DELETE CASCADE,
-        email TEXT NOT NULL,
-        token TEXT NOT NULL,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        expires_at TIMESTAMPTZ NOT NULL
-      );
-    `);
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS email_verification_tokens (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER REFERENCES user_profiles(id) ON DELETE CASCADE,
+    telegram_user_id TEXT REFERENCES user_profiles(telegram_user_id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT email_verif_user_or_telegram CHECK (
+      user_id IS NOT NULL OR telegram_user_id IS NOT NULL
+    )
+  );
+`);
 
     // === Indexes ===
+await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_userid ON email_verification_tokens(user_id);`);
+await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_tgid ON email_verification_tokens(telegram_user_id);`);
+
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_events_city
       ON events(LOWER(city));
