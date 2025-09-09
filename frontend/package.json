@@ -9,6 +9,7 @@
     "postinstall": "patch-package"
   },
   "dependencies": {
+    "@getbrevo/brevo": "^3.0.1",
     "@rainbow-me/rainbowkit": "^2.2.8",
     "@reown/appkit": "^1.7.15",
     "@reown/appkit-controllers": "^1.7.15",
@@ -18,11 +19,13 @@
     "alchemy-sdk": "^2.10.2",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.2",
+    "dotenv": "^17.2.2",
     "ethers": "^6.15.0",
     "lucide-react": "^0.525.0",
     "micro": "^10.0.1",
     "next": "^13.5.11",
     "node-fetch": "^3.3.2",
+    "pg": "^8.16.3",
     "qr": "^0.5.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -42,4 +45,3 @@
     "terser-webpack-plugin": "^5.3.14"
   }
 }
-
