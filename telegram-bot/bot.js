@@ -5,8 +5,6 @@ import dotenv from 'dotenv';
 import express from 'express';
 import { runMigrations } from './migrations.js';
 import Stripe from 'stripe';
-import crypto from 'crypto';
-
 
 import {
   sendEmailVerification,
@@ -14,7 +12,6 @@ import {
   sendPaymentConfirmed,
   isLikelyEmail,
 } from "./email.js";
-
 
 dotenv.config();
 const { Pool } = pkg;
@@ -47,26 +44,13 @@ const bot = new TelegramBot(BOT_TOKEN, { webHook: true });
 const userStates = {};
 
 // ==============================
-// DB HELPERS (NEW SCHEMA: user_id)
+// DB HELPERS
 // ==============================
-
-/**
- * Get user row by telegram_user_id
- * @param {string} tgId
- * @returns user_profiles row or null
- */
 async function getUserByTelegramId(tgId) {
-  const res = await pool.query(
-    'SELECT * FROM user_profiles WHERE telegram_user_id = $1',
-    [tgId]
-  );
+  const res = await pool.query('SELECT * FROM user_profiles WHERE telegram_user_id = $1', [tgId]);
   return res.rows[0] || null;
 }
 
-/**
- * Create a user row pre-populated with Telegram info (email optional).
- * Returns the created row.
- */
 async function createUserWithTelegram(tgId, username, email = null) {
   const res = await pool.query(
     `INSERT INTO user_profiles (telegram_user_id, telegram_username, email)
@@ -80,42 +64,28 @@ async function createUserWithTelegram(tgId, username, email = null) {
   return res.rows[0];
 }
 
-/**
- * Ensure we have a user row for this Telegram user.
- * Returns user row with a valid integer "id".
- */
 async function ensureUserForTelegram(tgId, username) {
   let user = await getUserByTelegramId(tgId);
   if (!user) {
     user = await createUserWithTelegram(tgId, username);
   } else if (username && user.telegram_username !== username) {
-    // keep username in sync
     const upd = await pool.query(
-      `UPDATE user_profiles SET telegram_username = $1, updated_at = NOW()
-       WHERE id = $2 RETURNING *`,
+      `UPDATE user_profiles SET telegram_username=$1, updated_at=NOW() WHERE id=$2 RETURNING *`,
       [username, user.id]
     );
     user = upd.rows[0];
   }
-  return user; // has .id (PK), .telegram_user_id (optional)
+  return user;
 }
 
-/**
- * Get available cities for upcoming events
- */
 async function getAvailableCities() {
-  const res = await pool.query(
-    'SELECT DISTINCT city FROM events WHERE datetime > NOW() ORDER BY city ASC'
-  );
+  const res = await pool.query('SELECT DISTINCT city FROM events WHERE datetime > NOW() ORDER BY city ASC');
   return res.rows.map(r => r.city);
 }
 
-/**
- * Get open events by city
- */
 async function getOpenEventsByCity(city) {
   const res = await pool.query(
-    `SELECT id,name,datetime,min_attendees,max_attendees,is_confirmed,price
+    `SELECT id,name,datetime,min_attendees,max_attendees,is_confirmed,price,city
      FROM events
      WHERE datetime > NOW() AND LOWER(city)=LOWER($1)
      ORDER BY datetime ASC`,
@@ -124,9 +94,6 @@ async function getOpenEventsByCity(city) {
   return res.rows;
 }
 
-/**
- * Get a user's events by user_id
- */
 async function getUserEventsByUserId(userId) {
   const res = await pool.query(
     `SELECT e.id, e.name, e.datetime, e.price, r.has_paid
@@ -139,16 +106,11 @@ async function getUserEventsByUserId(userId) {
   return res.rows;
 }
 
-/**
- * Register a user (by user_id) for an event.
- * Stores telegram_username/email/wallet if provided.
- * Confirms event if min_attendees reached.
- */
-async function registerUserById(eventId, userId, telegramUsername, email, wallet) {
+async function registerUserById(eventId, userId) {
   // Fetch event
   const { rows: eventRows } = await pool.query(
     `SELECT id, name, city, datetime, min_attendees, max_attendees, is_confirmed
-     FROM events WHERE id = $1`,
+     FROM events WHERE id=$1`,
     [eventId]
   );
   const event = eventRows[0];
@@ -163,7 +125,6 @@ async function registerUserById(eventId, userId, telegramUsername, email, wallet
 
   // Check capacity
   if (event.max_attendees && count >= event.max_attendees) {
-    // But also check if this user is already registered (ON CONFLICT later would no-op)
     const { rows: already } = await pool.query(
       'SELECT 1 FROM registrations WHERE event_id=$1 AND user_id=$2',
       [eventId, userId]
@@ -173,12 +134,12 @@ async function registerUserById(eventId, userId, telegramUsername, email, wallet
     }
   }
 
-  // Insert (idempotent by unique (event_id, user_id))
+  // Insert registration (idempotent)
   await pool.query(
-    `INSERT INTO registrations (event_id, user_id, telegram_username, email, wallet_address)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO registrations (event_id, user_id)
+     VALUES ($1, $2)
      ON CONFLICT (event_id, user_id) DO NOTHING`,
-    [eventId, userId, telegramUsername || null, email || null, wallet || null]
+    [eventId, userId]
   );
 
   // New count
@@ -197,11 +158,8 @@ async function registerUserById(eventId, userId, telegramUsername, email, wallet
     await pool.query('UPDATE events SET is_confirmed=TRUE WHERE id=$1', [eventId]);
     statusMsg += '\n✅ Event now confirmed!';
 
-    // Send confirmation to all registered users via email helper
-    const detailsRes = await pool.query(
-      'SELECT name, city, datetime FROM events WHERE id=$1',
-      [eventId]
-    );
+    // Send confirmation emails
+    const detailsRes = await pool.query('SELECT name, city, datetime FROM events WHERE id=$1', [eventId]);
     const details = detailsRes.rows[0];
     const dtString = details ? new Date(details.datetime).toLocaleString() : '';
     await sendEventConfirmed(eventId, details.name, details.city, dtString);
@@ -214,9 +172,6 @@ async function registerUserById(eventId, userId, telegramUsername, email, wallet
   return { confirmed: newCount >= event.min_attendees, eventName: event.name, statusMsg };
 }
 
-/**
- * Show attendees for an organizer (uses new registrations.user_id)
- */
 async function showAttendees(chatId, eventId, messageId = null) {
   const { rows: regs } = await pool.query(
     `SELECT r.id, u.telegram_username,
@@ -232,7 +187,7 @@ async function showAttendees(chatId, eventId, messageId = null) {
   if (!regs.length) {
     const txt = '📭 No attendees yet.';
     if (messageId) {
-      await bot.editMessageText(txt, { chat_id: chatId, message_id: messageId }).catch(()=>{});
+      await bot.editMessageText(txt, { chat_id: chatId, message_id: messageId }).catch(() => {});
     } else {
       await bot.sendMessage(chatId, txt);
     }
@@ -263,7 +218,7 @@ async function showAttendees(chatId, eventId, messageId = null) {
       chat_id: chatId,
       message_id: messageId,
       reply_markup: opts.reply_markup
-    }).catch(()=>{});
+    }).catch(() => {});
   } else {
     await bot.sendMessage(chatId, `👥 Attendees for event ID ${eventId}:`, opts);
   }
@@ -315,9 +270,16 @@ bot.onText(/\/events/, async (msg) => {
   const chatId = msg.chat.id;
   const cities = await getAvailableCities();
   if (!cities.length) return bot.sendMessage(chatId, '📭 No upcoming events.');
-  const opts = { reply_markup: { inline_keyboard: cities.map(city => [{ text: city, callback_data: `city_${city}` }]) } };
+const inline_keyboard = cities.map(city => [
+  { text: city, callback_data: `city_${encodeURIComponent(city)}` } // encode spaces & special chars
+]);
+const opts = { reply_markup: { inline_keyboard } };
+
+
   bot.sendMessage(chatId, '📍 Select your city:', opts);
 });
+
+
 
 // /user_edit (email) — leaves verification flow intact (by telegram_user_id)
 bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
@@ -520,9 +482,10 @@ bot.on('callback_query', async (query) => {
       return;
     }
 
-    if (data.startsWith('city_')) {
-      const city = data.split('_')[1];
-      const events = await getOpenEventsByCity(city);
+if (data.startsWith('city_')) {
+  const city = decodeURIComponent(data.slice(5)); // decode back to original
+  const events = await getOpenEventsByCity(city);
+
       if (!events.length) return bot.sendMessage(chatId, `📭 No upcoming events in ${city}.`);
 
       const opts = { reply_markup: { inline_keyboard: [] } };
@@ -543,7 +506,7 @@ bot.on('callback_query', async (query) => {
 
     // --- PAY (Stripe) ---
     if (data.startsWith('pay_')) {
-      const eventId = data.split('_')[1];
+const eventId = parseInt(data.split('_')[1], 10);
       try {
         const { rows } = await pool.query('SELECT name, price FROM events WHERE id=$1', [eventId]);
         if (!rows.length) {
@@ -555,22 +518,26 @@ bot.on('callback_query', async (query) => {
         // Ensure user row
         const user = await ensureUserForTelegram(tgId, query.from.username || '');
 
-        const session = await stripe.checkout.sessions.create({
-          mode: 'payment',
-          payment_method_types: ['card'],
-          line_items: [{
-            price_data: {
-              currency: 'usd',
-              product_data: { name: event.name },
-              unit_amount: Math.round(Number(event.price) * 100),
-            },
-            quantity: 1,
-          }],
-          success_url: `${FRONTEND_URL}/success?event=${eventId}`,
-          cancel_url: `${FRONTEND_URL}/cancel?event=${eventId}`,
-          metadata: { eventId: String(eventId), userId: String(user.id), telegramId: String(chatId) },
-        });
-
+const session = await stripe.checkout.sessions.create({
+  payment_method_types: ['card'],
+  mode: 'payment',
+  line_items: [{
+    price_data: {
+      currency: 'usd',
+      product_data: { name: event.name },
+      unit_amount: Math.round(Number(event.price) * 100),
+    },
+    quantity: 1,
+  }],
+  success_url: `${FRONTEND_URL}/success?event=${eventId}&user=${user.id}`,
+  cancel_url: `${FRONTEND_URL}/cancel?event=${eventId}`,
+  metadata: {
+    eventId: String(eventId),
+    userId: String(user.id),
+    telegramId: String(tgId),
+  },
+  customer_email: user.email || undefined,
+});
         await bot.sendMessage(chatId, `💳 Complete your payment here:\n${session.url}`);
         await bot.answerCallbackQuery(query.id);
       } catch (err) {
@@ -657,6 +624,61 @@ bot.on('callback_query', async (query) => {
   }
 });
 
+
+// ==============================
+// STRIPE WEBHOOK
+// ==============================
+import bodyParser from 'body-parser';
+
+// Stripe requires raw body for signature verification
+app.post('/stripe-webhook', bodyParser.raw({ type: 'application/json' }), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (err) {
+    console.error('❌ Stripe webhook signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // Handle the event
+  switch (event.type) {
+    case 'checkout.session.completed':
+      const session = event.data.object;
+      // Assuming you pass userId in metadata when creating the checkout session
+      const userId = session.metadata?.userId;
+      const eventId = session.metadata?.eventId;
+
+      if (userId && eventId) {
+        try {
+          await pool.query(
+            `UPDATE registrations
+             SET has_paid = TRUE, updated_at = NOW()
+             WHERE user_id = $1 AND event_id = $2`,
+            [userId, eventId]
+          );
+
+          // Send confirmation email
+          await sendPaymentConfirmed(userId, eventId);
+          console.log(`✅ Payment confirmed for user ${userId}, event ${eventId}`);
+        } catch (err) {
+          console.error('❌ Error updating payment status:', err);
+        }
+      }
+      break;
+
+    default:
+      console.log(`ℹ️ Unhandled Stripe event type: ${event.type}`);
+  }
+
+  res.json({ received: true });
+});
+
 // ==============================
 // EXPRESS WEBHOOK
 // ==============================
@@ -667,33 +689,4 @@ app.post(`/webhook/${BOT_TOKEN}`, (req, res) => {
 
 bot.setWebHook(`${PUBLIC_URL}/webhook/${BOT_TOKEN}`);
 app.listen(PORT, () => console.log(`🚀 Bot running on port ${PORT}`));
-
-/**
- * OPTIONAL: Stripe webhook (if you want to auto-mark r.has_paid=true)
- * Be sure to set STRIPE_WEBHOOK_SECRET; otherwise you can mark payment in your frontend success handler.
- *
- * Example:
- *
- * app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
- *   const sig = req.headers['stripe-signature'];
- *   let event;
- *   try {
- *     event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
- *   } catch (err) {
- *     console.error('Webhook signature verification failed.', err.message);
- *     return res.sendStatus(400);
- *   }
- *   if (event.type === 'checkout.session.completed') {
- *     const session = event.data.object;
- *     const eventId = parseInt(session.metadata.eventId, 10);
- *     const userId = parseInt(session.metadata.userId, 10);
- *     await pool.query(
- *       'UPDATE registrations SET has_paid=TRUE, paid_at=NOW() WHERE event_id=$1 AND user_id=$2',
- *       [eventId, userId]
- *     );
- *     try { await sendPaymentConfirmed(userId, eventId); } catch {}
- *   }
- *   res.sendStatus(200);
- * });
- */
 
