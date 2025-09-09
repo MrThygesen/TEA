@@ -50,6 +50,15 @@ async function getUserByTelegramId(tgId) {
   return res.rows[0] || null;
 }
 
+async function getUserByEmail(email) {
+  const res = await pool.query(
+    'SELECT * FROM user_profiles WHERE email = $1',
+    [email]
+  );
+  return res.rows[0] || null;
+}
+
+
 async function createUserWithTelegram(tgId, username, email = null) {
   const res = await pool.query(
     `INSERT INTO user_profiles (telegram_user_id, telegram_username, email)
@@ -292,17 +301,49 @@ bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
       return bot.sendMessage(chatId, '❌ Invalid email. Must include "@" and "."');
     }
 
+    // 🔎 Check if email already belongs to another user
+    const existing = await pool.query(
+      `SELECT * FROM user_profiles WHERE email = $1`,
+      [inlineEmail]
+    );
+
+    if (existing.rows.length && existing.rows[0].id !== user.id) {
+      const existingUser = existing.rows[0];
+
+      // 🔗 Merge accounts: move Telegram ID to the email account
+      await pool.query(
+        `UPDATE user_profiles
+         SET telegram_user_id = $1,
+             telegram_username = $2,
+             updated_at = NOW()
+         WHERE id = $3`,
+        [tgId, username || null, existingUser.id]
+      );
+
+      // ❌ Remove old Telegram-only account
+      await pool.query(`DELETE FROM user_profiles WHERE id = $1`, [user.id]);
+
+      // ✅ Send verification for the existing account
+      await sendEmailVerification({ tgId, email: inlineEmail });
+
+      return bot.sendMessage(
+        chatId,
+        `✅ Your Telegram has been linked to existing email account: ${inlineEmail}. Please check your inbox to verify.`
+      );
+    }
+
+    // Otherwise, just update this user's email
     await pool.query(
       `UPDATE user_profiles SET email=$1, updated_at=NOW() WHERE id=$2`,
       [inlineEmail, user.id]
     );
 
-    // ✅ Corrected call to match email.js signature
     await sendEmailVerification({ tgId, email: inlineEmail });
 
     return bot.sendMessage(chatId, `✅ Email updated to: ${inlineEmail}. Please check your inbox to verify.`);
   }
 
+  // No inline email → prompt user to reply
   const prompt = await bot.sendMessage(
     chatId,
     `📧 Current email: ${user?.email || 'N/A'}\nReply to this message with your new email (must include '@' and '.').`,
