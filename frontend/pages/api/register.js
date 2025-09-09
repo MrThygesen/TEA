@@ -9,23 +9,23 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' })
   }
 
-  const { username, email, password } = req.body
+  const { email, password, username } = req.body
 
-  if (!username || !email || !password) {
-    return res.status(400).json({ error: 'Username, email, and password are required.' })
+  if (!email || !password || !username) {
+    return res.status(400).json({ error: 'Username, email and password are required.' })
   }
 
   try {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // Insert user (fail if email or username already exists)
+    // Insert user (fail if email already exists)
     const result = await pool.query(
-      `INSERT INTO user_profiles (telegram_username, email, password_hash, email_verified)
+      `INSERT INTO user_profiles (email, password_hash, telegram_username, email_verified)
        VALUES ($1, $2, $3, FALSE)
        ON CONFLICT (email) DO NOTHING
        RETURNING id, email, telegram_username, role, tier`,
-      [username, email, hashedPassword]
+      [email, hashedPassword, username]
     )
 
     if (result.rows.length === 0) {
