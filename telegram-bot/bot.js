@@ -42,7 +42,6 @@ app.use(express.json());
 // ==== TELEGRAM BOT ====
 const bot = new TelegramBot(BOT_TOKEN, { webHook: true });
 const userStates = {};
-
 // ==============================
 // DB HELPERS
 // ==============================
@@ -280,8 +279,7 @@ const opts = { reply_markup: { inline_keyboard } };
 });
 
 
-
-// /user_edit (email) — leaves verification flow intact (by telegram_user_id)
+// /user_edit (email)
 bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const tgId = String(msg.from.id);
@@ -298,8 +296,9 @@ bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
       `UPDATE user_profiles SET email=$1, updated_at=NOW() WHERE id=$2`,
       [inlineEmail, user.id]
     );
-    // Keep your helper contract: verification still by telegram_user_id (your table)
-    await sendEmailVerification(tgId, inlineEmail);
+
+    // ✅ Corrected call to match email.js signature
+    await sendEmailVerification({ tgId, email: inlineEmail });
 
     return bot.sendMessage(chatId, `✅ Email updated to: ${inlineEmail}. Please check your inbox to verify.`);
   }
@@ -311,12 +310,6 @@ bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
   );
 
   userStates[tgId] = { step: 'editingProfile', field: 'email', replyTo: prompt.message_id };
-});
-
-bot.onText(/\/cancel/, async (msg) => {
-  const tgId = String(msg.from.id);
-  delete userStates[tgId];
-  bot.sendMessage(msg.chat.id, '✖️ Email update canceled.');
 });
 
 // Capture reply to /user_edit prompt
@@ -341,12 +334,80 @@ bot.on('message', async (msg) => {
       `UPDATE user_profiles SET email=$1, updated_at=NOW() WHERE id=$2`,
       [email, user.id]
     );
-    await sendEmailVerification(tgId, email);
+
+    // ✅ Corrected call
+    await sendEmailVerification({ tgId, email });
+
     delete userStates[tgId];
     bot.sendMessage(msg.chat.id, `✅ Email updated to: ${email}. Please check your inbox to verify.`);
   }
 });
 
+// ==============================
+// STRIPE WEBHOOK
+// ==============================
+import bodyParser from 'body-parser';
+
+app.post('/stripe-webhook', bodyParser.raw({ type: 'application/json' }), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (err) {
+    console.error('❌ Stripe webhook signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  switch (event.type) {
+    case 'checkout.session.completed':
+      const session = event.data.object;
+      const userId = session.metadata?.userId;
+      const eventId = session.metadata?.eventId;
+
+      if (userId && eventId) {
+        try {
+          await pool.query(
+            `UPDATE registrations
+             SET has_paid = TRUE, updated_at = NOW()
+             WHERE user_id = $1 AND event_id = $2`,
+            [userId, eventId]
+          );
+
+          // ✅ Corrected: fetch tgId & eventName
+          const { rows: userRows } = await pool.query(
+            'SELECT telegram_user_id FROM user_profiles WHERE id=$1',
+            [userId]
+          );
+          const tgId = userRows[0]?.telegram_user_id;
+
+          const { rows: eventRows } = await pool.query(
+            'SELECT name FROM events WHERE id=$1',
+            [eventId]
+          );
+          const eventName = eventRows[0]?.name;
+
+          if (tgId && eventName) {
+            await sendPaymentConfirmed(eventId, eventName, tgId);
+          }
+
+          console.log(`✅ Payment confirmed for user ${userId}, event ${eventId}`);
+        } catch (err) {
+          console.error('❌ Error updating payment status:', err);
+        }
+      }
+      break;
+
+    default:
+      console.log(`ℹ️ Unhandled Stripe event type: ${event.type}`);
+  }
+
+  res.json({ received: true });
+});
 bot.onText(/\/myevents/, async (msg) => {
   const tgId = String(msg.from.id);
   const user = await ensureUserForTelegram(tgId, msg.from.username || '');
@@ -622,61 +683,6 @@ const session = await stripe.checkout.sessions.create({
     console.error('Callback query error:', error);
     await bot.answerCallbackQuery(query.id, { text: '⚠️ Something went wrong', show_alert: true });
   }
-});
-
-
-// ==============================
-// STRIPE WEBHOOK
-// ==============================
-import bodyParser from 'body-parser';
-
-// Stripe requires raw body for signature verification
-app.post('/stripe-webhook', bodyParser.raw({ type: 'application/json' }), async (req, res) => {
-  const sig = req.headers['stripe-signature'];
-  let event;
-
-  try {
-    event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
-  } catch (err) {
-    console.error('❌ Stripe webhook signature verification failed:', err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
-
-  // Handle the event
-  switch (event.type) {
-    case 'checkout.session.completed':
-      const session = event.data.object;
-      // Assuming you pass userId in metadata when creating the checkout session
-      const userId = session.metadata?.userId;
-      const eventId = session.metadata?.eventId;
-
-      if (userId && eventId) {
-        try {
-          await pool.query(
-            `UPDATE registrations
-             SET has_paid = TRUE, updated_at = NOW()
-             WHERE user_id = $1 AND event_id = $2`,
-            [userId, eventId]
-          );
-
-          // Send confirmation email
-          await sendPaymentConfirmed(userId, eventId);
-          console.log(`✅ Payment confirmed for user ${userId}, event ${eventId}`);
-        } catch (err) {
-          console.error('❌ Error updating payment status:', err);
-        }
-      }
-      break;
-
-    default:
-      console.log(`ℹ️ Unhandled Stripe event type: ${event.type}`);
-  }
-
-  res.json({ received: true });
 });
 
 // ==============================
