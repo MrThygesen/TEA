@@ -9,52 +9,27 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' })
   }
 
-  const { email, password, telegram_user_id, telegram_username } = req.body
+  const { email, password, username } = req.body
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required.' })
+  }
 
   try {
-    // --- If no email provided (pure Telegram registration) ---
-    if (!email) {
-      if (!telegram_user_id) {
-        return res.status(400).json({ error: 'Telegram ID is required if no email is given.' })
-      }
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password, 10)
 
-      const result = await pool.query(
-        `INSERT INTO user_profiles (telegram_user_id, telegram_username)
-         VALUES ($1, $2)
-         ON CONFLICT (telegram_user_id) DO UPDATE
-           SET telegram_username = EXCLUDED.telegram_username
-         RETURNING id, telegram_user_id, telegram_username, role, tier, email, email_verified`,
-        [telegram_user_id, telegram_username || null]
-      )
-
-      return res.status(201).json({
-        user: result.rows[0],
-        message: 'Telegram registration successful (no email provided).',
-      })
-    }
-
-    // --- If email IS provided (Web OR Telegram with email) ---
-    // Password may be empty if coming from Telegram edit
-    let hashedPassword = null
-    if (password) {
-      hashedPassword = await bcrypt.hash(password, 10)
-    }
-
+    // Insert user (pure web, no telegram)
     const result = await pool.query(
       `INSERT INTO user_profiles (email, password_hash, telegram_user_id, telegram_username, email_verified)
-       VALUES ($1, $2, $3, $4, FALSE)
-       ON CONFLICT (email) DO NOTHING
+       VALUES ($1, $2, NULL, NULL, FALSE)
        RETURNING id, email, role, tier`,
-      [email, hashedPassword, telegram_user_id || null, telegram_username || null]
+      [email, hashedPassword]
     )
-
-    if (result.rows.length === 0) {
-      return res.status(400).json({ error: 'Email already registered' })
-    }
 
     const user = result.rows[0]
 
-    // Generate verification token
+    // Generate email verification token
     const token = crypto.randomBytes(32).toString('hex')
     await pool.query(
       `INSERT INTO email_verification_tokens (user_id, token, expires_at)
@@ -62,14 +37,24 @@ export default async function handler(req, res) {
       [user.id, token]
     )
 
+    // Send verification email
     const verifyUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/api/verify-email?token=${token}`
-    await sendVerificationEmail(email, verifyUrl)
+    try {
+      await sendVerificationEmail(email, verifyUrl)
+    } catch (emailErr) {
+      console.error('Failed to send verification email:', emailErr)
+      return res.status(500).json({ error: 'Failed to send verification email' })
+    }
 
     return res.status(201).json({
       user,
       message: 'Registration successful. Please check your email to verify your account.',
     })
   } catch (err) {
+    // Handle duplicate email error
+    if (err.code === '23505') {
+      return res.status(400).json({ error: 'Email already registered' })
+    }
     console.error('Registration error:', err)
     return res.status(500).json({ error: 'Internal server error' })
   }
