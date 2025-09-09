@@ -1,5 +1,5 @@
 -- =========================
--- SCHEMA FOR TEA EVENTS DB
+-- TEA EVENTS DB SCHEMA
 -- =========================
 
 -- USER PROFILES
@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     id SERIAL PRIMARY KEY,
     telegram_user_id TEXT UNIQUE,
     telegram_username TEXT UNIQUE,
+    username TEXT UNIQUE,
     tier INTEGER DEFAULT 1 CHECK (tier IN (1,2)),
     email TEXT UNIQUE,
     wallet_address TEXT,
@@ -14,6 +15,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     role TEXT DEFAULT 'user' CHECK (role IN ('user','organizer','admin')),
     group_id INTEGER,
     password_hash TEXT,
+    email_verified BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
@@ -114,7 +116,7 @@ BEGIN
 END;
 $$ LANGUAGE 'plpgsql';
 
--- ATTACH TRIGGER
+-- ATTACH TRIGGERS
 CREATE TRIGGER trg_update_user_profiles_updated_at
 BEFORE UPDATE ON user_profiles
 FOR EACH ROW
