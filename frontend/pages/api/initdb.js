@@ -17,11 +17,11 @@ export default async function handler(req, res) {
   try {
     console.log('🔹 Initializing database...');
 
-    const schemaSQL = `
-    -- =========================
-    -- USER PROFILES
-    -- =========================
-    CREATE TABLE IF NOT EXISTS user_profiles (
+    // ----------------------------
+    // USER PROFILES
+    // ----------------------------
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_profiles (
         id SERIAL PRIMARY KEY,
         telegram_user_id TEXT UNIQUE,
         telegram_username TEXT UNIQUE,
@@ -36,12 +36,14 @@ export default async function handler(req, res) {
         email_verified BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-    );
+      );
+    `);
 
-    -- =========================
-    -- EMAIL VERIFICATION TOKENS
-    -- =========================
-    CREATE TABLE IF NOT EXISTS email_verification_tokens (
+    // ----------------------------
+    // EMAIL VERIFICATION TOKENS
+    // ----------------------------
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS email_verification_tokens (
         token TEXT PRIMARY KEY,
         user_id INTEGER REFERENCES user_profiles(id) ON DELETE CASCADE,
         telegram_user_id TEXT,
@@ -49,18 +51,20 @@ export default async function handler(req, res) {
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         expires_at TIMESTAMPTZ NOT NULL,
         CONSTRAINT email_verif_user_or_telegram CHECK (user_id IS NOT NULL OR telegram_user_id IS NOT NULL)
-    );
+      );
+    `);
 
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_userid
-        ON email_verification_tokens(user_id);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_userid
+      ON email_verification_tokens(user_id);`);
 
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_tgid
-        ON email_verification_tokens(telegram_user_id);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_tgid
+      ON email_verification_tokens(telegram_user_id);`);
 
-    -- =========================
-    -- EVENTS
-    -- =========================
-    CREATE TABLE IF NOT EXISTS events (
+    // ----------------------------
+    // EVENTS
+    // ----------------------------
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS events (
         id SERIAL PRIMARY KEY,
         group_id INTEGER,
         name TEXT NOT NULL,
@@ -82,15 +86,16 @@ export default async function handler(req, res) {
         image_url TEXT,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-    );
+      );
+    `);
 
-    CREATE INDEX IF NOT EXISTS idx_events_city
-        ON events(LOWER(city));
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_events_city ON events(LOWER(city));`);
 
-    -- =========================
-    -- REGISTRATIONS
-    -- =========================
-    CREATE TABLE IF NOT EXISTS registrations (
+    // ----------------------------
+    // REGISTRATIONS
+    // ----------------------------
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS registrations (
         id SERIAL PRIMARY KEY,
         event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
         user_id INTEGER NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
@@ -108,12 +113,14 @@ export default async function handler(req, res) {
         has_paid BOOLEAN DEFAULT FALSE,
         paid_at TIMESTAMPTZ,
         UNIQUE(event_id, user_id)
-    );
+      );
+    `);
 
-    -- =========================
-    -- INVITATIONS
-    -- =========================
-    CREATE TABLE IF NOT EXISTS invitations (
+    // ----------------------------
+    // INVITATIONS
+    // ----------------------------
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS invitations (
         id SERIAL PRIMARY KEY,
         event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
         inviter_id TEXT NOT NULL,
@@ -122,43 +129,46 @@ export default async function handler(req, res) {
         invitee_username TEXT,
         confirmed BOOLEAN DEFAULT FALSE,
         timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-    );
+      );
+    `);
 
-    -- =========================
-    -- USER EMAILS
-    -- =========================
-    CREATE TABLE IF NOT EXISTS user_emails (
+    // ----------------------------
+    // USER EMAILS
+    // ----------------------------
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_emails (
         user_id INTEGER PRIMARY KEY REFERENCES user_profiles(id) ON DELETE CASCADE,
         email TEXT NOT NULL,
         subscribed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-    );
+      );
+    `);
 
-    -- =========================
-    -- updated_at trigger function
-    -- =========================
-    CREATE OR REPLACE FUNCTION update_updated_at_column()
-    RETURNS TRIGGER AS $$
-    BEGIN
+    // ----------------------------
+    // updated_at trigger
+    // ----------------------------
+    await pool.query(`
+      CREATE OR REPLACE FUNCTION update_updated_at_column()
+      RETURNS TRIGGER AS $$
+      BEGIN
         NEW.updated_at = CURRENT_TIMESTAMP;
         RETURN NEW;
-    END;
-    $$ LANGUAGE 'plpgsql';
+      END;
+      $$ LANGUAGE 'plpgsql';
+    `);
 
-    -- =========================
-    -- attach triggers
-    -- =========================
-    CREATE TRIGGER IF NOT EXISTS trg_update_user_profiles_updated_at
-    BEFORE UPDATE ON user_profiles
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+    await pool.query(`
+      CREATE TRIGGER IF NOT EXISTS trg_update_user_profiles_updated_at
+      BEFORE UPDATE ON user_profiles
+      FOR EACH ROW
+      EXECUTE FUNCTION update_updated_at_column();
+    `);
 
-    CREATE TRIGGER IF NOT EXISTS trg_update_events_updated_at
-    BEFORE UPDATE ON events
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-    `;
-
-    await pool.query(schemaSQL);
+    await pool.query(`
+      CREATE TRIGGER IF NOT EXISTS trg_update_events_updated_at
+      BEFORE UPDATE ON events
+      FOR EACH ROW
+      EXECUTE FUNCTION update_updated_at_column();
+    `);
 
     console.log('✅ Database fully initialized.');
     res.status(200).json({ success: true, message: 'Database fully initialized' });
