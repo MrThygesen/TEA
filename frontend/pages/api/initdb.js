@@ -144,7 +144,7 @@ export default async function handler(req, res) {
     `);
 
     // ----------------------------
-    // updated_at trigger
+    // updated_at trigger function
     // ----------------------------
     await pool.query(`
       CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -156,15 +156,24 @@ export default async function handler(req, res) {
       $$ LANGUAGE 'plpgsql';
     `);
 
+    // ----------------------------
+    // drop triggers first (if exist)
+    // ----------------------------
+    await pool.query(`DROP TRIGGER IF EXISTS trg_update_user_profiles_updated_at ON user_profiles;`);
+    await pool.query(`DROP TRIGGER IF EXISTS trg_update_events_updated_at ON events;`);
+
+    // ----------------------------
+    // attach triggers
+    // ----------------------------
     await pool.query(`
-      CREATE TRIGGER IF NOT EXISTS trg_update_user_profiles_updated_at
+      CREATE TRIGGER trg_update_user_profiles_updated_at
       BEFORE UPDATE ON user_profiles
       FOR EACH ROW
       EXECUTE FUNCTION update_updated_at_column();
     `);
 
     await pool.query(`
-      CREATE TRIGGER IF NOT EXISTS trg_update_events_updated_at
+      CREATE TRIGGER trg_update_events_updated_at
       BEFORE UPDATE ON events
       FOR EACH ROW
       EXECUTE FUNCTION update_updated_at_column();
