@@ -1,49 +1,22 @@
 // tea-project/frontend/pages/api/verify-email.js
-import { pool } from "../../lib/postgres.js";
+import { confirmEmailToken } from "../../../shared/email.js";
 
 export default async function handler(req, res) {
-  const { userId, tgId, token } = req.query;
-  if (!token || (!userId && !tgId)) {
+  const { token } = req.query;
+
+  if (!token) {
     return res.redirect(302, "https://teanet.xyz?status=error&reason=missing");
   }
 
   try {
-    const result = await pool.query(
-      `SELECT * FROM email_verification_tokens
-       WHERE token=$1
-         AND expires_at > NOW()
-         AND ((user_id IS NOT NULL AND user_id=$2) OR (telegram_user_id IS NOT NULL AND telegram_user_id=$3))`,
-      [token, userId || null, tgId || null]
-    );
+    // Use shared/email.js function to validate token and update user
+    const result = await confirmEmailToken(token);
 
-    if (!result.rows.length) {
-      return res.redirect(302, "https://teanet.xyz?status=error&reason=invalid");
-    }
-
-    // ✅ Mark email as verified
-    if (userId) {
-      await pool.query(
-        `UPDATE user_profiles
-         SET is_verified = true, updated_at = NOW()
-         WHERE id = $1`,
-        [userId]
-      );
-    } else if (tgId) {
-      await pool.query(
-        `UPDATE user_profiles
-         SET is_verified = true, updated_at = NOW()
-         WHERE telegram_user_id = $1`,
-        [tgId]
-      );
-    }
-
-    // 🔒 Delete token (one-time use)
-    await pool.query(`DELETE FROM email_verification_tokens WHERE token=$1`, [token]);
-
+    console.log("Email verified for:", result);
     return res.redirect(302, "https://teanet.xyz?status=success");
   } catch (err) {
-    console.error("Verification error:", err);
-    return res.redirect(302, "https://teanet.xyz?status=error&reason=server");
+    console.error("Email verification failed:", err.message);
+    return res.redirect(302, `https://teanet.xyz?status=error&reason=${encodeURIComponent(err.message)}`);
   }
 }
 

@@ -22,30 +22,31 @@ const pool = new Pool({
 const FROM_EMAIL = process.env.FROM_EMAIL || "no-reply@teanet.xyz";
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 
-// ==== HELPER: EMAIL CHECK ====
+// ==== HELPERS ====
 export function isLikelyEmail(s) {
   return typeof s === "string" && s.includes("@") && s.includes(".");
 }
 
-// ==== GENERATE TOKEN ====
 export function generateEmailToken() {
   return crypto.randomBytes(20).toString("hex"); // 40-character token
 }
 
-// ==== SEND VERIFICATION EMAIL ====
-export async function sendEmailVerification(tgId, email) {
+// ==== SEND EMAIL VERIFICATION ====
+export async function sendEmailVerification({ userId = null, tgId = null, email }) {
+  if (!isLikelyEmail(email)) throw new Error("Invalid email");
+
   const token = generateEmailToken();
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h expiration
 
   await pool.query(
-    `INSERT INTO email_verification_tokens (telegram_user_id, email, token, expires_at)
-     VALUES ($1, $2, $3, $4)
-     ON CONFLICT (telegram_user_id)
+    `INSERT INTO email_verification_tokens (user_id, telegram_user_id, email, token, expires_at)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (user_id, telegram_user_id)
      DO UPDATE SET email = EXCLUDED.email, token = EXCLUDED.token, expires_at = EXCLUDED.expires_at`,
-    [tgId, email, token, expiresAt]
+    [userId, tgId, email, token, expiresAt]
   );
 
-  const verificationUrl = `${FRONTEND_URL}/verify-email?tgId=${tgId}&token=${token}`;
+  const verificationUrl = `${FRONTEND_URL}/verify-email?token=${token}`;
 
   const msg = {
     sender: { email: FROM_EMAIL },
@@ -64,8 +65,49 @@ export async function sendEmailVerification(tgId, email) {
   return token;
 }
 
-// ==== SEND EVENT CONFIRMATION EMAIL ====
-    export async function sendEventConfirmed(eventId, eventName, eventCity, eventDateTime) {
+// ==== CONFIRM EMAIL TOKEN ====
+export async function confirmEmailToken(token) {
+  const res = await pool.query(
+    `SELECT user_id, telegram_user_id, email, expires_at
+     FROM email_verification_tokens
+     WHERE token=$1`,
+    [token]
+  );
+
+  if (!res.rows.length) throw new Error("Invalid token");
+  const { user_id, telegram_user_id, email, expires_at } = res.rows[0];
+
+  if (new Date() > expires_at) throw new Error("Token expired");
+
+  // Update user_profiles if user exists
+  if (user_id) {
+    await pool.query(
+      `UPDATE user_profiles
+       SET email=$1, is_verified=TRUE
+       WHERE id=$2`,
+      [email, user_id]
+    );
+  } else if (telegram_user_id) {
+    await pool.query(
+      `UPDATE user_profiles
+       SET email=$1, is_verified=TRUE
+       WHERE telegram_user_id=$2`,
+      [email, telegram_user_id]
+    );
+  }
+
+  // Delete token
+  await pool.query(
+    `DELETE FROM email_verification_tokens WHERE token=$1`,
+    [token]
+  );
+
+  console.log(`✅ Email verified: ${email}`);
+  return { email, userId: user_id, tgId: telegram_user_id };
+}
+
+// ==== SEND EVENT CONFIRMATION ====
+export async function sendEventConfirmed(eventId, eventName, eventCity, eventDateTime) {
   try {
     const res = await pool.query(
       `SELECT email, telegram_username
@@ -101,7 +143,7 @@ export async function sendEmailVerification(tgId, email) {
   }
 }
 
-// ==== SEND PAYMENT CONFIRMATION EMAIL ====
+// ==== SEND PAYMENT CONFIRMATION ====
 export async function sendPaymentConfirmed(eventId, eventName, tgId) {
   try {
     const res = await pool.query(
