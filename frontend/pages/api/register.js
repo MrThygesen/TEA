@@ -9,23 +9,23 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' })
   }
 
-  const { email, password } = req.body
+  const { email, username, password } = req.body
 
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required.' })
+  if (!email || !username || !password) {
+    return res.status(400).json({ error: 'Email, username, and password are required.' })
   }
 
   try {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // Insert user (fail if email already exists)
+    // Insert user (fail if email or username already exists)
     const result = await pool.query(
-      `INSERT INTO user_profiles (email, password_hash, email_verified)
-       VALUES ($1, $2, FALSE)
+      `INSERT INTO user_profiles (email, telegram_username, password_hash, email_verified)
+       VALUES ($1, $2, $3, FALSE)
        ON CONFLICT (email) DO NOTHING
-       RETURNING id, email, role, tier`,
-      [email, hashedPassword]
+       RETURNING id, email, telegram_username, role, tier`,
+      [email, username, hashedPassword]
     )
 
     if (result.rows.length === 0) {
@@ -47,7 +47,13 @@ export default async function handler(req, res) {
     await sendVerificationEmail(email, verifyUrl)
 
     return res.status(201).json({
-      user,
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.telegram_username,
+        role: user.role,
+        tier: user.tier,
+      },
       message: '✅ Registration successful. Please check your email to verify your account.',
     })
   } catch (err) {
