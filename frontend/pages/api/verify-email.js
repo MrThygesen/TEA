@@ -20,15 +20,19 @@ export default async function handler(req, res) {
       return res.redirect(302, "https://teanet.xyz?status=error&reason=invalid");
     }
 
-    // ✅ Mark verified (updates timestamp only — email already stored)
+    // ✅ Mark email as verified
     if (userId) {
       await pool.query(
-        `UPDATE user_profiles SET updated_at=NOW() WHERE id=$1`,
+        `UPDATE user_profiles
+         SET is_verified = true, updated_at = NOW()
+         WHERE id = $1`,
         [userId]
       );
     } else if (tgId) {
       await pool.query(
-        `UPDATE user_profiles SET updated_at=NOW() WHERE telegram_user_id=$1`,
+        `UPDATE user_profiles
+         SET is_verified = true, updated_at = NOW()
+         WHERE telegram_user_id = $1`,
         [tgId]
       );
     }

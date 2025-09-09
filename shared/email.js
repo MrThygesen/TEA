@@ -1,4 +1,4 @@
-// copy of tea-project/shared/email.js due to scope of cloud file structure.
+// tea-project/shared/email.js
 import crypto from "crypto";
 import pkg from "pg";
 import dotenv from "dotenv";
