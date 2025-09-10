@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import auth from '.auth'
+import auth from './auth'
 
 export default function EmailVerified() {
   const router = useRouter()
