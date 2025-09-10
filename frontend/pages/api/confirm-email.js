@@ -38,7 +38,7 @@ export default async function handler(req, res) {
       [user.user_id]
     )
 
-    // 3. Remove the token
+    // 3. Remove the token (so it can’t be reused)
     await pool.query(`DELETE FROM email_verification_tokens WHERE token = $1`, [token])
 
     // 4. Create JWT
@@ -48,9 +48,12 @@ export default async function handler(req, res) {
       { expiresIn: '7d' }
     )
 
-    // 5. Redirect to frontend page with token
-    const redirectUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/email-verified?token=${jwtToken}&status=success`
-    return res.redirect(302, redirectUrl)
+    // ✅ 5. Return JSON instead of redirect
+    return res.status(200).json({
+      message: '✅ Email verified successfully',
+      token: jwtToken,
+      user,
+    })
   } catch (err) {
     console.error('❌ Email verification error:', err)
     return res.status(500).json({ error: 'Internal server error', details: err.message })
