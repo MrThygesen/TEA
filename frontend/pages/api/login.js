@@ -1,6 +1,7 @@
 // pages/api/login.js
 
 import bcrypt from 'bcryptjs'
+import jwt from 'jsonwebtoken'
 import { pool } from '../../lib/postgres.js'
 
 export default async function handler(req, res) {
@@ -9,7 +10,6 @@ export default async function handler(req, res) {
   }
 
   const { email, password } = req.body
-
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required.' })
   }
@@ -22,13 +22,13 @@ export default async function handler(req, res) {
       [email]
     )
 
-    if (result.rows.length === 0) {
+    if (!result.rows.length) {
       return res.status(400).json({ error: 'Invalid email or password.' })
     }
 
     const user = result.rows[0]
-
     const validPassword = await bcrypt.compare(password, user.password_hash)
+
     if (!validPassword) {
       return res.status(400).json({ error: 'Invalid email or password.' })
     }
@@ -39,8 +39,16 @@ export default async function handler(req, res) {
       })
     }
 
+    // ✅ Generate JWT token
+    const token = jwt.sign(
+      { id: user.id, email: user.email, username: user.username },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' } // token valid for 7 days
+    )
+
     return res.status(200).json({
       message: '✅ Login successful',
+      token, // <-- send JWT to frontend
       user: {
         id: user.id,
         username: user.username,

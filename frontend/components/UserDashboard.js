@@ -1,9 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/router'
+import { auth } from '../lib/auth'   // <-- import our helper
 import LoginModal from './LoginModal'
 
 export default function UserDashboard() {
+  const router = useRouter()
   const [user, setUser] = useState(null)
   const [showLogin, setShowLogin] = useState(false)
   const [tickets, setTickets] = useState([])
@@ -13,19 +16,24 @@ export default function UserDashboard() {
   const [email, setEmail] = useState('')
   const [compactView, setCompactView] = useState(false)
 
-  // Fetch tickets and prebooked events
+  // On mount, check if user is logged in
+  useEffect(() => {
+    if (auth.isLoggedIn()) {
+      setUser(auth.getUser())   // pull user from JWT
+    }
+  }, [])
+
+  // Fetch tickets + prebooked once user is set
   useEffect(() => {
     if (!user) return
 
     async function fetchData() {
       try {
-        // Tickets
-        const ticketRes = await fetch(`/api/tickets?email=${user.email}`)
+        const ticketRes = await auth.fetchWithAuth(`/api/tickets`)
         const ticketData = await ticketRes.json()
         setTickets(ticketData.tickets || [])
 
-        // Prebooked events
-        const prebookRes = await fetch(`/api/registrations?email=${user.email}`)
+        const prebookRes = await auth.fetchWithAuth(`/api/registrations`)
         const prebookData = await prebookRes.json()
         setPrebooked(prebookData.registrations || [])
       } catch (err) {
@@ -36,15 +44,19 @@ export default function UserDashboard() {
     fetchData()
   }, [user])
 
+  // When login succeeds, store token + user
   const handleLoginSuccess = (data) => {
-    setUser(data)
-    setUsername(data.username)
-    setEmail(data.email)
+    if (data.token) {
+      auth.setToken(data.token, data.user)
+      setUser(data.user)
+      setUsername(data.user.username)
+      setEmail(data.user.email)
+    }
   }
 
   const handleSave = async () => {
     try {
-      const res = await fetch('/api/update-user', {
+      const res = await auth.fetchWithAuth('/api/update-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, email }),
@@ -52,6 +64,7 @@ export default function UserDashboard() {
       const data = await res.json()
       if (res.ok) {
         setUser(data.user)
+        auth.setToken(auth.getToken(), data.user) // update local storage
         setEditMode(false)
       } else {
         alert(data.error || 'Update failed')
@@ -61,6 +74,15 @@ export default function UserDashboard() {
     }
   }
 
+  // Logout handler
+  const handleLogout = () => {
+    auth.logout()
+    setUser(null)
+    setTickets([])
+    setPrebooked([])
+  }
+
+  // If no user → show login button
   if (!user) {
     return (
       <>
@@ -85,6 +107,13 @@ export default function UserDashboard() {
       <h2 className="text-2xl font-bold mb-4 text-blue-400">
         Welcome, {user.username}
       </h2>
+
+      <button
+        onClick={handleLogout}
+        className="mb-4 bg-red-600 p-2 rounded text-white"
+      >
+        Logout
+      </button>
 
       {/* User Info */}
       <div className="mb-6 p-4 bg-zinc-800 rounded">
