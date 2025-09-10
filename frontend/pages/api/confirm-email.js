@@ -3,6 +3,8 @@
 import jwt from 'jsonwebtoken'
 import { pool } from '../../lib/postgres.js'
 
+console.log('JWT_SECRET in confirm-email:', process.env.JWT_SECRET)
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed. Use GET.' })
