@@ -1,5 +1,5 @@
 // lib/email.js
-import brevo from '@getbrevo/brevo'
+import * as brevo from '@getbrevo/brevo'   // ✅ correct
 
 const apiInstance = new brevo.TransactionalEmailsApi()
 apiInstance.setApiKey(
@@ -28,7 +28,10 @@ export async function sendVerificationEmail(to, verifyUrl) {
     console.log('✅ Verification email sent to', to, 'response:', response)
     return true
   } catch (err) {
-    console.error('❌ Failed to send verification email:', err.response?.body || err)
+    console.error(
+      '❌ Failed to send verification email:',
+      err.response?.body || err
+    )
     throw new Error('Failed to send verification email')
   }
 }
