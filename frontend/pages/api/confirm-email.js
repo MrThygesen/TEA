@@ -1,4 +1,5 @@
 // pages/api/confirm-email.js
+
 import { pool } from '../../lib/postgres.js'
 
 export default async function handler(req, res) {
@@ -7,12 +8,11 @@ export default async function handler(req, res) {
   if (!token) {
     return res.redirect(
       302,
-      'https://teanet.xyz?status=error&reason=missing_token'
+      `${process.env.NEXT_PUBLIC_BASE_URL}/email-verified?status=error&reason=missing_token`
     )
   }
 
   try {
-    // 1. Look up token
     const result = await pool.query(
       `SELECT user_id, expires_at FROM email_verification_tokens WHERE token = $1`,
       [token]
@@ -21,28 +21,25 @@ export default async function handler(req, res) {
     if (result.rows.length === 0) {
       return res.redirect(
         302,
-        'https://teanet.xyz?status=error&reason=invalid_token'
+        `${process.env.NEXT_PUBLIC_BASE_URL}/email-verified?status=error&reason=invalid_token`
       )
     }
 
     const { user_id, expires_at } = result.rows[0]
     const now = new Date()
 
-    // 2. Check expiration
     if (new Date(expires_at) < now) {
       return res.redirect(
         302,
-        'https://teanet.xyz?status=error&reason=expired_token'
+        `${process.env.NEXT_PUBLIC_BASE_URL}/email-verified?status=error&reason=expired_token`
       )
     }
 
-    // 3. Update user as verified
     await pool.query(
       `UPDATE user_profiles SET email_verified = TRUE WHERE id = $1`,
       [user_id]
     )
 
-    // 4. Delete token so it can’t be reused
     await pool.query(
       `DELETE FROM email_verification_tokens WHERE token = $1`,
       [token]
@@ -50,13 +47,16 @@ export default async function handler(req, res) {
 
     console.log(`✅ Email verified for user_id ${user_id}`)
 
-    // 5. Redirect success
-    return res.redirect(302, 'https://teanet.xyz?status=success')
+    return res.redirect(
+      302,
+      `${process.env.NEXT_PUBLIC_BASE_URL}/email-verified?status=success`
+    )
+
   } catch (err) {
     console.error('❌ Email verification error:', err)
     return res.redirect(
       302,
-      `https://teanet.xyz?status=error&reason=${encodeURIComponent(err.message)}`
+      `${process.env.NEXT_PUBLIC_BASE_URL}/email-verified?status=error&reason=${encodeURIComponent(err.message)}`
     )
   }
 }

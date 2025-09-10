@@ -27,12 +27,12 @@ export default async function handler(req, res) {
     )
 
     if (result.rows.length === 0) {
-      console.warn('⚠️ Email already registered:', email)
       return res.status(400).json({ error: 'Email already registered' })
     }
 
     const user = result.rows[0]
 
+    // Create verification token
     const token = crypto.randomBytes(32).toString('hex')
     await pool.query(
       `INSERT INTO email_verification_tokens (user_id, token, expires_at, email)
@@ -45,16 +45,18 @@ export default async function handler(req, res) {
     )
 
     const verifyUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/api/confirm-email?token=${token}`
+
     try {
       await sendVerificationEmail(email, verifyUrl)
     } catch (emailErr) {
-      console.warn('⚠️ Failed to send verification email, but user was created:', emailErr)
+      console.warn('⚠️ Failed to send verification email:', emailErr)
     }
 
+    // ⚠️ DO NOT log in yet
     return res.status(201).json({
-      user,
       message: '✅ Registration successful. Please check your email to verify your account.',
     })
+
   } catch (err) {
     console.error('❌ Registration error:', err)
     return res.status(500).json({ error: 'Internal server error', details: err.message })
