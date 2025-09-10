@@ -26,9 +26,10 @@ export default async function handler(req, res) {
     }
 
     const { user_id, expires_at } = result.rows[0]
+    const now = new Date()
 
     // 2. Check expiration
-    if (new Date(expires_at) < new Date()) {
+    if (new Date(expires_at) < now) {
       return res.redirect(
         302,
         'https://teanet.xyz?status=error&reason=expired_token'
@@ -55,9 +56,7 @@ export default async function handler(req, res) {
     console.error('❌ Email verification error:', err)
     return res.redirect(
       302,
-      `https://teanet.xyz?status=error&reason=${encodeURIComponent(
-        err.message
-      )}`
+      `https://teanet.xyz?status=error&reason=${encodeURIComponent(err.message)}`
     )
   }
 }

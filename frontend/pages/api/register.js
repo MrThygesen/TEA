@@ -1,4 +1,3 @@
-// pages/api/register.js
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { pool } from '../../lib/postgres.js'
@@ -17,10 +16,8 @@ export default async function handler(req, res) {
   try {
     console.log('🔹 Registration started for:', email)
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // Insert user
     const result = await pool.query(
       `INSERT INTO user_profiles (email, password_hash, username, email_verified)
        VALUES ($1, $2, $3, FALSE)
@@ -35,9 +32,7 @@ export default async function handler(req, res) {
     }
 
     const user = result.rows[0]
-    console.log('✅ User inserted:', user)
 
-    // Generate verification token
     const token = crypto.randomBytes(32).toString('hex')
     await pool.query(
       `INSERT INTO email_verification_tokens (user_id, token, expires_at, email)
@@ -48,13 +43,10 @@ export default async function handler(req, res) {
                      email = EXCLUDED.email`,
       [user.id, token, email]
     )
-    console.log('✅ Verification token upserted for user_id:', user.id)
 
-    // Send verification email (fail gracefully)
     const verifyUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/api/confirm-email?token=${token}`
     try {
       await sendVerificationEmail(email, verifyUrl)
-      console.log('✅ Verification email sent successfully')
     } catch (emailErr) {
       console.warn('⚠️ Failed to send verification email, but user was created:', emailErr)
     }
