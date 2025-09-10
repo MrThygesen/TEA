@@ -1,16 +1,15 @@
 // lib/email.js
-const brevo = require('@getbrevo/brevo')
+const SibApiV3Sdk = require('@getbrevo/brevo')
 
 // Configure API key
-const defaultClient = brevo.ApiClient.instance
-const apiKey = defaultClient.authentications['api-key']
-apiKey.apiKey = process.env.BREVO_API_KEY
+const defaultClient = SibApiV3Sdk.ApiClient.instance
+defaultClient.authentications['api-key'].apiKey = process.env.BREVO_API_KEY
 
-const apiInstance = new brevo.TransactionalEmailsApi()
+const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi()
 
 async function sendVerificationEmail(to, verifyUrl) {
   try {
-    const sendSmtpEmail = new brevo.SendSmtpEmail()
+    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
     sendSmtpEmail.sender = {
       name: 'Edgy Events',
       email: process.env.MAIL_FROM || 'no-reply@teanet.xyz',

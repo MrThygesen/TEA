@@ -59,6 +59,7 @@ module.exports = async function handler(req, res) {
       console.warn('⚠️ Failed to send verification email, but user was created:', emailErr)
     }
 
+    // Return success
     return res.status(201).json({
       user,
       message: '✅ Registration successful. Please check your email to verify your account.',
