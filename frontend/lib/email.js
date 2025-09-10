@@ -1,12 +1,19 @@
 // lib/email.js
+
 const SibApiV3Sdk = require('@getbrevo/brevo')
 
 // Create API instance with API key
 const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi()
-apiInstance.setApiKey(SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY)
+apiInstance.setApiKey(
+  SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey,
+  process.env.BREVO_API_KEY
+)
 
-async function sendVerificationEmail(to, verifyUrl) {
+async function sendVerificationEmail(to, token) {
   try {
+    // Link points to frontend page
+    const verifyUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/email-verified?token=${token}`
+
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
     sendSmtpEmail.sender = {
       name: 'Edgy Events',

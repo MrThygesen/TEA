@@ -1,3 +1,5 @@
+// pages/api/register.js
+
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { pool } from '../../lib/postgres.js'
@@ -44,10 +46,9 @@ export default async function handler(req, res) {
       [user.id, token, email]
     )
 
-    const verifyUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/api/confirm-email?token=${token}`
-
+    // ✅ Send email using new lib/email.js (the URL is built inside)
     try {
-      await sendVerificationEmail(email, verifyUrl)
+      await sendVerificationEmail(email, token)
     } catch (emailErr) {
       console.warn('⚠️ Failed to send verification email:', emailErr)
     }
