@@ -38,14 +38,19 @@ export default async function handler(req, res) {
     const user = result.rows[0]
     console.log('✅ User inserted:', user)
 
-    // Generate verification token
-    const token = crypto.randomBytes(32).toString('hex')
-    await pool.query(
-      `INSERT INTO email_verification_tokens (user_id, token, expires_at, email)
-       VALUES ($1, $2, NOW() + interval '1 day', $3)`,
-      [user.id, token, email]
-    )
-    console.log('✅ Verification token inserted for user_id:', user.id)
+// Generate verification token
+const token = crypto.randomBytes(32).toString('hex')
+await pool.query(
+  `INSERT INTO email_verification_tokens (user_id, token, expires_at, email)
+   VALUES ($1, $2, NOW() + interval '1 day', $3)
+   ON CONFLICT (user_id) 
+   DO UPDATE SET token = EXCLUDED.token,
+                 expires_at = EXCLUDED.expires_at,
+                 email = EXCLUDED.email`,
+  [user.id, token, email]
+)
+console.log('✅ Verification token upserted for user_id:', user.id)
+
 
     // Send verification email
     const verifyUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/api/confirm-email?token=${token}`
