@@ -1,5 +1,5 @@
 // lib/email.js
-import SibApiV3Sdk from '@getbrevo/brevo'
+import * as SibApiV3Sdk from '@getbrevo/brevo'
 
 const defaultClient = SibApiV3Sdk.ApiClient.instance
 defaultClient.authentications['api-key'].apiKey = process.env.BREVO_API_KEY
@@ -21,7 +21,6 @@ export async function sendVerificationEmail(to, verifyUrl) {
       <p><a href="${verifyUrl}">Verify my email</a></p>
       <p>This link expires in 24 hours.</p>
     `
-
     const response = await apiInstance.sendTransacEmail(sendSmtpEmail)
     console.log('✅ Verification email sent to', to, 'response:', response)
     return true

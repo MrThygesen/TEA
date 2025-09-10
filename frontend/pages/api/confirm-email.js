@@ -12,7 +12,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1️⃣ Look up token
+    // 1. Look up token
     const result = await pool.query(
       `SELECT user_id, expires_at FROM email_verification_tokens WHERE token = $1`,
       [token]
@@ -27,7 +27,7 @@ export default async function handler(req, res) {
 
     const { user_id, expires_at } = result.rows[0]
 
-    // 2️⃣ Check expiration
+    // 2. Check expiration
     if (new Date(expires_at) < new Date()) {
       return res.redirect(
         302,
@@ -35,13 +35,13 @@ export default async function handler(req, res) {
       )
     }
 
-    // 3️⃣ Update user as verified
+    // 3. Update user as verified
     await pool.query(
       `UPDATE user_profiles SET email_verified = TRUE WHERE id = $1`,
       [user_id]
     )
 
-    // 4️⃣ Delete token so it can’t be reused
+    // 4. Delete token so it can’t be reused
     await pool.query(
       `DELETE FROM email_verification_tokens WHERE token = $1`,
       [token]
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
 
     console.log(`✅ Email verified for user_id ${user_id}`)
 
-    // 5️⃣ Redirect success
+    // 5. Redirect success
     return res.redirect(302, 'https://teanet.xyz?status=success')
   } catch (err) {
     console.error('❌ Email verification error:', err)
