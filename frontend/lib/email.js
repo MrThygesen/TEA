@@ -1,14 +1,15 @@
 // lib/email.js
-const SibApiV3Sdk = require('@getbrevo/brevo')
-
-// Configure API key
-const defaultClient = SibApiV3Sdk.ApiClient.instance
-defaultClient.authentications['api-key'].apiKey = process.env.BREVO_API_KEY
-
-const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi()
-
 async function sendVerificationEmail(to, verifyUrl) {
   try {
+    // Lazy-load Brevo SDK to avoid build-time issues on Vercel
+    const SibApiV3Sdk = require('@getbrevo/brevo')
+
+    // Configure API key
+    const defaultClient = SibApiV3Sdk.ApiClient.instance
+    defaultClient.authentications['api-key'].apiKey = process.env.BREVO_API_KEY
+
+    const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi()
+
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
     sendSmtpEmail.sender = {
       name: 'Edgy Events',

@@ -5,14 +5,11 @@ const { pool } = require('../../lib/postgres.js')
 const { sendVerificationEmail } = require('../../lib/email.js')
 
 module.exports = async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed. Use POST.' })
-  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST' })
 
   const { email, password, username } = req.body
-  if (!email || !password || !username) {
-    return res.status(400).json({ error: 'Username, email and password are required.' })
-  }
+  if (!email || !password || !username)
+    return res.status(400).json({ error: 'Email, username and password required' })
 
   try {
     console.log('🔹 Registration started for:', email)
@@ -29,15 +26,13 @@ module.exports = async function handler(req, res) {
       [email, hashedPassword, username]
     )
 
-    if (result.rows.length === 0) {
-      console.warn('⚠️ Email already registered:', email)
+    if (!result.rows.length)
       return res.status(400).json({ error: 'Email already registered' })
-    }
 
     const user = result.rows[0]
     console.log('✅ User inserted:', user)
 
-    // Generate verification token
+    // Create verification token
     const token = crypto.randomBytes(32).toString('hex')
     await pool.query(
       `INSERT INTO email_verification_tokens (user_id, token, expires_at, email)
@@ -48,18 +43,16 @@ module.exports = async function handler(req, res) {
                      email = EXCLUDED.email`,
       [user.id, token, email]
     )
-    console.log('✅ Verification token upserted for user_id:', user.id)
+    console.log('✅ Verification token created for user_id:', user.id)
 
-    // Send verification email (fail gracefully)
+    // Send email (fail gracefully)
     const verifyUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/api/confirm-email?token=${token}`
     try {
       await sendVerificationEmail(email, verifyUrl)
-      console.log('✅ Verification email sent successfully')
-    } catch (emailErr) {
-      console.warn('⚠️ Failed to send verification email, but user was created:', emailErr)
+    } catch (e) {
+      console.warn('⚠️ Email failed, but user created:', e.message)
     }
 
-    // Return success
     return res.status(201).json({
       user,
       message: '✅ Registration successful. Please check your email to verify your account.',
