@@ -1,41 +1,30 @@
 // components/EmailVerified.js
+'use client'
+
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import auth from '../lib/auth'
 
 export default function EmailVerified() {
   const router = useRouter()
-  const { token } = router.query
-  const [status, setStatus] = useState('loading')
+  const { status, token } = router.query
+  const [message, setMessage] = useState('⏳ Verifying your email...')
 
   useEffect(() => {
-    if (!token) return
+    if (!status) return
 
-    async function verifyEmail() {
-      try {
-        const res = await fetch(`/api/confirm-email?token=${token}`)
-        const data = await res.json()
-
-        if (res.ok) {
-          auth.setToken(data.token) // store JWT
-          setStatus('success')
-          router.push('/dashboard') // auto redirect
-        } else {
-          setStatus('error')
-          console.error(data.error)
-        }
-      } catch (err) {
-        console.error(err)
-        setStatus('error')
-      }
+    if (status === 'success' && token) {
+      // Store JWT and redirect
+      auth.setToken(token)
+      setMessage('✅ Email verified! Redirecting to your dashboard...')
+      setTimeout(() => {
+        router.push('/dashboard')
+      }, 1500)
+    } else if (status === 'error') {
+      setMessage('❌ Email verification failed. The token may be invalid or expired.')
     }
+  }, [status, token, router])
 
-    verifyEmail()
-  }, [token, router])
-
-  if (status === 'loading') return <p>⏳ Verifying your email...</p>
-  if (status === 'error') return <p>❌ Email verification failed.</p>
-
-  return <p>✅ Email verified! Redirecting...</p>
+  return <p>{message}</p>
 }
 
