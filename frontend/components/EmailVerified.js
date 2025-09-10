@@ -1,8 +1,9 @@
+// components/EmailVerified.js 
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import auth from './auth'
+import auth from '../lib/auth'
 
 export default function EmailVerified() {
   const router = useRouter()
