@@ -1,15 +1,18 @@
 // pages/api/register.js
-const bcrypt = require('bcryptjs')
-const crypto = require('crypto')
-const { pool } = require('../../lib/postgres.js')
-const { sendVerificationEmail } = require('../../lib/email.js')
+import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
+import { pool } from '../../lib/postgres.js'
+import { sendVerificationEmail } from '../../lib/email.js'
 
-module.exports = async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST' })
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed. Use POST.' })
+  }
 
   const { email, password, username } = req.body
-  if (!email || !password || !username)
+  if (!email || !password || !username) {
     return res.status(400).json({ error: 'Email, username and password required' })
+  }
 
   try {
     console.log('🔹 Registration started for:', email)
@@ -26,8 +29,9 @@ module.exports = async function handler(req, res) {
       [email, hashedPassword, username]
     )
 
-    if (!result.rows.length)
+    if (!result.rows.length) {
       return res.status(400).json({ error: 'Email already registered' })
+    }
 
     const user = result.rows[0]
     console.log('✅ User inserted:', user)
@@ -45,7 +49,7 @@ module.exports = async function handler(req, res) {
     )
     console.log('✅ Verification token created for user_id:', user.id)
 
-    // Send email (fail gracefully)
+    // Send verification email (fail gracefully)
     const verifyUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/api/confirm-email?token=${token}`
     try {
       await sendVerificationEmail(email, verifyUrl)
