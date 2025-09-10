@@ -1,12 +1,12 @@
-export async function sendVerificationEmail(to, verifyUrl) {
+// lib/email.js
+const SibApiV3Sdk = require('@getbrevo/brevo')
+
+// Create API instance with API key
+const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi()
+apiInstance.setApiKey(SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY)
+
+async function sendVerificationEmail(to, verifyUrl) {
   try {
-    // Dynamically import the Brevo SDK
-    const SibApiV3Sdk = await import('@getbrevo/brevo')
-    const defaultClient = SibApiV3Sdk.ApiClient.instance
-    defaultClient.authentications['api-key'].apiKey = process.env.BREVO_API_KEY
-
-    const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi()
-
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
     sendSmtpEmail.sender = {
       name: 'Edgy Events',
@@ -29,4 +29,6 @@ export async function sendVerificationEmail(to, verifyUrl) {
     throw new Error('Failed to send verification email')
   }
 }
+
+module.exports = { sendVerificationEmail }
 
