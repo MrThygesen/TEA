@@ -1,4 +1,4 @@
-// frontend/pages/api/verify-email.js
+// frontend/pages/api/confirm-email.js
 
 export default async function handler(req, res) {
   const { token } = req.query;
@@ -9,7 +9,7 @@ export default async function handler(req, res) {
 
   try {
     // Call the backend bot/email.js endpoint
-    const backendUrl = process.env.BOT_SERVER_URL || "https://your-bot-server.vercel.app";
+    const backendUrl = process.env.BOT_SERVER_URL || "https://tea-liart.vercel.app";
     const response = await fetch(`${backendUrl}/api/confirm-email`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

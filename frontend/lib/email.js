@@ -12,7 +12,7 @@ export async function sendVerificationEmail(to, verifyUrl) {
     const sendSmtpEmail = new brevo.SendSmtpEmail()
     sendSmtpEmail.sender = {
       name: 'Edgy Events',
-      email: process.env.MAIL_FROM || 'noreply@edgy.com',
+      email: process.env.MAIL_FROM || 'noreply@teanet.syz',
     }
     sendSmtpEmail.to = [{ email: to }]
     sendSmtpEmail.subject = 'Verify your email for Edgy Events'
