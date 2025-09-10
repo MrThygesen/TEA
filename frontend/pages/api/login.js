@@ -7,45 +7,54 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' })
   }
 
-  const { email, username, password } = req.body
+  const { email, password } = req.body
 
-  if ((!email && !username) || !password) {
-    return res.status(400).json({ error: 'Email or username and password are required.' })
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required.' })
   }
 
   try {
-    // Look up user either by email or by username
+    // 1️⃣ Fetch user by email
     const result = await pool.query(
-      `SELECT id, email, telegram_username, password_hash, role, tier 
-       FROM user_profiles 
-       WHERE ($1::text IS NOT NULL AND email = $1) 
-          OR ($2::text IS NOT NULL AND telegram_username = $2)`,
-      [email || null, username || null]
+      `SELECT id, username, email, password_hash, role, tier, email_verified
+       FROM user_profiles
+       WHERE email = $1`,
+      [email]
     )
 
     if (result.rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid credentials' })
+      return res.status(400).json({ error: 'Invalid email or password.' })
     }
 
     const user = result.rows[0]
 
-    // Compare password
-    const isValid = await bcrypt.compare(password, user.password_hash)
-    if (!isValid) {
-      return res.status(400).json({ error: 'Invalid credentials' })
+    // 2️⃣ Verify password
+    const validPassword = await bcrypt.compare(password, user.password_hash)
+    if (!validPassword) {
+      return res.status(400).json({ error: 'Invalid email or password.' })
     }
 
-    // Return safe user object (no password hash)
+    // 3️⃣ Check if email is verified
+    if (!user.email_verified) {
+      return res.status(403).json({
+        error: 'Email not verified. Please check your inbox and confirm your email before logging in.',
+      })
+    }
+
+    // 4️⃣ Login successful, return user data
     return res.status(200).json({
-      id: user.id,
-      email: user.email,
-      username: user.telegram_username,
-      role: user.role,
-      tier: user.tier,
+      message: '✅ Login successful',
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        tier: user.tier,
+      },
     })
   } catch (err) {
-    console.error('Login error:', err)
-    return res.status(500).json({ error: 'Internal server error' })
+    console.error('❌ Login error:', err)
+    return res.status(500).json({ error: 'Internal server error', details: err.message })
   }
 }
 
