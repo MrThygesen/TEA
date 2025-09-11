@@ -23,7 +23,7 @@ export default async function handler(req, res) {
       `INSERT INTO user_profiles (email, password_hash, username, email_verified)
        VALUES ($1, $2, $3, FALSE)
        ON CONFLICT (email) DO NOTHING
-       RETURNING id, email, username, role, tier`,
+       RETURNING id, email, username`,
       [email, hashedPassword, username]
     )
 
@@ -33,21 +33,22 @@ export default async function handler(req, res) {
 
     const user = result.rows[0]
 
-// Create verification token
-const token = crypto.randomBytes(32).toString('hex')
+    // ✅ Generate token
+    const token = crypto.randomBytes(32).toString('hex')
 
-// compute expiry in Node (24h later, UTC)
-const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
+    // ✅ Use ISO string for Postgres TIMESTAMPTZ
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
 
-await pool.query(
-  `INSERT INTO email_verification_tokens (user_id, token, expires_at, email)
-   VALUES ($1, $2, $3, $4)
-   ON CONFLICT (user_id) 
-   DO UPDATE SET token = EXCLUDED.token,
-                 expires_at = EXCLUDED.expires_at,
-                 email = EXCLUDED.email`,
-  [user.id, token, expiresAt, email]
-)
+    // Insert token
+    await pool.query(
+      `INSERT INTO email_verification_tokens (user_id, token, expires_at, email)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (user_id) 
+       DO UPDATE SET token = EXCLUDED.token,
+                     expires_at = EXCLUDED.expires_at,
+                     email = EXCLUDED.email`,
+      [user.id, token, expiresAt, email]
+    )
 
     // Send verification email
     try {
@@ -58,6 +59,7 @@ await pool.query(
 
     return res.status(201).json({
       message: '✅ Registration successful. Please check your email to verify your account.',
+      debug: { token, expiresAt }, // optional for debugging
     })
 
   } catch (err) {

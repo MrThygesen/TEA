@@ -17,8 +17,7 @@ export default async function handler(req, res) {
       SELECT up.id AS user_id,
              up.username,
              up.email,
-             evt.expires_at,
-             evt.created_at
+             evt.expires_at
       FROM email_verification_tokens evt
       JOIN user_profiles up ON up.id = evt.user_id
       WHERE evt.token = $1
@@ -31,25 +30,22 @@ export default async function handler(req, res) {
     }
 
     const row = result.rows[0]
-    const nodeNow = new Date()
-    const expiresAt = row.expires_at ? new Date(row.expires_at) : null
 
-    // Debug when expired
-if (!expiresAt || nodeNow.getTime() > expiresAt.getTime()) {
-  console.warn('❌ Token expired check failed', {
-    nodeNow: nodeNow.toISOString(),
-    expiresAt: expiresAt ? expiresAt.toISOString() : null,
-    token,
-  })
-  return res.status(400).json({
-    error: 'Invalid or expired token.',
-    debug: {
-      nodeNow: nodeNow.toISOString(),
-      expiresAt: expiresAt ? expiresAt.toISOString() : null,
-    },
-  })
-}
-    // mark verified
+    // ✅ Parse timestamp as Date
+    const nodeNow = new Date()
+    const expiresAt = new Date(row.expires_at)
+
+    console.log('🔹 Token row:', row)
+    console.log('🔹 nodeNow:', nodeNow.toISOString(), 'expiresAt:', expiresAt.toISOString())
+
+    if (nodeNow.getTime() > expiresAt.getTime()) {
+      return res.status(400).json({
+        error: 'Invalid or expired token.',
+        debug: { nodeNow: nodeNow.toISOString(), expiresAt: expiresAt.toISOString() },
+      })
+    }
+
+    // Mark email as verified
     await pool.query(
       `UPDATE user_profiles
        SET email_verified = TRUE
@@ -57,10 +53,13 @@ if (!expiresAt || nodeNow.getTime() > expiresAt.getTime()) {
       [row.user_id]
     )
 
-    // remove token
-    await pool.query(`DELETE FROM email_verification_tokens WHERE token = $1`, [token])
+    // Remove token
+    await pool.query(
+      `DELETE FROM email_verification_tokens WHERE token = $1`,
+      [token]
+    )
 
-    // create JWT
+    // Create JWT
     const jwtToken = jwt.sign(
       { id: row.user_id, email: row.email, username: row.username },
       process.env.JWT_SECRET,
@@ -72,6 +71,7 @@ if (!expiresAt || nodeNow.getTime() > expiresAt.getTime()) {
       token: jwtToken,
       user: { id: row.user_id, username: row.username, email: row.email },
     })
+
   } catch (err) {
     console.error('❌ Email verification error:', err)
     return res.status(500).json({ error: 'Internal server error', details: err.message })
