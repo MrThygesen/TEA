@@ -1,4 +1,4 @@
-//components/EmailVerified
+	//components/EmailVerified
 
 'use client'
 import { useEffect, useState } from 'react'

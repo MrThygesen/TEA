@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { auth } from '../lib/auth'
+import auth from '../components/auth'
 import LoginModal from './LoginModal'
 
+// --- Simple reusable Modal ---
 function Modal({ open, onClose, title, children }) {
   if (!open) return null
   return (
@@ -36,45 +37,56 @@ export default function UserDashboard() {
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
 
-  // On mount, check if user is logged in
+  // === On mount: read token + user from auth/localStorage ===
   useEffect(() => {
     if (auth.isLoggedIn()) {
-      const u = auth.getUser()
-      setUser(u)
-      setUsername(u.username)
-      setEmail(u.email)
+      try {
+        const u = auth.getUser()
+        if (u) {
+          setUser(u)
+          setUsername(u.username || '')
+          setEmail(u.email || '')
+        }
+      } catch (err) {
+        console.error('Failed to parse stored user:', err)
+        auth.logout()
+      }
     }
   }, [])
 
-  // Fetch tickets + prebooked once user is set
+  // === Fetch tickets + prebooked when user is available ===
   useEffect(() => {
     if (!user) return
+
     async function fetchData() {
       try {
-        const ticketRes = await auth.fetchWithAuth(`/api/tickets`)
+        const ticketRes = await auth.fetchWithAuth('/api/tickets')
         const ticketData = await ticketRes.json()
-        setTickets(ticketData.tickets || [])
+        setTickets(ticketData?.tickets || [])
 
-        const prebookRes = await auth.fetchWithAuth(`/api/registrations`)
+        const prebookRes = await auth.fetchWithAuth('/api/registrations')
         const prebookData = await prebookRes.json()
-        setPrebooked(prebookData.registrations || [])
+        setPrebooked(prebookData?.registrations || [])
       } catch (err) {
         console.error('Error fetching user events:', err)
       }
     }
+
     fetchData()
   }, [user])
 
-  // When login succeeds
+  // === When login succeeds ===
   const handleLoginSuccess = (data) => {
     if (data.token) {
       auth.setToken(data.token, data.user)
       setUser(data.user)
-      setUsername(data.user.username)
-      setEmail(data.user.email)
+      setUsername(data.user.username || '')
+      setEmail(data.user.email || '')
+      setShowLogin(false)
     }
   }
 
+  // === Profile update ===
   const handleSaveProfile = async () => {
     try {
       const res = await auth.fetchWithAuth('/api/update-user', {
@@ -92,6 +104,7 @@ export default function UserDashboard() {
       }
     } catch (err) {
       console.error(err)
+      alert('Network error while updating profile')
     }
   }
 
@@ -100,9 +113,10 @@ export default function UserDashboard() {
     setUser(null)
     setTickets([])
     setPrebooked([])
+    router.replace('/login')
   }
 
-  // If no user → login button
+  // === If no user: show login modal ===
   if (!user) {
     return (
       <>
@@ -122,6 +136,7 @@ export default function UserDashboard() {
     )
   }
 
+  // === Dashboard view when logged in ===
   return (
     <div className="p-6 text-white">
       <h2 className="text-3xl font-bold mb-6 text-blue-400">
@@ -235,7 +250,7 @@ export default function UserDashboard() {
                 <p>City: {e.city}</p>
                 <p>Date: {new Date(e.datetime).toLocaleString()}</p>
                 <p>Venue: {e.venue_type}</p>
-                <p>Status: {e.is_confirmed ? 'Confirmed' : 'Idle'}</p>
+                <p>Status: {e.is_confirmed ? '✅ Confirmed' : '⌛ Idle'}</p>
               </div>
             ))}
           </div>

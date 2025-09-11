@@ -1,8 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/router'
 
 export default function LoginModal({ onClose, onLoginSuccess }) {
+  const router = useRouter()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
@@ -19,8 +21,19 @@ export default function LoginModal({ onClose, onLoginSuccess }) {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Login failed')
+
+      // ✅ Save JWT + user in localStorage
+      localStorage.setItem('token', data.token)
+      localStorage.setItem('user', JSON.stringify(data.user))
+
+      // ✅ Call parent callback (if needed)
       onLoginSuccess(data)
+
+      // ✅ Close modal
       onClose()
+
+      // ✅ Redirect to dashboard
+      router.push('/dashboard')
     } catch (err) {
       setError(err.message)
     } finally {
@@ -40,7 +53,7 @@ export default function LoginModal({ onClose, onLoginSuccess }) {
         <h2 className="text-xl font-bold mb-4 text-blue-400">Login</h2>
         <input
           type="text"
-          placeholder="Username"
+          placeholder="Email"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           className="w-full mb-3 p-2 rounded text-black"
