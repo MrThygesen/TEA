@@ -1,4 +1,4 @@
-// components/EmailVerified.js
+// frontend/components/EmailVerified.js
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'

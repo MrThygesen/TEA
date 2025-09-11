@@ -20,7 +20,3 @@ export async function getServerSideProps(context) {
     },
   }
 }
-
-
-
--f frontend/pages/email-verified.js -f 
