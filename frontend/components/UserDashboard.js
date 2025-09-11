@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import auth from '../components/auth'
-import LoginModal from './LoginModal'
+import LoginModal from './loginModal'
 
 // --- Simple reusable Modal ---
 function Modal({ open, onClose, title, children }) {
