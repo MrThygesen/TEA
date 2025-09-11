@@ -1,11 +1,13 @@
-// frontend/components/EmailVerified.js
+//components/EmailVerified
 
+'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import auth from './auth'
 
-export default function EmailVerified({ token }) {
+export default function EmailVerified() {
   const router = useRouter()
+  const { token } = router.query
   const [message, setMessage] = useState('⏳ Verifying your email...')
 
   useEffect(() => {
@@ -17,9 +19,9 @@ export default function EmailVerified({ token }) {
         const data = await res.json()
 
         if (res.ok) {
-          auth.setToken(data.token, data.user)
+          auth.setToken(data.token, data.user) // store JWT + user
           setMessage('✅ Email verified! Redirecting to your dashboard...')
-          setTimeout(() => router.replace('/dashboard'), 1500)
+          setTimeout(() => router.replace('/dashboard'), 1500) // clean URL
         } else {
           setMessage(`❌ Email verification failed: ${data.error}`)
         }
@@ -30,7 +32,7 @@ export default function EmailVerified({ token }) {
     }
 
     verifyEmail()
-  }, [token])
+  }, [token, router])
 
   return <p>{message}</p>
 }
