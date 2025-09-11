@@ -1,4 +1,5 @@
-// pages/api/confirm-email.js
+//frontend/pages/api/confirm-email.js
+
 import jwt from 'jsonwebtoken'
 import { pool } from '../../lib/postgres.js'
 
@@ -30,19 +31,11 @@ export default async function handler(req, res) {
     }
 
     const row = result.rows[0]
-
-    // ✅ Parse timestamp as Date
     const nodeNow = new Date()
     const expiresAt = new Date(row.expires_at)
 
-    console.log('🔹 Token row:', row)
-    console.log('🔹 nodeNow:', nodeNow.toISOString(), 'expiresAt:', expiresAt.toISOString())
-
     if (nodeNow.getTime() > expiresAt.getTime()) {
-      return res.status(400).json({
-        error: 'Invalid or expired token.',
-        debug: { nodeNow: nodeNow.toISOString(), expiresAt: expiresAt.toISOString() },
-      })
+      return res.status(400).json({ error: 'Invalid or expired token.' })
     }
 
     // Mark email as verified
@@ -66,10 +59,10 @@ export default async function handler(req, res) {
       { expiresIn: '7d' }
     )
 
+    // Return JSON so frontend can handle auto-login
     return res.status(200).json({
-      message: '✅ Email verified successfully',
       token: jwtToken,
-      user: { id: row.user_id, username: row.username, email: row.email },
+      user: { id: row.user_id, email: row.email, username: row.username }
     })
 
   } catch (err) {
