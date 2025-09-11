@@ -2,31 +2,53 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { auth } from '../lib/auth'   // <-- import our helper
+import { auth } from '../lib/auth'
 import LoginModal from './LoginModal'
+
+function Modal({ open, onClose, title, children }) {
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+      <div className="bg-zinc-900 text-white rounded-lg shadow-xl w-full max-w-lg p-6 relative">
+        <button
+          onClick={onClose}
+          className="absolute top-2 right-2 text-gray-300 hover:text-white"
+        >
+          ✕
+        </button>
+        <h2 className="text-xl font-bold mb-4 text-blue-400">{title}</h2>
+        {children}
+      </div>
+    </div>
+  )
+}
 
 export default function UserDashboard() {
   const router = useRouter()
   const [user, setUser] = useState(null)
   const [showLogin, setShowLogin] = useState(false)
+
   const [tickets, setTickets] = useState([])
   const [prebooked, setPrebooked] = useState([])
-  const [editMode, setEditMode] = useState(false)
+
+  const [modalType, setModalType] = useState(null) // 'profile' | 'tickets' | 'prebooked'
+
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
-  const [compactView, setCompactView] = useState(false)
 
   // On mount, check if user is logged in
   useEffect(() => {
     if (auth.isLoggedIn()) {
-      setUser(auth.getUser())   // pull user from JWT
+      const u = auth.getUser()
+      setUser(u)
+      setUsername(u.username)
+      setEmail(u.email)
     }
   }, [])
 
   // Fetch tickets + prebooked once user is set
   useEffect(() => {
     if (!user) return
-
     async function fetchData() {
       try {
         const ticketRes = await auth.fetchWithAuth(`/api/tickets`)
@@ -40,11 +62,10 @@ export default function UserDashboard() {
         console.error('Error fetching user events:', err)
       }
     }
-
     fetchData()
   }, [user])
 
-  // When login succeeds, store token + user
+  // When login succeeds
   const handleLoginSuccess = (data) => {
     if (data.token) {
       auth.setToken(data.token, data.user)
@@ -54,7 +75,7 @@ export default function UserDashboard() {
     }
   }
 
-  const handleSave = async () => {
+  const handleSaveProfile = async () => {
     try {
       const res = await auth.fetchWithAuth('/api/update-user', {
         method: 'POST',
@@ -64,8 +85,8 @@ export default function UserDashboard() {
       const data = await res.json()
       if (res.ok) {
         setUser(data.user)
-        auth.setToken(auth.getToken(), data.user) // update local storage
-        setEditMode(false)
+        auth.setToken(auth.getToken(), data.user)
+        setModalType(null)
       } else {
         alert(data.error || 'Update failed')
       }
@@ -74,7 +95,6 @@ export default function UserDashboard() {
     }
   }
 
-  // Logout handler
   const handleLogout = () => {
     auth.logout()
     setUser(null)
@@ -82,7 +102,7 @@ export default function UserDashboard() {
     setPrebooked([])
   }
 
-  // If no user → show login button
+  // If no user → login button
   if (!user) {
     return (
       <>
@@ -103,118 +123,124 @@ export default function UserDashboard() {
   }
 
   return (
-    <div className="p-4">
-      <h2 className="text-2xl font-bold mb-4 text-blue-400">
+    <div className="p-6 text-white">
+      <h2 className="text-3xl font-bold mb-6 text-blue-400">
         Welcome, {user.username}
       </h2>
 
-      <button
-        onClick={handleLogout}
-        className="mb-4 bg-red-600 p-2 rounded text-white"
-      >
-        Logout
-      </button>
+      <div className="flex gap-3 mb-6">
+        <button
+          onClick={() => setModalType('profile')}
+          className="bg-blue-600 px-4 py-2 rounded"
+        >
+          Profile
+        </button>
+        <button
+          onClick={() => setModalType('tickets')}
+          className="bg-green-600 px-4 py-2 rounded"
+        >
+          Tickets
+        </button>
+        <button
+          onClick={() => setModalType('prebooked')}
+          className="bg-purple-600 px-4 py-2 rounded"
+        >
+          Prebooked
+        </button>
+        <button
+          onClick={handleLogout}
+          className="bg-red-600 px-4 py-2 rounded ml-auto"
+        >
+          Logout
+        </button>
+      </div>
 
-      {/* User Info */}
-      <div className="mb-6 p-4 bg-zinc-800 rounded">
-        {editMode ? (
-          <>
+      {/* Profile Modal */}
+      <Modal
+        open={modalType === 'profile'}
+        onClose={() => setModalType(null)}
+        title="Your Profile"
+      >
+        <div className="flex flex-col gap-3">
+          <label>
+            Username
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="mb-2 p-2 rounded w-full text-black"
+              className="w-full p-2 text-black rounded"
             />
+          </label>
+          <label>
+            Email
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mb-2 p-2 rounded w-full text-black"
+              className="w-full p-2 text-black rounded"
             />
+          </label>
+          <p>Role: {user.role}</p>
+          <div className="flex gap-2">
             <button
-              onClick={handleSave}
-              className="bg-green-600 p-2 rounded text-white"
+              onClick={handleSaveProfile}
+              className="bg-green-600 px-4 py-2 rounded"
             >
               Save
             </button>
             <button
-              onClick={() => setEditMode(false)}
-              className="ml-2 bg-gray-600 p-2 rounded text-white"
+              onClick={() => setModalType(null)}
+              className="bg-gray-600 px-4 py-2 rounded"
             >
               Cancel
             </button>
-          </>
-        ) : (
-          <>
-            <p>Username: {user.username}</p>
-            <p>Email: {user.email}</p>
-            <p>Role: {user.role}</p>
-            <button
-              onClick={() => setEditMode(true)}
-              className="mt-2 bg-blue-600 p-2 rounded text-white"
-            >
-              Edit Info
-            </button>
-          </>
-        )}
-      </div>
+          </div>
+        </div>
+      </Modal>
 
-      {/* Tickets */}
-      <div className="mb-6">
-        <h3 className="text-xl font-bold mb-2 text-blue-400">Your Tickets</h3>
+      {/* Tickets Modal */}
+      <Modal
+        open={modalType === 'tickets'}
+        onClose={() => setModalType(null)}
+        title="Your Tickets"
+      >
         {tickets.length === 0 ? (
           <p>No tickets yet.</p>
         ) : (
-          tickets.map((t) => (
-            <div key={t.id} className="p-2 mb-2 bg-zinc-800 rounded">
-              <p>{t.name}</p>
-              <p>Date: {new Date(t.datetime).toLocaleString()}</p>
-              <p>Ticket Code: {t.ticketCode}</p>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Prebooked Events */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-xl font-bold text-blue-400">Prebooked Events</h3>
-          <button
-            onClick={() => setCompactView(!compactView)}
-            className="bg-blue-600 p-1 rounded text-white text-sm"
-          >
-            {compactView ? 'Grid View' : 'Compact View'}
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          {prebooked.length === 0 ? (
-            <p>No prebooked events.</p>
-          ) : (
-            prebooked.map((e) => (
-              <div
-                key={e.id}
-                className="p-2 bg-zinc-800 rounded flex flex-col md:flex-row justify-between items-start md:items-center"
-              >
-                {compactView ? (
-                  <p>
-                    {e.venue_type} | {new Date(e.datetime).toLocaleDateString()} |{' '}
-                    {e.name} | {e.city} | Preview
-                  </p>
-                ) : (
-                  <>
-                    <p>Name: {e.name}</p>
-                    <p>City: {e.city}</p>
-                    <p>Date: {new Date(e.datetime).toLocaleString()}</p>
-                    <p>Venue Type: {e.venue_type}</p>
-                    <p>Status: {e.is_confirmed ? 'Confirmed' : 'Idle'}</p>
-                  </>
-                )}
+          <div className="flex flex-col gap-3">
+            {tickets.map((t) => (
+              <div key={t.id} className="p-3 bg-zinc-800 rounded">
+                <p className="font-bold">{t.name}</p>
+                <p>Date: {new Date(t.datetime).toLocaleString()}</p>
+                <p>Ticket Code: {t.ticketCode}</p>
               </div>
-            ))
-          )}
-        </div>
-      </div>
+            ))}
+          </div>
+        )}
+      </Modal>
+
+      {/* Prebooked Modal */}
+      <Modal
+        open={modalType === 'prebooked'}
+        onClose={() => setModalType(null)}
+        title="Prebooked Events"
+      >
+        {prebooked.length === 0 ? (
+          <p>No prebooked events.</p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {prebooked.map((e) => (
+              <div key={e.id} className="p-3 bg-zinc-800 rounded">
+                <p className="font-bold">{e.name}</p>
+                <p>City: {e.city}</p>
+                <p>Date: {new Date(e.datetime).toLocaleString()}</p>
+                <p>Venue: {e.venue_type}</p>
+                <p>Status: {e.is_confirmed ? 'Confirmed' : 'Idle'}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }
