@@ -1,5 +1,4 @@
 // pages/api/login.js
-
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { pool } from '../../lib/postgres.js'
@@ -39,16 +38,16 @@ export default async function handler(req, res) {
       })
     }
 
-    // ✅ Generate JWT token
+    // ✅ Generate JWT
     const token = jwt.sign(
       { id: user.id, email: user.email, username: user.username },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' } // token valid for 7 days
+      { expiresIn: '7d' }
     )
 
     return res.status(200).json({
       message: '✅ Login successful',
-      token, // <-- send JWT to frontend
+      token,
       user: {
         id: user.id,
         username: user.username,

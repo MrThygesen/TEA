@@ -5,7 +5,7 @@ import { useRouter } from 'next/router'
 
 export default function LoginModal({ onClose, onLoginSuccess }) {
   const router = useRouter()
-  const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -17,22 +17,18 @@ export default function LoginModal({ onClose, onLoginSuccess }) {
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: username, password }),
+        body: JSON.stringify({ email, password }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Login failed')
 
-      // ✅ Save JWT + user in localStorage
+      // ✅ Save JWT + user
       localStorage.setItem('token', data.token)
       localStorage.setItem('user', JSON.stringify(data.user))
 
-      // ✅ Call parent callback (if needed)
-      onLoginSuccess(data)
+      if (onLoginSuccess) onLoginSuccess(data)
 
-      // ✅ Close modal
       onClose()
-
-      // ✅ Redirect to dashboard
       router.push('/dashboard')
     } catch (err) {
       setError(err.message)
@@ -52,10 +48,10 @@ export default function LoginModal({ onClose, onLoginSuccess }) {
       >
         <h2 className="text-xl font-bold mb-4 text-blue-400">Login</h2>
         <input
-          type="text"
+          type="email"
           placeholder="Email"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           className="w-full mb-3 p-2 rounded text-black"
         />
         <input
