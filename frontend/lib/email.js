@@ -1,16 +1,22 @@
 // lib/email.js
 const SibApiV3Sdk = require('@getbrevo/brevo')
 
+// Initialize Brevo client
 const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi()
 apiInstance.setApiKey(
   SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey,
   process.env.BREVO_API_KEY
 )
 
+/**
+ * Send a verification email that calls the backend directly.
+ * Clicking the link immediately triggers /api/confirm-email with the token.
+ */
 async function sendVerificationEmail(to, token) {
   try {
+    // Backend verification URL
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-    const verifyUrl = `${baseUrl}/email-verified?token=${encodeURIComponent(token)}`
+    const verifyUrl = `${baseUrl}/api/confirm-email?token=${encodeURIComponent(token)}`
 
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
     sendSmtpEmail.sender = {
