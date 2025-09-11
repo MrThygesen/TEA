@@ -16,11 +16,7 @@ async function sendVerificationEmail(to, token) {
   try {
     // Backend verification URL
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-    const verifyUrl = `${baseUrl}/email-verified?token=${encodeURIComponent(token)}`
-
-
-
-
+    const verifyUrl = `${baseUrl}/api/confirm-email?token=${encodeURIComponent(token)}`
 
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
     sendSmtpEmail.sender = {
