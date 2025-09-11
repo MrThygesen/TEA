@@ -21,7 +21,7 @@ export default async function handler(req, res) {
 
     const result = await pool.query(
       `INSERT INTO user_profiles (email, password_hash, username, email_verified)
-       VALUES ($1, $2, $3, FALSE)
+       VALUES ($1, $2, $3, TRUE)
        ON CONFLICT (email) DO NOTHING
        RETURNING id, email, username`,
       [email, hashedPassword, username]
