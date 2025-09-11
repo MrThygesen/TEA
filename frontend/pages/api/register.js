@@ -33,17 +33,21 @@ export default async function handler(req, res) {
 
     const user = result.rows[0]
 
-    // Create verification token
-    const token = crypto.randomBytes(32).toString('hex')
-    await pool.query(
-      `INSERT INTO email_verification_tokens (user_id, token, expires_at, email)
-       VALUES ($1, $2, CURRENT_TIMESTAMP + interval '1 day', $3)
-       ON CONFLICT (user_id) 
-       DO UPDATE SET token = EXCLUDED.token,
-                     expires_at = EXCLUDED.expires_at,
-                     email = EXCLUDED.email`,
-      [user.id, token, email]
-    )
+// Create verification token
+const token = crypto.randomBytes(32).toString('hex')
+
+// compute expiry in Node (24h later, UTC)
+const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
+
+await pool.query(
+  `INSERT INTO email_verification_tokens (user_id, token, expires_at, email)
+   VALUES ($1, $2, $3, $4)
+   ON CONFLICT (user_id) 
+   DO UPDATE SET token = EXCLUDED.token,
+                 expires_at = EXCLUDED.expires_at,
+                 email = EXCLUDED.email`,
+  [user.id, token, expiresAt, email]
+)
 
     // Send verification email
     try {
