@@ -1,5 +1,4 @@
 // pages/api/register.js
-
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { pool } from '../../lib/postgres.js'
@@ -38,7 +37,7 @@ export default async function handler(req, res) {
     const token = crypto.randomBytes(32).toString('hex')
     await pool.query(
       `INSERT INTO email_verification_tokens (user_id, token, expires_at, email)
-       VALUES ($1, $2, NOW() + interval '1 day', $3)
+       VALUES ($1, $2, CURRENT_TIMESTAMP + interval '1 day', $3)
        ON CONFLICT (user_id) 
        DO UPDATE SET token = EXCLUDED.token,
                      expires_at = EXCLUDED.expires_at,
@@ -46,14 +45,13 @@ export default async function handler(req, res) {
       [user.id, token, email]
     )
 
-    // ✅ Send email using new lib/email.js (the URL is built inside)
+    // Send verification email
     try {
       await sendVerificationEmail(email, token)
     } catch (emailErr) {
       console.warn('⚠️ Failed to send verification email:', emailErr)
     }
 
-    // ⚠️ DO NOT log in yet
     return res.status(201).json({
       message: '✅ Registration successful. Please check your email to verify your account.',
     })

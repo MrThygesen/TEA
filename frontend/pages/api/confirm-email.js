@@ -19,7 +19,7 @@ export default async function handler(req, res) {
        FROM email_verification_tokens evt
        JOIN user_profiles up ON up.id = evt.user_id
        WHERE evt.token = $1
-         AND evt.expires_at > NOW()
+         AND evt.expires_at > CURRENT_TIMESTAMP
        LIMIT 1`,
       [token]
     )
@@ -48,7 +48,6 @@ export default async function handler(req, res) {
       { expiresIn: '7d' }
     )
 
-    // ✅ 5. Return JSON instead of redirect
     return res.status(200).json({
       message: '✅ Email verified successfully',
       token: jwtToken,
