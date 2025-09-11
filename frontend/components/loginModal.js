@@ -10,15 +10,20 @@ export default function LoginModal({ onClose, onLoginSuccess }) {
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
 
-  const handleLogin = async () => {
+  const handleLogin = async (e) => {
+    e.preventDefault()
     setLoading(true)
     setError(null)
+
+    console.log("Login attempt with:", { email, password })
+
     try {
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       })
+
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Login failed')
 
@@ -47,28 +52,34 @@ export default function LoginModal({ onClose, onLoginSuccess }) {
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-xl font-bold mb-4 text-blue-400">Login</h2>
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full mb-3 p-2 rounded text-black"
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full mb-3 p-2 rounded text-black"
-        />
-        {error && <p className="text-red-400 text-sm mb-2">{error}</p>}
-        <button
-          onClick={handleLogin}
-          disabled={loading}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white p-2 rounded"
-        >
-          {loading ? 'Logging in...' : 'Login'}
-        </button>
+
+        <form onSubmit={handleLogin}>
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full mb-3 p-2 rounded text-black"
+            required
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full mb-3 p-2 rounded text-black"
+            required
+          />
+          {error && <p className="text-red-400 text-sm mb-2">{error}</p>}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white p-2 rounded"
+          >
+            {loading ? 'Logging in...' : 'Login'}
+          </button>
+        </form>
+
         <button
           onClick={onClose}
           className="mt-2 w-full bg-zinc-700 hover:bg-zinc-600 text-white p-2 rounded"
