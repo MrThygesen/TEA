@@ -9,14 +9,14 @@ apiInstance.setApiKey(
 )
 
 /**
- * Send a verification email with a link pointing to the frontend.
- * The frontend (pages/email-verified.js) will grab the token and call /api/confirm-email.
+ * Send a verification email that calls the backend directly.
+ * Clicking the link immediately triggers /api/confirm-email with the token.
  */
 async function sendVerificationEmail(to, token) {
   try {
-    // Make sure NEXT_PUBLIC_BASE_URL is set, e.g. https://yourapp.vercel.app
+    // Backend verification URL
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-    const verifyUrl = `${baseUrl}/email-verified?token=${token}`
+    const verifyUrl = `${baseUrl}/api/confirm-email?token=${encodeURIComponent(token)}`
 
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
     sendSmtpEmail.sender = {
@@ -27,9 +27,20 @@ async function sendVerificationEmail(to, token) {
     sendSmtpEmail.subject = 'Verify your email for Edgy Events'
     sendSmtpEmail.htmlContent = `
       <h1>Welcome to Edgy Events 🎉</h1>
-      <p>Thanks for signing up! Please verify your email address by clicking below:</p>
-      <p><a href="${verifyUrl}">Verify my email</a></p>
+      <p>Thanks for signing up! Click the button below to verify your email:</p>
+      <p style="margin: 20px 0;">
+        <a href="${verifyUrl}" style="
+          background-color: #4CAF50;
+          color: white;
+          padding: 12px 24px;
+          text-decoration: none;
+          border-radius: 5px;
+          display: inline-block;
+        ">Verify my email</a>
+      </p>
       <p>This link will expire in 24 hours.</p>
+      <p>If the button doesn’t work, copy and paste this URL into your browser:</p>
+      <p>${verifyUrl}</p>
     `
 
     const response = await apiInstance.sendTransacEmail(sendSmtpEmail)
