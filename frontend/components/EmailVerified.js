@@ -1,18 +1,15 @@
-//components/EmailVerified
-
-'use client'
+// components/EmailVerified.js
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import auth from './auth'
 
-export default function EmailVerified() {
+export default function EmailVerified({ token }) {
   const router = useRouter()
-  const { token } = router.query
   const [message, setMessage] = useState('⏳ Verifying your email...')
 
   useEffect(() => {
-    if (!router.isReady || !token) return
+    if (!token) return
 
     async function verifyEmail() {
       try {
@@ -33,7 +30,7 @@ export default function EmailVerified() {
     }
 
     verifyEmail()
-  }, [router.isReady, token])
+  }, [token])
 
   return <p>{message}</p>
 }
