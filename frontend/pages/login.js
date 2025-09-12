@@ -2,7 +2,7 @@
 'use client'
 
 import { useState } from 'react'
-import LoginModal from '../components/LoginModal'
+import LoginModal from '../components/loginModal'
 
 export default function LoginPage() {
   const [open, setOpen] = useState(true)
