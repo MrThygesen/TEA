@@ -5,10 +5,11 @@ import { pool } from '../../lib/postgres.js'
 
 export const config = {
   api: {
-    bodyParser: false, // disable default parser
+    bodyParser: false, // disable default parser for manual parsing
   },
 }
 
+// Helper to parse request body manually
 async function getBody(req) {
   const chunks = []
   for await (const chunk of req) {

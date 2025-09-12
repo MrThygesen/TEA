@@ -15,10 +15,8 @@ export default function LoginModal({ onClose }) {
 
   const handleLogin = async (e) => {
     e.preventDefault()
-    setError(null)
     setLoading(true)
-
-    console.log('📩 Attempting login with:', { email, password })
+    setError(null)
 
     try {
       const res = await fetch('/api/login', {
@@ -28,7 +26,6 @@ export default function LoginModal({ onClose }) {
       })
 
       const data = await res.json()
-      console.log('🟢 Server response:', data)
 
       if (!res.ok) throw new Error(data.error || 'Login failed')
 
@@ -36,14 +33,14 @@ export default function LoginModal({ onClose }) {
       localStorage.setItem('token', data.token)
       localStorage.setItem('user', JSON.stringify(data.user))
 
-      // Update global context
+      // Update global UserContext
       setUser(data.user)
 
-      // Close modal and redirect
+      // Close modal + redirect
       onClose()
       router.push('/')
     } catch (err) {
-      console.error('❌ Login error:', err)
+      console.error('Login failed:', err)
       setError(err.message)
     } finally {
       setLoading(false)
@@ -64,6 +61,7 @@ export default function LoginModal({ onClose }) {
         <form onSubmit={handleLogin}>
           <input
             type="email"
+            name="email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -72,6 +70,7 @@ export default function LoginModal({ onClose }) {
           />
           <input
             type="password"
+            name="password"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
