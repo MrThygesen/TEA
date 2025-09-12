@@ -15,8 +15,10 @@ export default function LoginModal({ onClose }) {
 
   const handleLogin = async (e) => {
     e.preventDefault()
-    setLoading(true)
     setError(null)
+    setLoading(true)
+
+    console.log('📩 Attempting login with:', { email, password })
 
     try {
       const res = await fetch('/api/login', {
@@ -26,20 +28,22 @@ export default function LoginModal({ onClose }) {
       })
 
       const data = await res.json()
+      console.log('🟢 Server response:', data)
+
       if (!res.ok) throw new Error(data.error || 'Login failed')
 
       // Save JWT + user
       localStorage.setItem('token', data.token)
       localStorage.setItem('user', JSON.stringify(data.user))
 
-      // Update global UserContext
+      // Update global context
       setUser(data.user)
 
-      // Close modal + redirect
+      // Close modal and redirect
       onClose()
       router.push('/')
     } catch (err) {
-      console.error('Login failed:', err)
+      console.error('❌ Login error:', err)
       setError(err.message)
     } finally {
       setLoading(false)

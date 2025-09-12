@@ -2,28 +2,17 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { pool } from '../../lib/postgres.js'
-import { json } from 'micro'
-
-export const config = {
-  api: {
-    bodyParser: false, // We'll use micro.json
-  },
-}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' })
   }
 
-  let body
-  try {
-    body = await json(req) // safely parses the JSON body
-  } catch (err) {
-    console.error('❌ Failed to parse JSON body:', err)
-    return res.status(400).json({ error: 'Invalid JSON' })
-  }
+  // ✅ Remove manual parsing
+  const { email, password } = req.body
 
-  const { email, password } = body
+  console.log('🔹 Received body:', req.body) // Debug
+
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required.' })
   }
