@@ -2,24 +2,17 @@
 import { useState } from 'react'
 
 export default function LoginModal({ onClose }) {
-  const [form, setForm] = useState({ email: '', password: '' })
-
-  const handleInput = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    })
-    console.log("✏️ Input:", e.target.name, "→", e.target.value)
-  }
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
 
   const handleLogin = async () => {
-    console.log("📨 Frontend sending:", form)
+    console.log("📨 Frontend sending:", { email, password })
 
     try {
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ email, password }),
       })
 
       const data = await res.json()
@@ -44,16 +37,22 @@ export default function LoginModal({ onClose }) {
         type="email"
         name="email"
         placeholder="Email"
-        value={form.email}
-        onInput={handleInput}
+        value={email}
+        onChange={(e) => {
+          console.log("✏️ Email typed:", e.target.value)
+          setEmail(e.target.value)
+        }}
         autoComplete="email"
       /><br />
       <input
         type="password"
         name="password"
         placeholder="Password"
-        value={form.password}
-        onInput={handleInput}
+        value={password}
+        onChange={(e) => {
+          console.log("✏️ Password typed:", e.target.value)
+          setPassword(e.target.value)
+        }}
         autoComplete="current-password"
       /><br />
       <button onClick={handleLogin}>Login</button>
