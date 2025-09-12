@@ -4,68 +4,54 @@ import jwt from 'jsonwebtoken'
 import { pool } from '../../lib/postgres.js'
 
 export default async function handler(req, res) {
-  console.log('📌 Request method:', req.method)
-
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' })
   }
 
-  // Manually parse the body
-  let body = {}
   try {
-    const chunks = []
-    for await (const chunk of req) chunks.push(chunk)
-    const rawBody = Buffer.concat(chunks).toString()
-    console.log('📩 Raw body received:', rawBody)
+    const { email, password } = req.body || {}
+    console.log('📩 Login attempt with:', { email, password })
 
-    body = JSON.parse(rawBody || '{}')
-  } catch (err) {
-    console.error('❌ Failed to parse JSON body:', err)
-    return res.status(400).json({ error: 'Invalid JSON body' })
-  }
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required.' })
+    }
 
-  const { email, password } = body
-  console.log('🔑 Parsed body:', { email, password })
-
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required.' })
-  }
-
-  try {
+    // Find user
     const result = await pool.query(
-      `SELECT id, username, email, password_hash, role, tier, email_verified
-       FROM user_profiles
-       WHERE email = $1`,
+      `SELECT id, username, email, role, tier, password_hash, email_verified
+       FROM user_profiles WHERE email = $1`,
       [email]
     )
 
-    if (!result.rows.length) {
+    if (result.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid email or password.' })
     }
 
     const user = result.rows[0]
-    const validPassword = await bcrypt.compare(password, user.password_hash)
+    console.log('👤 Found user:', user.email, 'verified:', user.email_verified)
 
-    if (!validPassword) {
+    // Verify password
+    const passwordOk = await bcrypt.compare(password, user.password_hash)
+    if (!passwordOk) {
+      console.log('❌ Wrong password for:', email)
       return res.status(400).json({ error: 'Invalid email or password.' })
     }
 
     if (!user.email_verified) {
-      return res.status(403).json({
-        error:
-          'Email not verified. Please check your inbox and confirm your email before logging in.',
-      })
+      return res.status(403).json({ error: 'Please verify your email first.' })
     }
 
     // Generate JWT
     const token = jwt.sign(
       { id: user.id, email: user.email, username: user.username },
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET || 'changeme',
       { expiresIn: '7d' }
     )
 
-    return res.status(200).json({
-      message: '✅ Login successful',
+    console.log('✅ Login successful for:', email)
+
+    res.status(200).json({
+      message: 'Login successful',
       token,
       user: {
         id: user.id,
@@ -76,8 +62,8 @@ export default async function handler(req, res) {
       },
     })
   } catch (err) {
-    console.error('❌ Login error:', err)
-    return res.status(500).json({ error: 'Internal server error', details: err.message })
+    console.error('💥 Login error:', err)
+    res.status(500).json({ error: 'Internal server error' })
   }
 }
 

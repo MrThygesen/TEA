@@ -1,22 +1,18 @@
 'use client'
+import { useState } from 'react'
 
-import { useState, useContext } from 'react'
-import { useRouter } from 'next/router'
-import { UserContext } from '../context/UserContext'
-
-export default function LoginModal({ onClose }) {
-  const router = useRouter()
-  const { setUser } = useContext(UserContext)
-
+export default function LoginModal({ onClose, onLoginSuccess }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState(null)
+  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const handleLogin = async (e) => {
+  async function handleLogin(e) {
     e.preventDefault()
+    setError('')
     setLoading(true)
-    setError(null)
+
+    console.log('🚀 Submitting login fetch', { email, password })
 
     try {
       const res = await fetch('/api/login', {
@@ -26,21 +22,18 @@ export default function LoginModal({ onClose }) {
       })
 
       const data = await res.json()
+      console.log('📩 Response from /api/login:', data)
 
-      if (!res.ok) throw new Error(data.error || 'Login failed')
+      if (!res.ok) {
+        throw new Error(data.error || 'Login failed')
+      }
 
-      // Save JWT + user
       localStorage.setItem('token', data.token)
-      localStorage.setItem('user', JSON.stringify(data.user))
 
-      // Update global UserContext
-      setUser(data.user)
-
-      // Close modal + redirect
+      if (onLoginSuccess) onLoginSuccess(data.user)
       onClose()
-      router.push('/')
     } catch (err) {
-      console.error('Login failed:', err)
+      console.error('❌ Login error:', err)
       setError(err.message)
     } finally {
       setLoading(false)
@@ -48,48 +41,36 @@ export default function LoginModal({ onClose }) {
   }
 
   return (
-    <div
-      className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-zinc-900 rounded-xl p-6 w-full max-w-sm"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-xl font-bold mb-4 text-blue-400">Login</h2>
-
-        <form onSubmit={handleLogin}>
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded-lg shadow-xl w-96">
+        <h2 className="text-lg font-bold mb-4">Login</h2>
+        {error && <p className="text-red-500 mb-2">{error}</p>}
+        <form onSubmit={handleLogin} className="space-y-4">
           <input
             type="email"
-            name="email"
             placeholder="Email"
+            className="w-full border p-2 rounded"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full mb-3 p-2 rounded text-black"
-            required
           />
           <input
             type="password"
-            name="password"
             placeholder="Password"
+            className="w-full border p-2 rounded"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full mb-3 p-2 rounded text-black"
-            required
           />
-          {error && <p className="text-red-400 text-sm mb-2">{error}</p>}
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white p-2 rounded"
+            className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700"
           >
             {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
-
         <button
           onClick={onClose}
-          className="mt-2 w-full bg-zinc-700 hover:bg-zinc-600 text-white p-2 rounded"
+          className="mt-4 text-gray-500 hover:text-gray-700"
         >
           Cancel
         </button>
