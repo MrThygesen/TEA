@@ -1,20 +1,21 @@
-//pages/api/login.js
+// pages/api/login.js
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { pool } from '../../lib/postgres.js'
 
-// helper to read raw body
-async function getRawBody(req) {
-  return new Promise((resolve, reject) => {
-    let body = ''
-    req.on('data', chunk => (body += chunk.toString()))
-    req.on('end', () => resolve(body))
-    req.on('error', err => reject(err))
-  })
+export const config = {
+  api: {
+    bodyParser: false, // disable default parser
+  },
 }
 
-export const config = {
-  api: { bodyParser: false } // disable automatic parsing
+async function getBody(req) {
+  const chunks = []
+  for await (const chunk of req) {
+    chunks.push(chunk)
+  }
+  const body = Buffer.concat(chunks).toString()
+  return JSON.parse(body || '{}')
 }
 
 export default async function handler(req, res) {
@@ -24,13 +25,11 @@ export default async function handler(req, res) {
 
   let email, password
   try {
-    const rawBody = await getRawBody(req)
-    const parsed = JSON.parse(rawBody)
-    email = parsed.email
-    password = parsed.password
+    const body = await getBody(req)
+    email = body.email
+    password = body.password
   } catch (err) {
-    console.error('❌ Failed to parse body:', err)
-    return res.status(400).json({ error: 'Invalid JSON' })
+    return res.status(400).json({ error: 'Invalid JSON body.' })
   }
 
   if (!email || !password) {
@@ -58,8 +57,7 @@ export default async function handler(req, res) {
 
     if (!user.email_verified) {
       return res.status(403).json({
-        error:
-          'Email not verified. Please check your inbox and confirm your email before logging in.',
+        error: 'Email not verified. Please check your inbox and confirm your email before logging in.',
       })
     }
 
@@ -70,7 +68,7 @@ export default async function handler(req, res) {
     )
 
     return res.status(200).json({
-      message: '✅ Login successful',
+      message: 'Login successful',
       token,
       user: {
         id: user.id,
@@ -81,7 +79,7 @@ export default async function handler(req, res) {
       },
     })
   } catch (err) {
-    console.error('❌ Login error:', err)
+    console.error('Login error:', err)
     return res.status(500).json({ error: 'Internal server error', details: err.message })
   }
 }
