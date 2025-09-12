@@ -1,12 +1,24 @@
 'use client'
-import { useState } from 'react'
+
+import { useState, useContext } from 'react'
+import { useRouter } from 'next/router'
+import { UserContext } from '../context/UserContext'
 
 export default function LoginModal({ onClose }) {
+  const router = useRouter()
+  const { setUser } = useContext(UserContext)
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(false)
 
-  const handleLogin = async () => {
-    console.log("📨 Frontend sending:", { email, password })
+  const handleLogin = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+
+    console.log('📩 Frontend sending:', { email, password })
 
     try {
       const res = await fetch('/api/login', {
@@ -16,46 +28,85 @@ export default function LoginModal({ onClose }) {
       })
 
       const data = await res.json()
-      console.log("📬 Response:", data)
+      console.log('🟢 Server response:', data)
 
-      if (res.ok) {
-        alert("✅ Login OK")
-        onClose?.()
-      } else {
-        alert("❌ Login failed: " + data.error)
-      }
+      if (!res.ok) throw new Error(data.error || 'Login failed')
+
+      // Save JWT + user
+      localStorage.setItem('token', data.token)
+      localStorage.setItem('user', JSON.stringify(data.user))
+
+      // Update global UserContext
+      setUser(data.user)
+
+      // Close modal + redirect
+      onClose()
+      router.push('/')
     } catch (err) {
-      console.error("🚨 Fetch error:", err)
-      alert("Network error, check console")
+      console.error('❌ Login failed:', err)
+      setError(err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
-    <div style={{ padding: 20, border: '1px solid gray' }}>
-      <h2>Login</h2>
-      <input
-        type="email"
-        name="email"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => {
-          console.log("✏️ Email typed:", e.target.value)
-          setEmail(e.target.value)
-        }}
-        autoComplete="email"
-      /><br />
-      <input
-        type="password"
-        name="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => {
-          console.log("✏️ Password typed:", e.target.value)
-          setPassword(e.target.value)
-        }}
-        autoComplete="current-password"
-      /><br />
-      <button onClick={handleLogin}>Login</button>
+    <div
+      className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-zinc-900 rounded-xl p-6 w-full max-w-sm"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-xl font-bold mb-4 text-blue-400">Login</h2>
+
+        <form onSubmit={handleLogin}>
+          <input
+            type="text"
+            id="email"
+            placeholder="Email"
+            value={email || ''}
+            onInput={(e) => {
+              console.log("✏️ onInput Email:", e.target.value)
+              setEmail(e.target.value)
+            }}
+            onChange={(e) => {
+              console.log("✏️ onChange Email:", e.target.value)
+              setEmail(e.target.value)
+            }}
+            autoComplete="off"
+            className="w-full mb-3 p-2 rounded text-black"
+            required
+          />
+
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full mb-3 p-2 rounded text-black"
+            required
+          />
+
+          {error && <p className="text-red-400 text-sm mb-2">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white p-2 rounded"
+          >
+            {loading ? 'Logging in...' : 'Login'}
+          </button>
+        </form>
+
+        <button
+          onClick={onClose}
+          className="mt-2 w-full bg-zinc-700 hover:bg-zinc-600 text-white p-2 rounded"
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   )
 }
