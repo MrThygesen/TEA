@@ -1,18 +1,16 @@
-// lib/email.js
 const SibApiV3Sdk = require('@getbrevo/brevo')
 
-// Initialize Brevo client
 const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi()
 apiInstance.setApiKey(
   SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey,
   process.env.BREVO_API_KEY
 )
 
-async function sendVerificationEmail(to, token) {
+async function sendVerificationEmail(to, token, tgId) {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
     // POINT LINK TO FRONTEND PAGE
-    const verifyUrl = `${baseUrl}/api/confirm-email?token=${encodeURIComponent(token)}`
+    const verifyUrl = `${baseUrl}/verify-email?token=${encodeURIComponent(token)}${tgId ? `&tgId=${encodeURIComponent(tgId)}` : ''}`
 
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
     sendSmtpEmail.sender = {
@@ -23,7 +21,7 @@ async function sendVerificationEmail(to, token) {
     sendSmtpEmail.subject = 'Verify your email for Edgy Events'
     sendSmtpEmail.htmlContent = `
       <h1>Welcome to Edgy Events 🎉</h1>
-      <p>Thanks for signing up! Click the button below to verify your email:</p>
+      <p>Click the button below to verify your email:</p>
       <p style="margin: 20px 0;">
         <a href="${verifyUrl}" style="
           background-color: #4CAF50;
