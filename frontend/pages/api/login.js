@@ -1,3 +1,4 @@
+// pages/api/login.js
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { pool } from '../../lib/postgres.js'
@@ -8,11 +9,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Ensure JSON parsing works even on Vercel serverless
+    // ✅ Ensure body is parsed
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body
     const { email, password } = body || {}
-
-    console.log('📩 Login body received:', body)
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required.' })
@@ -26,14 +25,14 @@ export default async function handler(req, res) {
     )
 
     if (!result.rows.length) {
-      return res.status(401).json({ error: 'Invalid email or password.' })
+      return res.status(400).json({ error: 'Invalid email or password.' })
     }
 
     const user = result.rows[0]
-
     const validPassword = await bcrypt.compare(password, user.password_hash)
+
     if (!validPassword) {
-      return res.status(401).json({ error: 'Invalid email or password.' })
+      return res.status(400).json({ error: 'Invalid email or password.' })
     }
 
     if (!user.email_verified) {
@@ -42,14 +41,15 @@ export default async function handler(req, res) {
       })
     }
 
+    // Generate JWT
     const token = jwt.sign(
-      { id: user.id, email: user.email, username: user.username, role: user.role },
+      { id: user.id, email: user.email, username: user.username },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     )
 
     return res.status(200).json({
-      message: '✅ Login successful',
+      message: 'Login successful',
       token,
       user: {
         id: user.id,
@@ -61,7 +61,7 @@ export default async function handler(req, res) {
     })
 
   } catch (err) {
-    console.error('❌ Login error:', err)
+    console.error('Login error:', err)
     return res.status(500).json({ error: 'Internal server error', details: err.message })
   }
 }

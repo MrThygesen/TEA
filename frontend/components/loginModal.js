@@ -18,9 +18,6 @@ export default function LoginModal({ onClose }) {
     setLoading(true)
     setError(null)
 
-    console.log('📩 Email entered:', email)
-    console.log('🔑 Password entered:', password)
-
     try {
       const res = await fetch('/api/login', {
         method: 'POST',
@@ -29,8 +26,6 @@ export default function LoginModal({ onClose }) {
       })
 
       const data = await res.json()
-      console.log('🟢 Server response:', data)
-
       if (!res.ok) throw new Error(data.error || 'Login failed')
 
       // Save JWT + user
@@ -44,7 +39,7 @@ export default function LoginModal({ onClose }) {
       onClose()
       router.push('/')
     } catch (err) {
-      console.error('❌ Login failed:', err)
+      console.error('Login failed:', err)
       setError(err.message)
     } finally {
       setLoading(false)
@@ -65,7 +60,6 @@ export default function LoginModal({ onClose }) {
         <form onSubmit={handleLogin}>
           <input
             type="email"
-            name="email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -74,7 +68,6 @@ export default function LoginModal({ onClose }) {
           />
           <input
             type="password"
-            name="password"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
