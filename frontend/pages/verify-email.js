@@ -1,27 +1,38 @@
-// pages/verify-email.js
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 export default function VerifyEmail() {
   const searchParams = useSearchParams();
-  const tgId = searchParams.get('tgId');
+  const router = useRouter();
+
   const token = searchParams.get('token');
+  const tgId = searchParams.get('tgId');
 
   const [message, setMessage] = useState('⏳ Verifying your email...');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!tgId || !token) return;
+    if (!token) return;
 
     const verifyEmail = async () => {
       try {
-        const res = await fetch(`/api/verify-email?tgId=${tgId}&token=${token}`);
+        const res = await fetch(`/api/confirm-email?token=${token}`);
         const data = await res.json();
 
         if (res.ok) {
-          setMessage(data.message || '✅ Email verified successfully!');
+          setMessage('✅ Email verified! Redirecting...');
+          // Save JWT for auto-login (localStorage or cookie)
+          localStorage.setItem('jwt', data.token);
+
+          // Optional: save user info
+          localStorage.setItem('user', JSON.stringify(data.user));
+
+          // Redirect after 2 seconds
+          setTimeout(() => {
+            router.push('/dashboard'); // or '/' for homepage
+          }, 2000);
         } else {
           setMessage(`❌ ${data.error || 'Verification failed'}`);
         }
@@ -34,7 +45,7 @@ export default function VerifyEmail() {
     };
 
     verifyEmail();
-  }, [tgId, token]);
+  }, [token, router]);
 
   return (
     <div style={{
