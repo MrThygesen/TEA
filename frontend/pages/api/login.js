@@ -1,4 +1,3 @@
-// pages/api/login.js
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { pool } from '../../lib/postgres.js'
@@ -8,15 +7,8 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' })
   }
 
-  let body = {}
-  try {
-    body = JSON.parse(req.body)
-  } catch (err) {
-    return res.status(400).json({ error: 'Invalid JSON' })
-  }
-
-  const { email, password } = body
-
+  // ✅ Use req.body directly (Next.js parses JSON automatically)
+  const { email, password } = req.body
   console.log('📩 API received:', { email, password })
 
   if (!email || !password) {

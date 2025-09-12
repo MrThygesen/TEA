@@ -32,11 +32,8 @@ export default function LoginModal({ onClose }) {
 
       if (!res.ok) throw new Error(data.error || 'Login failed')
 
-      // Save JWT + user
       localStorage.setItem('token', data.token)
       localStorage.setItem('user', JSON.stringify(data.user))
-
-      // Update global UserContext
       setUser(data.user)
 
       onClose()
@@ -65,7 +62,7 @@ export default function LoginModal({ onClose }) {
             type="email"
             placeholder="Email"
             value={email}
-            onInput={(e) => setEmail(e.target.value)}
+            onChange={(e) => setEmail(e.target.value)}
             className="w-full mb-3 p-2 rounded text-black"
             required
           />
@@ -73,7 +70,7 @@ export default function LoginModal({ onClose }) {
             type="password"
             placeholder="Password"
             value={password}
-            onInput={(e) => setPassword(e.target.value)}
+            onChange={(e) => setPassword(e.target.value)}
             className="w-full mb-3 p-2 rounded text-black"
             required
           />
