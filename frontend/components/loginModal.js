@@ -18,7 +18,7 @@ export default function LoginModal({ onClose }) {
     setLoading(true)
     setError(null)
 
-    console.log('📩 Frontend sending:', { email, password })
+    console.log('📩 Submitting login fetch', { email, password })
 
     try {
       const res = await fetch('/api/login', {
@@ -39,7 +39,6 @@ export default function LoginModal({ onClose }) {
       // Update global UserContext
       setUser(data.user)
 
-      // Close modal + redirect
       onClose()
       router.push('/')
     } catch (err) {
@@ -63,34 +62,22 @@ export default function LoginModal({ onClose }) {
 
         <form onSubmit={handleLogin}>
           <input
-            type="text"
-            id="email"
+            type="email"
             placeholder="Email"
-            value={email || ''}
-            onInput={(e) => {
-              console.log("✏️ onInput Email:", e.target.value)
-              setEmail(e.target.value)
-            }}
-            onChange={(e) => {
-              console.log("✏️ onChange Email:", e.target.value)
-              setEmail(e.target.value)
-            }}
-            autoComplete="off"
+            value={email}
+            onInput={(e) => setEmail(e.target.value)}
             className="w-full mb-3 p-2 rounded text-black"
             required
           />
-
           <input
             type="password"
             placeholder="Password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onInput={(e) => setPassword(e.target.value)}
             className="w-full mb-3 p-2 rounded text-black"
             required
           />
-
           {error && <p className="text-red-400 text-sm mb-2">{error}</p>}
-
           <button
             type="submit"
             disabled={loading}
