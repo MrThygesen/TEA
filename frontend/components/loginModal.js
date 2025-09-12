@@ -4,30 +4,36 @@ import { useState } from 'react'
 export default function LoginModal({ onClose }) {
   const [form, setForm] = useState({ email: '', password: '' })
 
-  const handleChange = (e) => {
+  const handleInput = (e) => {
     setForm({
       ...form,
       [e.target.name]: e.target.value,
     })
+    console.log("✏️ Input:", e.target.name, "→", e.target.value)
   }
 
   const handleLogin = async () => {
-    console.log("📨 Frontend about to send:", form)
+    console.log("📨 Frontend sending:", form)
 
-    const res = await fetch('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    })
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
 
-    const data = await res.json()
-    console.log("📬 Response:", data)
+      const data = await res.json()
+      console.log("📬 Response:", data)
 
-    if (res.ok) {
-      alert("✅ Login OK: " + JSON.stringify(data))
-      onClose?.()
-    } else {
-      alert("❌ Login failed: " + data.error)
+      if (res.ok) {
+        alert("✅ Login OK")
+        onClose?.()
+      } else {
+        alert("❌ Login failed: " + data.error)
+      }
+    } catch (err) {
+      console.error("🚨 Fetch error:", err)
+      alert("Network error, check console")
     }
   }
 
@@ -39,14 +45,16 @@ export default function LoginModal({ onClose }) {
         name="email"
         placeholder="Email"
         value={form.email}
-        onChange={handleChange}
+        onInput={handleInput}
+        autoComplete="email"
       /><br />
       <input
         type="password"
         name="password"
         placeholder="Password"
         value={form.password}
-        onChange={handleChange}
+        onInput={handleInput}
+        autoComplete="current-password"
       /><br />
       <button onClick={handleLogin}>Login</button>
     </div>
