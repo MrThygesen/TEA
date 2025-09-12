@@ -1,10 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useContext } from 'react'
 import { useRouter } from 'next/router'
+import { UserContext } from '../context/UserContext'
 
-export default function LoginModal({ onClose, onLoginSuccess }) {
+export default function LoginModal({ onClose }) {
   const router = useRouter()
+  const { setUser } = useContext(UserContext)
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
@@ -15,7 +18,8 @@ export default function LoginModal({ onClose, onLoginSuccess }) {
     setLoading(true)
     setError(null)
 
-    console.log("Login attempt with:", { email, password })
+    console.log('📩 Email entered:', email)
+    console.log('🔑 Password entered:', password)
 
     try {
       const res = await fetch('/api/login', {
@@ -25,17 +29,22 @@ export default function LoginModal({ onClose, onLoginSuccess }) {
       })
 
       const data = await res.json()
+      console.log('🟢 Server response:', data)
+
       if (!res.ok) throw new Error(data.error || 'Login failed')
 
-      // ✅ Save JWT + user
+      // Save JWT + user
       localStorage.setItem('token', data.token)
       localStorage.setItem('user', JSON.stringify(data.user))
 
-      if (onLoginSuccess) onLoginSuccess(data)
+      // Update global UserContext
+      setUser(data.user)
 
+      // Close modal + redirect
       onClose()
-      router.push('/dashboard')
+      router.push('/')
     } catch (err) {
+      console.error('❌ Login failed:', err)
       setError(err.message)
     } finally {
       setLoading(false)
@@ -56,6 +65,7 @@ export default function LoginModal({ onClose, onLoginSuccess }) {
         <form onSubmit={handleLogin}>
           <input
             type="email"
+            name="email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -64,6 +74,7 @@ export default function LoginModal({ onClose, onLoginSuccess }) {
           />
           <input
             type="password"
+            name="password"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
