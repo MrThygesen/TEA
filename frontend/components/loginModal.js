@@ -18,7 +18,7 @@ export default function LoginModal({ onClose }) {
     setLoading(true)
     setError(null)
 
-    console.log('📩 Submitting login fetch', { email, password })
+    console.log('🔹 Submitting login fetch', { email, password })
 
     try {
       const res = await fetch('/api/login', {
@@ -35,7 +35,6 @@ export default function LoginModal({ onClose }) {
       localStorage.setItem('token', data.token)
       localStorage.setItem('user', JSON.stringify(data.user))
       setUser(data.user)
-
       onClose()
       router.push('/')
     } catch (err) {
@@ -47,32 +46,36 @@ export default function LoginModal({ onClose }) {
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
-      <div style={{ background: '#fff', padding: '20px', width: '300px' }} onClick={e => e.stopPropagation()}>
-        <h2>Login</h2>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: '#111', padding: '2rem', borderRadius: '1rem', width: '300px' }}>
+        <h2 style={{ marginBottom: '1rem', color: '#4f46e5' }}>Login</h2>
+
         <form onSubmit={handleLogin}>
           <input
             type="email"
             placeholder="Email"
             value={email}
-            onChange={e => setEmail(e.target.value)}
-            style={{ width: '100%', marginBottom: '10px' }}
+            onChange={(e) => setEmail(e.target.value)}
             required
+            style={{ width: '100%', marginBottom: '0.5rem', padding: '0.5rem' }}
           />
           <input
             type="password"
             placeholder="Password"
             value={password}
-            onChange={e => setPassword(e.target.value)}
-            style={{ width: '100%', marginBottom: '10px' }}
+            onChange={(e) => setPassword(e.target.value)}
             required
+            style={{ width: '100%', marginBottom: '0.5rem', padding: '0.5rem' }}
           />
-          {error && <p style={{ color: 'red' }}>{error}</p>}
-          <button type="submit" disabled={loading}>
+          {error && <p style={{ color: 'red', marginBottom: '0.5rem' }}>{error}</p>}
+          <button type="submit" disabled={loading} style={{ width: '100%', padding: '0.5rem', background: '#4f46e5', color: 'white' }}>
             {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
-        <button onClick={onClose} style={{ marginTop: '10px' }}>Cancel</button>
+
+        <button onClick={onClose} style={{ marginTop: '0.5rem', width: '100%', padding: '0.5rem', background: '#333', color: 'white' }}>
+          Cancel
+        </button>
       </div>
     </div>
   )
