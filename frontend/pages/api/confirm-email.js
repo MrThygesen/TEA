@@ -1,4 +1,4 @@
-//frontend/pages/api/confirm-email.js
+// pages/api/confirm-email.js
 
 import jwt from 'jsonwebtoken'
 import { pool } from '../../lib/postgres.js'
@@ -31,10 +31,10 @@ export default async function handler(req, res) {
     }
 
     const row = result.rows[0]
-    const nodeNow = new Date()
+    const now = new Date()
     const expiresAt = new Date(row.expires_at)
 
-    if (nodeNow.getTime() > expiresAt.getTime()) {
+    if (now.getTime() > expiresAt.getTime()) {
       return res.status(400).json({ error: 'Invalid or expired token.' })
     }
 
@@ -52,7 +52,7 @@ export default async function handler(req, res) {
       [token]
     )
 
-    // Create JWT
+    // Create JWT for auto-login
     const jwtToken = jwt.sign(
       { id: row.user_id, email: row.email, username: row.username },
       process.env.JWT_SECRET,
