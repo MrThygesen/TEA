@@ -1,3 +1,48 @@
+// pages/dashboard.js
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/router'
+import { auth } from '../components/auth'
+
+export default function Dashboard() {
+  const router = useRouter()
+  const [user, setUser] = useState(null)
+
+  useEffect(() => {
+    if (!auth.isLoggedIn()) {
+      router.replace('/login')
+      return
+    }
+    setUser(auth.getUser())
+  }, [])
+
+  if (!user) return <p className="text-white">Loading...</p>
+
+  return (
+    <div className="p-6 text-white">
+      <h1 className="text-2xl font-bold mb-4">Welcome {user.username || user.email}</h1>
+      <p>Email: {user.email}</p>
+      <p>Tier: {user.tier}</p>
+      <button
+        onClick={() => {
+          auth.logout()
+          router.replace('/login')
+        }}
+        className="mt-4 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded"
+      >
+        Logout
+      </button>
+    </div>
+  )
+}
+
+
+
+
+
+/*
+
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -75,4 +120,4 @@ export default function Dashboard() {
     </div>
   )
 }
-
+*/ 

@@ -1,5 +1,27 @@
+
+// components/auth.js
+export const auth = {
+  isLoggedIn() {
+    return !!localStorage.getItem('token')
+  },
+  getToken() {
+    return localStorage.getItem('token')
+  },
+  getUser() {
+    const u = localStorage.getItem('user')
+    return u ? JSON.parse(u) : null
+  },
+  logout() {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+  }
+}
+
+
 // components/auth.js
 // Simple JWT auth helper
+
+/*
 
 const TOKEN_KEY = 'jwt'
 
@@ -51,4 +73,4 @@ export const auth = {
     return res
   },
 }
-
+*/ 
