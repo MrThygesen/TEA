@@ -3,6 +3,10 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { pool } from '../../lib/postgres.js'
 
+
+console.log("📥 req.body type:", typeof req.body, req.body)
+
+
 export const config = {
   api: {
     bodyParser: true, // ensure Next.js parses JSON
