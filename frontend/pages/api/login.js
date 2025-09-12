@@ -1,17 +1,37 @@
-// pages/api/login.js
+//pages/api/login.js
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { pool } from '../../lib/postgres.js'
+
+// helper to read raw body
+async function getRawBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = ''
+    req.on('data', chunk => (body += chunk.toString()))
+    req.on('end', () => resolve(body))
+    req.on('error', err => reject(err))
+  })
+}
+
+export const config = {
+  api: { bodyParser: false } // disable automatic parsing
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' })
   }
 
-  // ✅ Remove manual parsing
-  const { email, password } = req.body
-
-  console.log('🔹 Received body:', req.body) // Debug
+  let email, password
+  try {
+    const rawBody = await getRawBody(req)
+    const parsed = JSON.parse(rawBody)
+    email = parsed.email
+    password = parsed.password
+  } catch (err) {
+    console.error('❌ Failed to parse body:', err)
+    return res.status(400).json({ error: 'Invalid JSON' })
+  }
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required.' })
@@ -38,7 +58,8 @@ export default async function handler(req, res) {
 
     if (!user.email_verified) {
       return res.status(403).json({
-        error: 'Email not verified. Please check your inbox and confirm your email before logging in.',
+        error:
+          'Email not verified. Please check your inbox and confirm your email before logging in.',
       })
     }
 
