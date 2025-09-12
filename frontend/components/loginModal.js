@@ -1,13 +1,8 @@
 'use client'
 
-import { useState, useContext } from 'react'
-import { useRouter } from 'next/router'
-import { UserContext } from '../context/UserContext'
+import { useState } from 'react'
 
-export default function LoginModal({ onClose }) {
-  const router = useRouter()
-  const { setUser } = useContext(UserContext)
-
+export default function LoginModal({ onClose, onLoginSuccess }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
@@ -18,7 +13,7 @@ export default function LoginModal({ onClose }) {
     setLoading(true)
     setError(null)
 
-    console.log('🔹 Submitting login fetch', { email, password })
+    console.log('🔹 Modal submitting login fetch', { email, password })
 
     try {
       const res = await fetch('/api/login', {
@@ -28,17 +23,14 @@ export default function LoginModal({ onClose }) {
       })
 
       const data = await res.json()
-      console.log('🟢 Server response:', data)
+      console.log('🟢 Modal server response:', data)
 
       if (!res.ok) throw new Error(data.error || 'Login failed')
 
-      localStorage.setItem('token', data.token)
-      localStorage.setItem('user', JSON.stringify(data.user))
-      setUser(data.user)
-      onClose()
-      router.push('/')
+      if (onLoginSuccess) onLoginSuccess(data) // pass token + user up
+      onClose() // close modal after success
     } catch (err) {
-      console.error('❌ Login failed:', err)
+      console.error('❌ Modal login failed:', err)
       setError(err.message)
     } finally {
       setLoading(false)
@@ -46,10 +38,30 @@ export default function LoginModal({ onClose }) {
   }
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: '#111', padding: '2rem', borderRadius: '1rem', width: '300px' }}>
-        <h2 style={{ marginBottom: '1rem', color: '#4f46e5' }}>Login</h2>
-
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0,0,0,0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+      }}
+    >
+      <div
+        style={{
+          background: '#fff',
+          padding: '2rem',
+          borderRadius: '8px',
+          width: '320px',
+          maxWidth: '90%',
+        }}
+      >
+        <h2 style={{ marginBottom: '1rem' }}>Login</h2>
         <form onSubmit={handleLogin}>
           <input
             type="email"
@@ -57,7 +69,12 @@ export default function LoginModal({ onClose }) {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            style={{ width: '100%', marginBottom: '0.5rem', padding: '0.5rem' }}
+            style={{
+              display: 'block',
+              marginBottom: '0.5rem',
+              padding: '0.5rem',
+              width: '100%',
+            }}
           />
           <input
             type="password"
@@ -65,15 +82,40 @@ export default function LoginModal({ onClose }) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            style={{ width: '100%', marginBottom: '0.5rem', padding: '0.5rem' }}
+            style={{
+              display: 'block',
+              marginBottom: '0.5rem',
+              padding: '0.5rem',
+              width: '100%',
+            }}
           />
-          {error && <p style={{ color: 'red', marginBottom: '0.5rem' }}>{error}</p>}
-          <button type="submit" disabled={loading} style={{ width: '100%', padding: '0.5rem', background: '#4f46e5', color: 'white' }}>
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              padding: '0.5rem',
+              width: '100%',
+              background: '#0070f3',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+            }}
+          >
             {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
-
-        <button onClick={onClose} style={{ marginTop: '0.5rem', width: '100%', padding: '0.5rem', background: '#333', color: 'white' }}>
+        {error && <p style={{ color: 'red', marginTop: '0.5rem' }}>{error}</p>}
+        <button
+          onClick={onClose}
+          style={{
+            marginTop: '1rem',
+            padding: '0.5rem',
+            width: '100%',
+            border: '1px solid #ccc',
+            background: 'white',
+            borderRadius: '4px',
+          }}
+        >
           Cancel
         </button>
       </div>
