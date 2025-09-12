@@ -31,7 +31,7 @@ export default function VerifyEmail() {
 
           // Redirect after 2 seconds
           setTimeout(() => {
-            router.push('/dashboard'); // or '/' for homepage
+            router.push('/'); // or '/' for homepage
           }, 2000);
         } else {
           setMessage(`❌ ${data.error || 'Verification failed'}`);
