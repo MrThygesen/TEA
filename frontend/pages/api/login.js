@@ -7,8 +7,14 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' })
   }
 
-  // ✅ Use req.body directly (Next.js parses JSON automatically)
-  const { email, password } = req.body
+  let body
+  try {
+    body = JSON.parse(req.body)
+  } catch (err) {
+    return res.status(400).json({ error: 'Invalid JSON' })
+  }
+
+  const { email, password } = body
   console.log('📩 API received:', { email, password })
 
   if (!email || !password) {
@@ -35,9 +41,7 @@ export default async function handler(req, res) {
     }
 
     if (!user.email_verified) {
-      return res.status(403).json({
-        error: 'Email not verified. Please confirm your email before logging in.',
-      })
+      return res.status(403).json({ error: 'Email not verified.' })
     }
 
     const token = jwt.sign(
@@ -57,9 +61,10 @@ export default async function handler(req, res) {
         tier: user.tier,
       },
     })
+
   } catch (err) {
     console.error('❌ Login error:', err)
-    return res.status(500).json({ error: 'Internal server error', details: err.message })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 }
 

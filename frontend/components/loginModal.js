@@ -47,49 +47,32 @@ export default function LoginModal({ onClose }) {
   }
 
   return (
-    <div
-      className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-zinc-900 rounded-xl p-6 w-full max-w-sm"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-xl font-bold mb-4 text-blue-400">Login</h2>
-
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div style={{ background: '#fff', padding: '20px', width: '300px' }} onClick={e => e.stopPropagation()}>
+        <h2>Login</h2>
         <form onSubmit={handleLogin}>
           <input
             type="email"
             placeholder="Email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full mb-3 p-2 rounded text-black"
+            onChange={e => setEmail(e.target.value)}
+            style={{ width: '100%', marginBottom: '10px' }}
             required
           />
           <input
             type="password"
             placeholder="Password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full mb-3 p-2 rounded text-black"
+            onChange={e => setPassword(e.target.value)}
+            style={{ width: '100%', marginBottom: '10px' }}
             required
           />
-          {error && <p className="text-red-400 text-sm mb-2">{error}</p>}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white p-2 rounded"
-          >
+          {error && <p style={{ color: 'red' }}>{error}</p>}
+          <button type="submit" disabled={loading}>
             {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
-
-        <button
-          onClick={onClose}
-          className="mt-2 w-full bg-zinc-700 hover:bg-zinc-600 text-white p-2 rounded"
-        >
-          Cancel
-        </button>
+        <button onClick={onClose} style={{ marginTop: '10px' }}>Cancel</button>
       </div>
     </div>
   )
