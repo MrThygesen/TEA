@@ -2,16 +2,22 @@
 import { useState } from 'react'
 
 export default function LoginModal({ onClose }) {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [form, setForm] = useState({ email: '', password: '' })
+
+  const handleChange = (e) => {
+    setForm({
+      ...form,
+      [e.target.name]: e.target.value,
+    })
+  }
 
   const handleLogin = async () => {
-    console.log("📨 Frontend about to send:", { email, password })
+    console.log("📨 Frontend about to send:", form)
 
     const res = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(form),
     })
 
     const data = await res.json()
@@ -30,15 +36,17 @@ export default function LoginModal({ onClose }) {
       <h2>Login</h2>
       <input
         type="email"
+        name="email"
         placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
+        value={form.email}
+        onChange={handleChange}
       /><br />
       <input
         type="password"
+        name="password"
         placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
+        value={form.password}
+        onChange={handleChange}
       /><br />
       <button onClick={handleLogin}>Login</button>
     </div>
