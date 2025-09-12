@@ -3,24 +3,35 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { pool } from '../../lib/postgres.js'
 
-export const config = {
-  api: {
-    bodyParser: true, // ensures Vercel parses JSON body
-  },
-}
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' })
   }
 
-  const { email, password } = req.body // now should exist
+  // -------------------------------
+  // MANUALLY PARSE JSON BODY
+  // -------------------------------
+  let body = {}
+  try {
+    const chunks = []
+    for await (const chunk of req) chunks.push(chunk)
+    const raw = Buffer.concat(chunks).toString()
+    body = JSON.parse(raw)
+  } catch (err) {
+    console.error('❌ Error parsing JSON body:', err)
+    return res.status(400).json({ error: 'Invalid JSON' })
+  }
+
+  const { email, password } = body
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required.' })
   }
 
   try {
+    // -------------------------------
+    // LOOKUP USER
+    // -------------------------------
     const result = await pool.query(
       `SELECT id, username, email, password_hash, role, tier, email_verified
        FROM user_profiles
@@ -45,14 +56,20 @@ export default async function handler(req, res) {
       })
     }
 
+    // -------------------------------
+    // GENERATE JWT
+    // -------------------------------
     const token = jwt.sign(
       { id: user.id, email: user.email, username: user.username },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     )
 
+    // -------------------------------
+    // RETURN SUCCESS
+    // -------------------------------
     return res.status(200).json({
-      message: 'Login successful',
+      message: '✅ Login successful',
       token,
       user: {
         id: user.id,
@@ -63,7 +80,7 @@ export default async function handler(req, res) {
       },
     })
   } catch (err) {
-    console.error('Login error:', err)
+    console.error('❌ Login error:', err)
     return res.status(500).json({ error: 'Internal server error', details: err.message })
   }
 }
