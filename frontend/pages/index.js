@@ -312,16 +312,18 @@ export default function Home() {
   const allCities = Array.from(new Set(events.map(e => e.city))).filter(Boolean)
   const allVenueTypes = Array.from(new Set(events.map(e => e.venue_type))).filter(Boolean)
 
-  /* ---------------------------
-     Main Render
-  ---------------------------- */
-  return (
-    <div className="text-white min-h-screen bg-zinc-900">
+/* ---------------------------
+   Main Render
+---------------------------- */
+return (
+  <div className="text-white min-h-screen bg-zinc-900 flex justify-center">
+    {/* Centered container with max width */}
+    <div className="w-full max-w-5xl px-6 py-12 space-y-12">
 
       {/* -------------------
          Intro Section
       ------------------- */}
-      <section className="px-6 py-12 text-center">
+      <section className="text-center">
         <h1 className="text-4xl font-bold mb-4">Welcome to TEA Events</h1>
         <p className="max-w-2xl mx-auto text-lg text-gray-300">
           Explore curated events, book your spot, and enjoy exclusive perks.
@@ -331,7 +333,7 @@ export default function Home() {
       {/* -------------------
          Concept Boxes (3 boxes)
       ------------------- */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-6 px-6 py-12">
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-zinc-800 rounded-xl p-6 text-center shadow">
           <h3 className="text-xl font-semibold mb-2">Discover Events</h3>
           <p className="text-gray-400">Find curated events for networking and learning.</p>
@@ -349,7 +351,7 @@ export default function Home() {
       {/* -------------------
          Tags/Filters
       ------------------- */}
-      <section className="px-6 py-6 flex flex-wrap gap-2 items-center">
+      <section className="flex flex-wrap gap-2 items-center">
         <select
           value={selectedTag}
           onChange={(e) => setSelectedTag(e.target.value)}
@@ -392,7 +394,7 @@ export default function Home() {
       {/* -------------------
          Dynamic Event Cards / List
       ------------------- */}
-      <section className="px-6 py-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <section className={`grid gap-6 ${viewMode==='grid' ? 'md:grid-cols-2 lg:grid-cols-3' : ''}`}>
         {viewMode === 'grid'
           ? filteredEvents.map((e) => <DynamicEventCard key={e.id} event={e} />)
           : filteredEvents.map((e) => (
@@ -413,7 +415,7 @@ export default function Home() {
       {/* -------------------
          Footer + Wallet Connect
       ------------------- */}
-      <footer className="px-6 py-8 border-t border-zinc-700 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-400">
+      <footer className="border-t border-zinc-700 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-400">
         <div>© 2025 TEA Events</div>
         <div className="flex gap-4 items-center">
           <ConnectButton showBalance={false} chainStatus="none" />
@@ -427,6 +429,10 @@ export default function Home() {
           )}
         </div>
       </footer>
+
+    </div>
+  </div>
+)
 
       {/* -------------------
          Your Account Modal
