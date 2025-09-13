@@ -519,7 +519,4 @@ return (
 
     </div> {/* closes main container */}
   </div>   {/* closes page wrapper */}
-)
-  )
 }
-
