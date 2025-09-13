@@ -322,11 +322,26 @@ export default function Home() {
          Intro Section
       ------------------- */}
       <section className="px-6 py-12 text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to TEA Events</h1>
-        <p className="max-w-2xl mx-auto text-lg text-gray-300">
-          Explore curated events, book your spot, and enjoy exclusive perks.
-        </p>
-      </section>
+        <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-900 text-white px-6 py-12 space-y-8">
+  {/* Intro Text */}
+  <div className="text-center max-w-2xl space-y-4">
+    <h1 className="text-4xl font-bold">Welcome to TEA Events</h1>
+    <p className="text-gray-300">
+      Explore curated events, book your spot, and enjoy exclusive perks.
+    </p>
+    
+    {/* Video Button */}
+    <p>
+      Intro Video:{" "}
+      <a 
+        href="https://youtu.be/5QSHQ26JMm8" 
+        target="_blank"
+        className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition"
+      >
+        Watch on YouTube
+      </a>
+    </p>
+  </div>      </section>
 
       {/* -------------------
          Concept Boxes (3 boxes)
