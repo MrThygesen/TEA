@@ -756,3 +756,5 @@ Show your interest in the event and sign up to hear when events are confirmed an
       )}
 
     </main>
+      )}
+
