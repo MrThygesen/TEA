@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { useAccount } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import AdminSBTManager from '../components/AdminSBTManager'
-import WebAccessSBT from '../components/WebAccessSBT'
 
 /* ---------------------------
    Helpers: Auth persistence
@@ -146,25 +145,38 @@ function EventListRow({ event, onPreview }) {
 export default function Home() {
   const { isConnected, address } = useAccount()
   const [adminAddr, setAdminAddr] = useState(null)
+
   useEffect(() => {
     setAdminAddr(process.env.NEXT_PUBLIC_ADMIN?.toLowerCase?.() || null)
   }, [])
+
   const isAdmin = !!(address && adminAddr && address.toLowerCase() === adminAddr)
 
+  // --- State Hooks ---
   const [events, setEvents] = useState([])
   const [selectedTag, setSelectedTag] = useState('')
   const [selectedCity, setSelectedCity] = useState('')
   const [selectedVenueType, setSelectedVenueType] = useState('')
-  const [viewMode, setViewMode] = useState('grid') // 'grid' | 'list'
+  const [viewMode, setViewMode] = useState('grid')
 
+  const [showEmailModal, setShowEmailModal] = useState(false)
+  const [email, setEmail] = useState('')
+  const [emailStatus, setEmailStatus] = useState('')
+  const [isLoadingEmail, setIsLoadingEmail] = useState(false)
+
+  // --- NEW: User Auth ---
   const [authUser, setAuthUser] = useState(loadAuth())
-  const [showAccountModal, setShowAccountModal] = useState(false)
+  const [showLoginModal, setShowLoginModal] = useState(false)
+  const [showSignupModal, setShowSignupModal] = useState(false)
+  const [authError, setAuthError] = useState('')
+
   const [profileName, setProfileName] = useState('')
   const [profileEmail, setProfileEmail] = useState('')
   const [savingProfile, setSavingProfile] = useState(false)
   const [coupons, setCoupons] = useState([])
   const [prebookings, setPrebookings] = useState([])
 
+  // --- Fetch events ---
   useEffect(() => {
     fetch('/api/dump')
       .then((res) => res.json())
@@ -172,6 +184,20 @@ export default function Home() {
       .catch(() => setEvents([]))
   }, [])
 
+  // --- Admin Email fetch ---
+  useEffect(() => {
+    if (isAdmin && address) {
+      fetch(`/api/email-optin?wallet=${address}`)
+        .then(res => res.json())
+        .then(data => { if (data.email) setEmail(data.email) })
+        .catch(() => {})
+    } else {
+      setEmail('')
+      setEmailStatus('')
+    }
+  }, [isAdmin, address])
+
+  // --- Load user menu data when logged in ---
   useEffect(() => {
     if (!authUser) return
     setProfileName(authUser.username || '')
@@ -197,246 +223,281 @@ export default function Home() {
       .catch(() => setPrebookings([]))
   }, [authUser])
 
-  const filteredEvents = events.filter((e) => {
-    const tagMatch = selectedTag ? [e.tag1, e.tag2, e.tag3].includes(selectedTag) : true
-    const cityMatch = selectedCity ? e.city === selectedCity : true
-    const venueMatch = selectedVenueType ? e.venue_type === selectedVenueType : true
-    return tagMatch && cityMatch && venueMatch
-  })
-
   /* ---------------------------
-     Auth Handlers
+     NEW: Auth Handlers
   ---------------------------- */
+  async function handleLogin(e) {
+    e.preventDefault()
+    setAuthError('')
+    const form = new FormData(e.currentTarget)
+    const username = form.get('username')?.toString().trim()
+    const password = form.get('password')?.toString()
+    if (!username || !password) return setAuthError('Please enter username and password.')
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        return setAuthError(j.error || 'Login failed')
+      }
+      const user = await res.json()
+      setAuthUser(user)
+      saveAuth(user)
+      setShowLoginModal(false)
+    } catch (err) {
+      setAuthError('Network error')
+    }
+  }
+
+  async function handleSignup(e) {
+    e.preventDefault()
+    setAuthError('')
+    const form = new FormData(e.currentTarget)
+    const username = form.get('username')?.toString().trim()
+    const email = form.get('email')?.toString().trim()
+    const password = form.get('password')?.toString()
+    if (!username || !email || !password) return setAuthError('All fields are required.')
+    try {
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, email, password })
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        return setAuthError(j.error || 'Sign up failed')
+      }
+      const user = await res.json()
+      setAuthUser(user)
+      saveAuth(user)
+      setShowSignupModal(false)
+    } catch (err) {
+      setAuthError('Network error')
+    }
+  }
+
+  function handleLogout() {
+    clearAuth()
+    setAuthUser(null)
+  }
+
   async function saveProfile(e) {
     e.preventDefault()
     setSavingProfile(true)
     try {
       const res = await fetch('/api/user/me', {
-        method: 'PUT',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: profileName, email: profileEmail }),
-        credentials: 'include'
+        body: JSON.stringify({ username: profileName, email: profileEmail })
       })
-      if (res.ok) {
-        setAuthUser(prev => ({ ...prev, username: profileName, email: profileEmail }))
-        saveAuth({ ...authUser, username: profileName, email: profileEmail })
-      }
-    } finally { setSavingProfile(false) }
+      if (res.ok) alert('Profile updated!')
+    } catch (_) {}
+    setSavingProfile(false)
   }
 
-  /* ---------------------------
-     Tags/Cities/Venue Options
-  ---------------------------- */
-  const allTags = Array.from(new Set(events.flatMap(e => [e.tag1, e.tag2, e.tag3].filter(Boolean))))
-  const allCities = Array.from(new Set(events.map(e => e.city))).filter(Boolean)
-  const allVenueTypes = Array.from(new Set(events.map(e => e.venue_type))).filter(Boolean)
-
-  /* ---------------------------
-     Main Render
-  ---------------------------- */
   return (
-    <div className="text-white min-h-screen bg-zinc-900 flex justify-center">
-      <div className="w-full max-w-5xl px-6 py-12 space-y-12">
+    <div className="min-h-screen bg-zinc-900 text-white">
+      {/* ------------------ INTRO TEXT ------------------ */}
+      <section className="text-center py-12 px-4">
+        <h1 className="text-4xl font-bold mb-4">Welcome to TEA Events</h1>
+        <p className="text-lg max-w-xl mx-auto text-gray-300">
+          Discover unique events, secure your prebookings, and join our community. Everything you need in one place.
+        </p>
+      </section>
 
-        {/* -------------------
-           Intro Section
-        ------------------- */}
-        <section className="text-center">
-          <h1 className="text-4xl font-bold mb-4">Welcome to TEA Events</h1>
-          <p className="max-w-2xl mx-auto text-lg text-gray-300">
-            Explore curated events, book your spot, and enjoy exclusive perks.
-          </p>
-        </section>
+      {/* ------------------ CONCEPT BOXES ------------------ */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
+        <div className="bg-zinc-800 rounded-lg p-6 shadow">
+          <h3 className="font-bold text-xl mb-2">Connect</h3>
+          <p className="text-gray-300 text-sm">Join events and meet people who share your interests.</p>
+        </div>
+        <div className="bg-zinc-800 rounded-lg p-6 shadow">
+          <h3 className="font-bold text-xl mb-2">Book</h3>
+          <p className="text-gray-300 text-sm">Secure your spots before everyone else with prebooking options.</p>
+        </div>
+        <div className="bg-zinc-800 rounded-lg p-6 shadow">
+          <h3 className="font-bold text-xl mb-2">Enjoy</h3>
+          <p className="text-gray-300 text-sm">Attend events hassle-free and unlock perks and rewards.</p>
+        </div>
+      </section>
 
-        {/* -------------------
-           Concept Boxes (3 boxes)
-        ------------------- */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-zinc-800 rounded-xl p-6 text-center shadow">
-            <h3 className="text-xl font-semibold mb-2">Discover Events</h3>
-            <p className="text-gray-400">Find curated events for networking and learning.</p>
-          </div>
-          <div className="bg-zinc-800 rounded-xl p-6 text-center shadow">
-            <h3 className="text-xl font-semibold mb-2">Prebook Easily</h3>
-            <p className="text-gray-400">Reserve your spot quickly using our Telegram bot.</p>
-          </div>
-          <div className="bg-zinc-800 rounded-xl p-6 text-center shadow">
-            <h3 className="text-xl font-semibold mb-2">Earn Rewards</h3>
-            <p className="text-gray-400">Access coupons and perks for attending events.</p>
-          </div>
-        </section>
-
-        {/* -------------------
-           Tags/Filters
-        ------------------- */}
-        <section className="flex flex-wrap gap-2 items-center">
-          <select
+      {/* ------------------ EVENT FILTERS ------------------ */}
+      <section className="p-6">
+        <div className="flex flex-wrap gap-2 mb-4">
+          <input
+            type="text"
+            placeholder="Filter by tag"
+            className="px-3 py-1 rounded bg-zinc-700 text-white text-sm"
             value={selectedTag}
             onChange={(e) => setSelectedTag(e.target.value)}
-            className="bg-zinc-800 p-2 rounded text-sm"
-          >
-            <option value="">All Tags</option>
-            {allTags.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-
-          <select
+          />
+          <input
+            type="text"
+            placeholder="Filter by city"
+            className="px-3 py-1 rounded bg-zinc-700 text-white text-sm"
             value={selectedCity}
             onChange={(e) => setSelectedCity(e.target.value)}
-            className="bg-zinc-800 p-2 rounded text-sm"
-          >
-            <option value="">All Cities</option>
-            {allCities.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-
-          <select
+          />
+          <input
+            type="text"
+            placeholder="Filter by venue type"
+            className="px-3 py-1 rounded bg-zinc-700 text-white text-sm"
             value={selectedVenueType}
             onChange={(e) => setSelectedVenueType(e.target.value)}
-            className="bg-zinc-800 p-2 rounded text-sm"
+          />
+          <select
+            className="px-3 py-1 rounded bg-zinc-700 text-white text-sm"
+            value={viewMode}
+            onChange={(e) => setViewMode(e.target.value)}
           >
-            <option value="">All Venue Types</option>
-            {allVenueTypes.map(v => <option key={v} value={v}>{v}</option>)}
+            <option value="grid">Grid</option>
+            <option value="list">List</option>
           </select>
+        </div>
 
-          <div className="ml-auto flex gap-2">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`px-3 py-1 rounded ${viewMode==='grid'?'bg-blue-600':'bg-zinc-700'}`}
-            >Grid</button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`px-3 py-1 rounded ${viewMode==='list'?'bg-blue-600':'bg-zinc-700'}`}
-            >List</button>
-          </div>
-        </section>
-
-        {/* -------------------
-           Dynamic Event Cards / List
-        ------------------- */}
-        <section className={`grid gap-6 ${viewMode==='grid' ? 'md:grid-cols-2 lg:grid-cols-3' : ''}`}>
-          {viewMode === 'grid'
-            ? filteredEvents.map((e) => <DynamicEventCard key={e.id} event={e} />)
-            : filteredEvents.map((e) => (
-                <EventListRow key={e.id} event={e} onPreview={() => alert('Preview modal')} />
+        {/* ------------------ EVENTS ------------------ */}
+        {viewMode === 'grid' ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {events
+              .filter((e) => (!selectedTag || [e.tag1, e.tag2, e.tag3].includes(selectedTag)))
+              .filter((e) => !selectedCity || e.city === selectedCity)
+              .filter((e) => !selectedVenueType || e.venue_type === selectedVenueType)
+              .map((event) => (
+                <DynamicEventCard key={event.id} event={event} />
               ))}
-        </section>
-
-        {/* -------------------
-           Admin SBT Manager
-        ------------------- */}
-        {isAdmin && <AdminSBTManager />}
-
-        {/* -------------------
-           User WebAccessSBT Section
-        ------------------- */}
-        {isConnected && <WebAccessSBT />}
-
-        {/* -------------------
-           Footer + Wallet Connect
-        ------------------- */}
-        <footer className="border-t border-zinc-700 text-sm text-gray-400">
-          <div className="w-full max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 px-6 py-8">
-            <div>© 2025 TEA Events</div>
-            <div className="flex gap-4 items-center">
-              <ConnectButton showBalance={false} chainStatus="none" />
-              {authUser && (
-                <button
-                  onClick={() => setShowAccountModal(true)}
-                  className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white font-semibold transition"
-                >
-                  Your Account
-                </button>
-              )}
-            </div>
           </div>
-        </footer>
-
-        {/* -------------------
-           Your Account Modal
-        ------------------- */}
-        {showAccountModal && (
-          <div
-            className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
-            onClick={() => setShowAccountModal(false)}
-          >
-            <div
-              className="bg-zinc-900 rounded-3xl max-w-2xl w-full p-8 overflow-auto max-h-[90vh]"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h2 className="text-2xl font-semibold mb-4 text-blue-400">Your Account</h2>
-
-              <form onSubmit={saveProfile} className="space-y-3 mb-8">
-                <div>
-                  <label className="block text-sm mb-1">User name</label>
-                  <input
-                    value={profileName}
-                    onChange={e => setProfileName(e.target.value)}
-                    className="w-full p-2 rounded text-black"
-                    placeholder="Your name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={profileEmail}
-                    onChange={e => setProfileEmail(e.target.value)}
-                    className="w-full p-2 rounded text-black"
-                    placeholder="you@example.com"
-                  />
-                </div>
-                <button
-                  disabled={savingProfile}
-                  className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 disabled:opacity-60"
-                >
-                  Save changes
-                </button>
-              </form>
-
-              <div className="mb-8">
-                <h3 className="text-lg font-semibold mb-2">Paid event coupons</h3>
-                {coupons?.length ? (
-                  <ul className="space-y-2 text-sm">
-                    {coupons.map(c => (
-                      <li key={c.id} className="flex justify-between items-center border border-zinc-700 rounded p-3">
-                        <span className="truncate">{c.event_name} — {new Date(c.event_datetime).toLocaleString()}</span>
-                        <span className="text-green-400 font-medium">Paid</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : <p className="text-gray-400 text-sm">No paid coupons yet.</p>}
-              </div>
-
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Prebooked events</h3>
-                {prebookings?.length ? (
-                  <ul className="space-y-2 text-sm">
-                    {prebookings.map(p => (
-                      <li key={p.id} className="flex justify-between items-center border border-zinc-700 rounded p-3">
-                        <span className="truncate">{p.event_name} — {new Date(p.event_datetime).toLocaleString()}</span>
-                        <span className={
-                          'text-xs px-2 py-1 rounded ' + (p.is_confirmed ? 'bg-green-700' : 'bg-zinc-700')
-                        }>
-                          {p.is_confirmed ? 'confirmed' : 'idle'}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : <p className="text-gray-400 text-sm">No prebooked events yet.</p>}
-              </div>
-
-              <div className="flex justify-end mt-6">
-                <button
-                  onClick={() => setShowAccountModal(false)}
-                  className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700"
-                >
-                  Close
-                </button>
-              </div>
+        ) : (
+          <div className="overflow-x-auto border border-zinc-700 rounded-lg">
+            <div className="grid grid-cols-5 gap-2 p-3 font-semibold border-b border-zinc-600">
+              <span>Type</span>
+              <span>Date</span>
+              <span>Name</span>
+              <span>City</span>
+              <span>Action</span>
             </div>
+            {events.map((event) => (
+              <EventListRow
+                key={event.id}
+                event={event}
+                onPreview={() => alert(`Preview for ${event.name}`)}
+              />
+            ))}
           </div>
         )}
+      </section>
 
-      </div>
+      {/* ------------------ ADMIN SBT ------------------ */}
+      {isAdmin && (
+        <section className="p-6 border-t border-zinc-700">
+          <h2 className="text-xl font-bold mb-3">Admin SBT Management</h2>
+          <AdminSBTManager />
+        </section>
+      )}
+
+      {/* ------------------ YOUR ACCOUNT MODAL ------------------ */}
+      {authUser && (
+        <div className="fixed bottom-6 right-6">
+          <button
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded shadow"
+            onClick={() => setShowEmailModal(true)}
+          >
+            Your Account
+          </button>
+        </div>
+      )}
+
+      {showEmailModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowEmailModal(false)}
+        >
+          <div
+            className="bg-zinc-900 rounded-lg max-w-md w-full p-6 overflow-auto max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold mb-4">Your Account</h2>
+
+            <form onSubmit={saveProfile} className="space-y-3">
+              <div>
+                <label className="block text-sm mb-1">Username</label>
+                <input
+                  type="text"
+                  value={profileName}
+                  onChange={(e) => setProfileName(e.target.value)}
+                  className="w-full px-3 py-1 rounded bg-zinc-700 text-white text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm mb-1">Email</label>
+                <input
+                  type="email"
+                  value={profileEmail}
+                  onChange={(e) => setProfileEmail(e.target.value)}
+                  className="w-full px-3 py-1 rounded bg-zinc-700 text-white text-sm"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={savingProfile}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded"
+              >
+                {savingProfile ? 'Saving...' : 'Save Profile'}
+              </button>
+            </form>
+
+            <div className="mt-6">
+              <h3 className="font-bold mb-2">Your Coupons</h3>
+              {coupons.length > 0 ? (
+                <ul className="list-disc list-inside text-sm text-gray-300">
+                  {coupons.map((c) => (
+                    <li key={c.id}>{c.name} - {c.discount || '—'}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-gray-400">No coupons available</p>
+              )}
+            </div>
+
+            <div className="mt-6">
+              <h3 className="font-bold mb-2">Your Prebookings</h3>
+              {prebookings.length > 0 ? (
+                <ul className="list-disc list-inside text-sm text-gray-300">
+                  {prebookings.map((p) => (
+                    <li key={p.id}>{p.event_name} ({new Date(p.date).toLocaleDateString()})</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-gray-400">No prebookings</p>
+              )}
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="mt-6 px-4 py-2 bg-red-600 hover:bg-red-700 rounded text-white"
+            >
+              Logout
+            </button>
+
+            <button
+              onClick={() => setShowEmailModal(false)}
+              className="mt-4 px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded text-white"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------ FOOTER ------------------ */}
+      <footer className="p-6 border-t border-zinc-700 text-center">
+        <p className="text-gray-400 mb-2">© 2025 TEA Events</p>
+        <div className="flex justify-center">
+          <ConnectButton showBalance={false} chainStatus="none" />
+        </div>
+      </footer>
     </div>
   )
 }
