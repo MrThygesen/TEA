@@ -412,27 +412,25 @@ return (
       ------------------- */}
       {isConnected && <WebAccessSBT />}
 
-      {/* -------------------
-         Footer + Wallet Connect
-      ------------------- */}
-      <footer className="border-t border-zinc-700 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-400">
-        <div>© 2025 TEA Events</div>
-        <div className="flex gap-4 items-center">
-          <ConnectButton showBalance={false} chainStatus="none" />
-          {authUser && (
-            <button
-              onClick={() => setShowAccountModal(true)}
-              className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white font-semibold transition"
-            >
-              Your Account
-            </button>
-          )}
-        </div>
-      </footer>
-
+{/* -------------------
+   Footer + Wallet Connect
+------------------- */}
+<footer className="border-t border-zinc-700 text-sm text-gray-400">
+  <div className="w-full max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 px-6 py-8">
+    <div>© 2025 TEA Events</div>
+    <div className="flex gap-4 items-center">
+      <ConnectButton showBalance={false} chainStatus="none" />
+      {authUser && (
+        <button
+          onClick={() => setShowAccountModal(true)}
+          className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white font-semibold transition"
+        >
+          Your Account
+        </button>
+      )}
     </div>
   </div>
-)
+</footer>
 
       {/* -------------------
          Your Account Modal
