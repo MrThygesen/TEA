@@ -324,7 +324,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'
 
 export default function IntroSection() {
   return (
-    <div className="text-white min-h-screen bg-zinc-900 flex flex-col items-center justify-center px-6 py-12 space-y-12">
+ <div className="text-white min-h-screen bg-zinc-900 flex flex-col items-center justify-center px-6 py-12 space-y-12">
 
       {/* -------------------
          Intro Section
@@ -369,8 +369,7 @@ export default function IntroSection() {
       </section>
     </div>
   )
-}
-      {/* -------------------
+}      {/* -------------------
          Concept Boxes (3 boxes)
       ------------------- */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-6 px-6 py-12">
