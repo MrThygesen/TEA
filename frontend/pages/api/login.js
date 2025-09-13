@@ -1,3 +1,4 @@
+// pages/api/login.js
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { pool } from '../../lib/postgres.js'
@@ -8,29 +9,32 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { email, password } = req.body
-    console.log('📩 API received:', { email, password })
+    const { email, username, password } = req.body
+    console.log('📩 API received:', { email, username, password })
 
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required.' })
+    if ((!email && !username) || !password) {
+      return res.status(400).json({ error: 'Email/username and password are required.' })
     }
+
+    const identifier = email || username
 
     const result = await pool.query(
       `SELECT id, username, email, password_hash, role, tier, email_verified
        FROM user_profiles
-       WHERE email = $1`,
-      [email]
+       WHERE email = $1 OR username = $1
+       LIMIT 1`,
+      [identifier]
     )
 
     if (!result.rows.length) {
-      return res.status(400).json({ error: 'Invalid email or password.' })
+      return res.status(400).json({ error: 'Invalid credentials.' })
     }
 
     const user = result.rows[0]
     const validPassword = await bcrypt.compare(password, user.password_hash)
 
     if (!validPassword) {
-      return res.status(400).json({ error: 'Invalid email or password.' })
+      return res.status(400).json({ error: 'Invalid credentials.' })
     }
 
     if (!user.email_verified) {
