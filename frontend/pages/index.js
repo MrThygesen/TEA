@@ -334,15 +334,15 @@ export default function Home() {
       <section className="grid grid-cols-1 md:grid-cols-3 gap-6 px-6 py-12">
         <div className="bg-zinc-800 rounded-xl p-6 text-center shadow">
           <h3 className="text-xl font-semibold mb-2">Discover Events</h3>
-          <p className="text-gray-400">Find curated events for networking and learning.</p>
+          <p className="text-gray-400">Find curated events for networking and business.</p>
         </div>
         <div className="bg-zinc-800 rounded-xl p-6 text-center shadow">
           <h3 className="text-xl font-semibold mb-2">Prebook Easily</h3>
-          <p className="text-gray-400">Reserve your spot quickly using our Telegram bot.</p>
+          <p className="text-gray-400">Reserve your spot on the web or telegram.</p>
         </div>
         <div className="bg-zinc-800 rounded-xl p-6 text-center shadow">
           <h3 className="text-xl font-semibold mb-2">Earn Rewards</h3>
-          <p className="text-gray-400">Access coupons and perks for attending events.</p>
+          <p className="text-gray-400">Access perks as part of the event.</p>
         </div>
       </section>
 
