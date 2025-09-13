@@ -26,7 +26,7 @@ function clearAuth() {
   try { localStorage.removeItem('edgy_auth_user') } catch (_) {}
 }
 
-/* ---------------------------½
+/* ---------------------------
    Dynamic Event Card Component
 ---------------------------- */
 function DynamicEventCard({ event }) {
@@ -756,4 +756,3 @@ Show your interest in the event and sign up to hear when events are confirmed an
       )}
 
     </main>
-
