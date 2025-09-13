@@ -630,39 +630,6 @@ Show your interest in the event and sign up to hear when events are confirmed an
 </section>
 
 
-        {/* ---------------- Roadmap ---------------- */}
-        <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg">
-          <h2 className="text-2xl font-semibold mb-4 text-center text-blue-400">Project Roadmap</h2>
-          <ul className="list-disc list-inside space-y-2">
-           
-            <li>Q2 2025: Blockchain and SBT experiments </li>
-            <li>Q2 2025: BOT development </li>
-            <li>Q3 2025: planning of architecture ()Web2)      </li>
-            <li>Q3 2025: Web2 event platform design (Web2)     </li>
-            <li>Q3 2025: Web2 payment integration (Web2)       </li>
-            <li>Q3 2025: Web2 mail integration (Web2)          </li>
-            <li>Q3 2025: Web2 invite-incentives integration (Web2)        </li>
-            <li>Q4 2025: Partner onboarding & growth (Web2)    </li> 
-            <li>Q1 2026: Telegram BOT -market expansion (Web2) </li>
-            <li>Q2 2026: Telegram wallet integration (Web3)    </li>
-            <li>Q2 2026: loyalty-reward integration ()Web3)    </li>
-          </ul>
-          <div className="text-center mt-4- Main: “EDGY EVENTS: Where people, venues, and opportunities meet.”
-- Subhead: “Curated experiences that blend business with social connection.”
-We give your edge in networking, nightlife, and opportunity.">
-            <button
-              onClick={() => setShowFullRoadmap(!showFullRoadmap)}
-              className="text-blue-400 hover:underline text-sm"
-            >
-              {showFullRoadmap ? 'Hide Full Roadmap' : '📜 Show Full Roadmap'}
-            </button>
-          </div>
-          {showFullRoadmap && (
-            <div className="mt-6 text-sm space-y-4 text-gray-300">
-              {/* Detailed roadmap content omitted for brevity, same as before */}
-            </div>
-          )}
-        </section>
 
         {/* ---------------- Footer ---------------- */}
             {/* Footer */}
