@@ -324,49 +324,51 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'
 
 export default function IntroSection() {
   return (
- <div className="text-white min-h-screen bg-zinc-900 flex flex-col items-center justify-center px-6 py-12 space-y-12">
+  <div className="text-white min-h-screen bg-zinc-900 flex flex-col items-center justify-center px-6 py-12 space-y-12">
 
-      {/* -------------------
-         Intro Section
-      ------------------- */}
-      <section className="text-center max-w-2xl space-y-6">
-        <h1 className="text-4xl font-bold">Welcome to TEA Events</h1>
-        <p className="text-gray-300">
-          Explore curated events, book your spot, and enjoy exclusive perks.
-        </p>
-        
-        {/* Video Button */}
-        <p>
-          Intro Video:{" "}
-          <a 
-            href="https://youtu.be/5QSHQ26JMm8" 
-            target="_blank"
-            className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition"
-          >
-            Watch on YouTube
-          </a>
-        </p>
+    {/* -------------------
+       Intro Section
+    ------------------- */}
+    <section className="text-center max-w-2xl space-y-6">
+      <h1 className="text-4xl font-bold">Welcome to TEA Events</h1>
+      <p className="text-gray-300">
+        Explore curated events, book your spot, and enjoy exclusive perks.
+      </p>
+      
+      {/* Video Button */}
+      <p>
+        Intro Video:{" "}
+        <a 
+          href="https://youtu.be/5QSHQ26JMm8" 
+          target="_blank"
+          className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition"
+        >
+          Watch on YouTube
+        </a>
+      </p>
 
-        {/* Buttons Row */}
-        <div className="flex flex-wrap items-center justify-center gap-4 mt-6">
-          {/* Wallet Button */}
-          <div className="h-12">
-            <ConnectButton showBalance={false} className="h-full" />
-          </div>
-
-          {/* Twitter Button */}
-          <a
-            href="https://twitter.com/yourtwitterhandle"
-            target="_blank"
-            className="flex items-center gap-2 bg-blue-400 hover:bg-blue-500 text-white px-6 h-12 rounded-lg transition justify-center"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M24 4.557a9.832 9.832 0 0 1-2.828.775 4.932 4.932 0 0 0 2.165-2.724 9.864 9.864 0 0 1-3.127 1.195 4.916 4.916 0 0 0-8.384 4.482A13.944 13.944 0 0 1 1.671 3.149a4.916 4.916 0 0 0 1.523 6.562A4.902 4.902 0 0 1 .964 9.17v.062a4.918 4.918 0 0 0 3.946 4.817 4.902 4.902 0 0 1-2.212.084 4.918 4.918 0 0 0 4.588 3.417A9.867 9.867 0 0 1 0 19.54a13.936 13.936 0 0 0 7.548 2.212c9.056 0 14.01-7.496 14.01-13.986 0-.21 0-.423-.015-.634A10.012 10.012 0 0 0 24 4.557z"/>
-            </svg>
-            @TEAProject
-          </a>
+      {/* Buttons Row */}
+      <div className="flex flex-wrap items-center justify-center gap-4 mt-6">
+        {/* Wallet Button */}
+        <div className="h-12">
+          <ConnectButton showBalance={false} className="h-full" />
         </div>
-      </section>
+
+        {/* Twitter Button */}
+        <a
+          href="https://twitter.com/yourtwitterhandle"
+          target="_blank"
+          className="flex items-center gap-2 bg-blue-400 hover:bg-blue-500 text-white px-6 h-12 rounded-lg transition justify-center"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M24 4.557a9.832 9.832 0 0 1-2.828.775 4.932 4.932 0 0 0 2.165-2.724 9.864 9.864 0 0 1-3.127 1.195 4.916 4.916 0 0 0-8.384 4.482A13.944 13.944 0 0 1 1.671 3.149a4.916 4.916 0 0 0 1.523 6.562A4.902 4.902 0 0 1 .964 9.17v.062a4.918 4.918 0 0 0 3.946 4.817 4.902 4.902 0 0 1-2.212.084 4.918 4.918 0 0 0 4.588 3.417A9.867 9.867 0 0 1 0 19.54a13.936 13.936 0 0 0 7.548 2.212c9.056 0 14.01-7.496 14.01-13.986 0-.21 0-.423-.015-.634A10.012 10.012 0 0 0 24 4.557z"/>
+          </svg>
+          @TEAProject
+        </a>
+      </div>
+    </section>
+
+    {/* ...rest of your sections follow here */}
     </div>
   )
 }      {/* -------------------
