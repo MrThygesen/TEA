@@ -752,8 +752,6 @@ if (data.startsWith('register_')) {
 // ==============================
 // EXPRESS APP SETUP FOR TELEGRAM WEBHOOK
 // ==============================
-const app = express();
-app.use(bodyParser.json());
 
 app.post(`/webhook/${BOT_TOKEN}`, (req, res) => {
   bot.processUpdate(req.body);
