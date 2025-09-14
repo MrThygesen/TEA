@@ -742,23 +742,20 @@ if (data.startsWith('register_')) {
 }
 }); // <-- closes bot.on("callback_query")
 
-// ==================================================
-// EXPRESS SERVER + WEBHOOK
-// ==================================================
+
+// ==============================
+// EXPRESS WEBHOOK & SERVER
+// ==============================
 const app = express();
 app.use(express.json());
 
-app.get('/', (req, res) => {
-  res.send('✅ Bot is running.');
+app.post(`/webhook/${BOT_TOKEN}`, (req, res) => {
+  bot.processUpdate(req.body);
+  res.sendStatus(200);
 });
 
-// Set webhook dynamically from PUBLIC_URL
-if (PUBLIC_URL) {
-  bot.setWebHook(`${PUBLIC_URL}/bot${BOT_TOKEN}`);
-  console.log(`🌍 Webhook set to ${PUBLIC_URL}/bot${BOT_TOKEN}`);
-}
+bot.setWebHook(`${PUBLIC_URL}/webhook/${BOT_TOKEN}`);
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🚀 Bot running on port ${PORT}`);
 });
-
