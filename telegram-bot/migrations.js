@@ -157,15 +157,18 @@ export async function runMigrations() {
       $$ LANGUAGE 'plpgsql';
     `);
 
+    // Drop triggers if they exist, then create them
     await pool.query(`
-      CREATE TRIGGER IF NOT EXISTS trg_update_user_profiles_updated_at
+      DROP TRIGGER IF EXISTS trg_update_user_profiles_updated_at ON user_profiles;
+      CREATE TRIGGER trg_update_user_profiles_updated_at
       BEFORE UPDATE ON user_profiles
       FOR EACH ROW
       EXECUTE FUNCTION update_updated_at_column();
     `);
 
     await pool.query(`
-      CREATE TRIGGER IF NOT EXISTS trg_update_events_updated_at
+      DROP TRIGGER IF EXISTS trg_update_events_updated_at ON events;
+      CREATE TRIGGER trg_update_events_updated_at
       BEFORE UPDATE ON events
       FOR EACH ROW
       EXECUTE FUNCTION update_updated_at_column();
