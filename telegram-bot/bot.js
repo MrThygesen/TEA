@@ -760,5 +760,5 @@ bot.setWebHook(`${PUBLIC_URL}/webhook/${BOT_TOKEN}`);
 
 app.listen(PORT, () => {
   console.log(`🚀 Bot running on port ${PORT}`);
-}));
+});
 
