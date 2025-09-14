@@ -151,4 +151,210 @@ export default function Home() {
 
   const [events, setEvents] = useState([])
   const [selectedCity, setSelectedCity] = useState('')
-  const [selectedVenueType, setSe
+  const [selectedVenueType, setSelectedVenueType] = useState('')
+  const [viewMode, setViewMode] = useState('grid')
+
+  const [authUser, setAuthUser] = useState(loadAuth())
+  const [showLoginModal, setShowLoginModal] = useState(false)
+  const [showSignupModal, setShowSignupModal] = useState(false)
+  const [showAccountModal, setShowAccountModal] = useState(false)
+  const [authError, setAuthError] = useState('')
+
+  const [profileName, setProfileName] = useState('')
+  const [profileEmail, setProfileEmail] = useState('')
+  const [coupons, setCoupons] = useState([])
+  const [prebookings, setPrebookings] = useState([])
+
+  useEffect(() => {
+    fetch('/api/dump')
+      .then((res) => res.json())
+      .then(setEvents)
+      .catch(() => setEvents([]))
+  }, [])
+
+  useEffect(() => {
+    if (!authUser) return
+    setProfileName(authUser.username || '')
+    setProfileEmail(authUser.email || '')
+
+    fetch('/api/user/coupons', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : { coupons: [] })
+      .then(d => setCoupons(d.coupons || []))
+      .catch(() => setCoupons([]))
+
+    fetch('/api/user/prebookings', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : { items: [] })
+      .then(d => setPrebookings(d.items || []))
+      .catch(() => setPrebookings([]))
+  }, [authUser])
+
+  function handleLogout() {
+    clearAuth()
+    setAuthUser(null)
+  }
+
+  async function handleLogin(e) {
+    e.preventDefault()
+    setAuthError('')
+    const form = new FormData(e.currentTarget)
+    const username = form.get('username')?.toString().trim()
+    const password = form.get('password')?.toString()
+    if (!username || !password) return setAuthError('Please enter username and password.')
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        return setAuthError(j.error || 'Login failed')
+      }
+      const user = await res.json()
+      setAuthUser(user)
+      saveAuth(user)
+      setShowLoginModal(false)
+    } catch (err) {
+      setAuthError('Network error')
+    }
+  }
+
+  async function handleSignup(e) {
+    e.preventDefault()
+    setAuthError('')
+    const form = new FormData(e.currentTarget)
+    const username = form.get('username')?.toString().trim()
+    const email = form.get('email')?.toString().trim()
+    const password = form.get('password')?.toString()
+    if (!username || !email || !password) return setAuthError('All fields are required.')
+    try {
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, email, password })
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        return setAuthError(j.error || 'Sign up failed')
+      }
+      const user = await res.json()
+      setAuthUser(user)
+      saveAuth(user)
+      setShowSignupModal(false)
+    } catch (err) {
+      setAuthError('Network error')
+    }
+  }
+
+  // Filtered Events
+  const filteredEvents = events.filter((e) => {
+    const cityMatch = selectedCity ? e.city === selectedCity : true
+    const venueMatch = selectedVenueType ? e.venue_type === selectedVenueType : true
+    return cityMatch && venueMatch
+  })
+
+  return (
+    <main className="bg-black text-white min-h-screen flex flex-col items-center py-12 px-4">
+      <div className="w-full max-w-3xl space-y-10">
+        <header className="bg-zinc-900 rounded-3xl p-8 border border-zinc-700 shadow-lg text-center">
+          <h1 className="text-4xl font-bold text-blue-400">EDGY EVENT PLATFORM</h1>
+
+          <div className="mt-6 flex gap-3 justify-center">
+            {!authUser ? (
+              <>
+                <button onClick={() => setShowSignupModal(true)} className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700">Create account</button>
+                <button onClick={() => setShowLoginModal(true)} className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600">Log in</button>
+              </>
+            ) : (
+              <>
+                <span>Welcome, {authUser.username}</span>
+                <button onClick={() => setShowAccountModal(true)} className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700">Your Account</button>
+                <button onClick={handleLogout} className="px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600">Log out</button>
+              </>
+            )}
+          </div>
+        </header>
+
+        {isAdmin && <AdminSBTManager darkMode={true} />}
+
+        {/* Event Flow Explanation */}
+        <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg">
+          <h2 className="text-2xl font-semibold mb-6 text-center text-blue-400">How It Works</h2>
+          <div className="grid md:grid-cols-3 gap-6 text-left">
+            <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow">
+              <h3 className="text-lg font-bold mb-2 text-yellow-400">1. Prebook</h3>
+              <p className="text-gray-300 text-sm">Show your interest in the event and sign up to hear when events are confirmed and open for coupon purchase.</p>
+            </div>
+            <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow">
+              <h3 className="text-lg font-bold mb-2 text-green-400">2. Book</h3>
+              <p className="text-gray-300 text-sm">Purchase your coupon for the venue to meet your network and get your perks. Buy coupons early.</p>
+            </div>
+            <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow">
+              <h3 className="text-lg font-bold mb-2 text-blue-400">3. Show Up</h3>
+              <p className="text-gray-300 text-sm">Get registered on the digital guestlist, meet new people, place your order, and enjoy the mystery perk served on the side.</p>
+            </div>
+          </div>
+        </section>
+
+        {/* Event Grid/List Section */}
+        <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-semibold text-blue-400">Explore Events</h2>
+            <button
+              onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+              className="text-sm px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600"
+            >
+              {viewMode === 'grid' ? 'List view' : 'Grid view'}
+            </button>
+          </div>
+
+          <div className="flex gap-4 mb-6 justify-center">
+            <select
+              className="bg-zinc-800 text-white p-2 rounded"
+              onChange={(e) => setSelectedCity(e.target.value)}
+              value={selectedCity}
+            >
+              <option value="">All Cities</option>
+              {[...new Set((events || []).map(e => e.city).filter(Boolean))].map((city, i) => (
+                <option key={i} value={city}>{city}</option>
+              ))}
+            </select>
+
+            <select
+              className="bg-zinc-800 text-white p-2 rounded"
+              onChange={(e) => setSelectedVenueType(e.target.value)}
+              value={selectedVenueType}
+            >
+              <option value="">Event Types</option>
+              {[...new Set((events || []).map(e => e.venue_type).filter(Boolean))].map((type, i) => (
+                <option key={i} value={type}>{type}</option>
+              ))}
+            </select>
+          </div>
+
+          {filteredEvents.length === 0 ? (
+            <p className="text-center text-gray-400">No events match your filter.</p>
+          ) : viewMode === 'grid' ? (
+            <div className="grid md:grid-cols-3 gap-6">
+              {filteredEvents.map(event => <DynamicEventCard key={event.id} event={event} />)}
+            </div>
+          ) : (
+            <div className="border border-zinc-700 rounded-lg overflow-hidden">
+              <div className="grid grid-cols-5 gap-2 items-center py-2 px-3 bg-zinc-800 text-xs uppercase tracking-wide text-gray-400">
+                <span>Type</span>
+                <span>Date</span>
+                <span>Name</span>
+                <span>City</span>
+                <span className="text-right">Preview</span>
+              </div>
+              {filteredEvents.map(event => (
+                <EventListRow key={event.id} event={event} onPreview={() => alert(`Preview: ${event.name}`)} />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Footer */}
+        <footer className="bg-zinc-900 border border-zinc-700 rounded-3xl p-6 text-center text-gray-400">
+          <p>Docs: <a href="https://github.com/MrThygesen/TEA" className="text-blue-400 hover:underline" target="_blank">Git
+
