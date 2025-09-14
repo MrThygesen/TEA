@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 import express from 'express';
 import { runMigrations } from './migrations.js';
 import Stripe from 'stripe';
-import { sendEmailVerification } from './lib/sendEmailVerification.js'
+//import { sendEmailVerification } from './lib/sendEmailVerification.js'
 
 import {
   sendEmailVerification,
