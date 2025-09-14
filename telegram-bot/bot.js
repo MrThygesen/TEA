@@ -749,6 +749,7 @@ if (data.startsWith('register_')) {
 const app = express();
 app.use(express.json());
 
+
 app.post(`/webhook/${BOT_TOKEN}`, (req, res) => {
   bot.processUpdate(req.body);
   res.sendStatus(200);
