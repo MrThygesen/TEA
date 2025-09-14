@@ -1,11 +1,12 @@
 // bot.js
+//import { sendEmailVerification } from './lib/sendEmailVerification.js'
+
 import TelegramBot from 'node-telegram-bot-api';
 import pkg from 'pg';
 import dotenv from 'dotenv';
 import express from 'express';
 import { runMigrations } from './migrations.js';
 import Stripe from 'stripe';
-//import { sendEmailVerification } from './lib/sendEmailVerification.js'
 
 const app = express();
 app.use(express.json());
@@ -743,7 +744,7 @@ if (data.startsWith('register_')) {
     await bot.answerCallbackQuery(query.id, { text: 'Error occurred ❌', show_alert: true });
   } catch {}
 }
-}); // <-- closes bot.on("callback_query")
+}); 
 
 
 // ==============================
@@ -759,4 +760,5 @@ bot.setWebHook(`${PUBLIC_URL}/webhook/${BOT_TOKEN}`);
 
 app.listen(PORT, () => {
   console.log(`🚀 Bot running on port ${PORT}`);
-})};
+}));
+
