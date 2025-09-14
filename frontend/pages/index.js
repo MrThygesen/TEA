@@ -26,17 +26,19 @@ function clearAuth() {
 
 function DynamicEventCard({ event, onPreview }) {
   const [loading, setLoading] = useState(false)
+  const [internalModalOpen, setInternalModalOpen] = useState(false) // fixed
 
   const telegramLink = `https://t.me/TeaIsHereBot?start=${event.id}`
 
   async function handleWebAction() {
     setLoading(true)
     try {
+      const token = localStorage.getItem('token')
       const res = await fetch('/api/events/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${token || ''}`,
         },
         body: JSON.stringify({ eventId: event.id }),
       })
@@ -57,62 +59,116 @@ function DynamicEventCard({ event, onPreview }) {
   }
 
   return (
-    <div className="border border-zinc-700 rounded-lg p-4 text-left bg-zinc-800 shadow flex flex-col justify-between">
-      <img
-        src={event.image_url || '/default-event.jpg'}
-        alt={event.name}
-        className="w-full h-40 object-cover rounded mb-3"
-      />
-      <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
-      <p className="text-sm mb-2">
-        {event.description?.split(' ').slice(0, 30).join(' ')}...
-      </p>
+    <>
+      <div className="border border-zinc-700 rounded-lg p-4 text-left bg-zinc-800 shadow flex flex-col justify-between">
+        <img
+          src={event.image_url || '/default-event.jpg'}
+          alt={event.name}
+          className="w-full h-40 object-cover rounded mb-3"
+        />
+        <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
+        <p className="text-sm mb-2">
+          {event.description?.split(' ').slice(0, 30).join(' ')}...
+        </p>
 
-      <div className="flex flex-wrap gap-1 mb-2">
-        {[event.tag1, event.tag2, event.tag3].filter(Boolean).map((tag, i) => (
-          <span key={i} className="bg-blue-700 text-xs px-2 py-1 rounded">
-            {tag}
-          </span>
-        ))}
-      </div>
+        <div className="flex flex-wrap gap-1 mb-2">
+          {[event.tag1, event.tag2, event.tag3].filter(Boolean).map((tag, i) => (
+            <span key={i} className="bg-blue-700 text-xs px-2 py-1 rounded">
+              {tag}
+            </span>
+          ))}
+        </div>
 
-      <div className="flex justify-between items-center mt-auto mb-2 gap-2">
-        {/* Telegram button */}
-        {(event.registered_users || 0) < event.min_attendees ? (
+        <div className="flex justify-between items-center mt-auto mb-2 gap-2">
+          {/* Telegram button */}
+          {(event.registered_users || 0) < (event.min_attendees || 0) ? (
+            <button
+              onClick={() => window.open(telegramLink, '_blank')}
+              className="flex-1 px-3 py-1 rounded bg-yellow-600 hover:bg-yellow-700 text-white text-sm"
+            >
+              Prebook (Telegram)
+            </button>
+          ) : (
+            <button
+              onClick={() =>
+                window.open(`https://t.me/TeaIsHereBot?start=buy_${event.id}`, '_blank')
+              }
+              className="flex-1 px-3 py-1 rounded bg-green-600 hover:bg-green-700 text-white text-sm"
+            >
+              Book (Telegram)
+            </button>
+          )}
+
+          {/* Web button */}
           <button
-            onClick={() => window.open(telegramLink, '_blank')}
-            className="flex-1 px-3 py-1 rounded bg-yellow-600 hover:bg-yellow-700 text-white text-sm"
+            onClick={handleWebAction}
+            disabled={loading}
+            className="flex-1 px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm disabled:opacity-50"
           >
-            Prebook (Telegram)
+            {event.price && Number(event.price) > 0 ? 'Book (Web)' : 'Prebook (Web)'}
           </button>
-        ) : (
+        </div>
+
+        <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
+          <span>
+            💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}
+          </span>
+          <span>👥 {event.registered_users || 0} Users</span>
+        </div>
+
+        {/* Internal preview button */}
+        {!onPreview && (
           <button
-            onClick={() =>
-              window.open(`https://t.me/TeaIsHereBot?start=buy_${event.id}`, '_blank')
-            }
-            className="flex-1 px-3 py-1 rounded bg-green-600 hover:bg-green-700 text-white text-sm"
+            onClick={() => setInternalModalOpen(true)}
+            className="mt-2 w-full px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-sm"
           >
-            Book (Telegram)
+            Preview
           </button>
         )}
+      </div>
 
-        {/* Web button */}
-        <button
-          onClick={handleWebAction}
-          disabled={loading}
-          className="flex-1 px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm disabled:opacity-50"
+      {/* Internal preview modal */}
+      {!onPreview && internalModalOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          onClick={() => setInternalModalOpen(false)}
         >
-          {event.price && Number(event.price) > 0 ? 'Book (Web)' : 'Prebook (Web)'}
-        </button>
-      </div>
+          <div
+            className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold mb-4">{event.name}</h2>
+            <img
+              src={event.image_url || '/default-event.jpg'}
+              alt={event.name}
+              className="w-full h-56 object-contain rounded mb-4"
+            />
+            <p className="mb-2 text-sm text-gray-400">
+              {new Date(event.datetime).toLocaleString()} @ {event.venue} ({event.venue_type || 'N/A'})
+            </p>
+            <p className="mb-4">{event.details}</p>
 
-      <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
-        <span>
-          💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}
-        </span>
-        <span>👥 {event.registered_users || 0} Users</span>
-      </div>
-    </div>
+            {event.basic_perk && (
+              <p className="text-sm text-gray-300">
+                <strong>Basic Perk:</strong> {event.basic_perk}
+              </p>
+            )}
+            {(event.paid_count || 0) >= 10 && event.advanced_perk && (
+              <p className="text-sm text-gray-300">
+                <strong>Advanced Perk:</strong> {event.advanced_perk}
+              </p>
+            )}
+
+            <button
+              onClick={() => setInternalModalOpen(false)}
+              className="mt-6 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
