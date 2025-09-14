@@ -7,6 +7,9 @@ import { runMigrations } from './migrations.js';
 import Stripe from 'stripe';
 //import { sendEmailVerification } from './lib/sendEmailVerification.js'
 
+const app = express();
+app.use(express.json());
+
 import {
   sendEmailVerification,
   sendEventConfirmed,
@@ -746,9 +749,6 @@ if (data.startsWith('register_')) {
 // ==============================
 // EXPRESS WEBHOOK & SERVER
 // ==============================
-const app = express();
-app.use(express.json());
-
 
 app.post(`/webhook/${BOT_TOKEN}`, (req, res) => {
   bot.processUpdate(req.body);
