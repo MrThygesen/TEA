@@ -717,46 +717,48 @@ const session = await stripe.checkout.sessions.create({
       return;
     }
 
-    // --- REGISTER ---
-    if (data.startsWith('register_')) {
-      const eventId = parseInt(data.split('_')[1], 10);
-      const user = await ensureUserForTelegram(tgId, query.from.username || '');
-      const res = await registerUserById(eventId, user.id, user.telegram_username, user.email, user.wallet_address);
-      await bot.sendMessage(chatId, res.statusMsg);
-      return;
-    }
+// --- REGISTER ---
+if (data.startsWith('register_')) {
+  const eventId = parseInt(data.split('_')[1], 10);
+  const user = await ensureUserForTelegram(tgId, query.from.username || '');
+  const res = await registerUserById(eventId, user.id, user.telegram_username, user.email, user.wallet_address);
 
-    // --- SHOW ATTENDEES (organizer only) ---
-    if (data.startsWith('showattendees_')) {
-      const user = await ensureUserForTelegram(tgId, query.from.username || '');
-      if (user?.role !== 'organizer') {
-        try {
-          await bot.answerCallbackQuery(query.id, { text: 'Organizer role required', show_alert: true });
-        } catch {}
-        return;
-      }
-      const eventId = parseInt(data.split('_')[1], 10);
-      await showAttendees(chatId, eventId);
-      return;
-    }
-  } catch (error) {
-    console.error('Callback query error:', error);
-    await bot.answerCallbackQuery(query.id, { text: '⚠️ Something went wrong', show_alert: true });
-  }
-});
+  await bot.sendMessage(
+    chatId,
+    `📌 Registration for event: ${res.eventName}\n${res.statusMsg}`
+  );
 
-// ==============================
-// EXPRESS WEBHOOK
-// ==============================
-app.post(`/webhook/${BOT_TOKEN}`, (req, res) => {
-  bot.processUpdate(req.body);
-  res.sendStatus(200);
-});
+  try {
+    await bot.answerCallbackQuery(query.id);
+  } catch {}
+  return;
+}
 
-// ==== EXPRESS ====
+} catch (err) {
+  console.error('❌ Callback query error:', err);
+  try {
+    await bot.answerCallbackQuery(query.id, { text: 'Error occurred ❌', show_alert: true });
+  } catch {}
+}
+}); // <-- closes bot.on("callback_query")
+
+// ==================================================
+// EXPRESS SERVER + WEBHOOK
+// ==================================================
 const app = express();
 app.use(express.json());
 
-bot.setWebHook(`${PUBLIC_URL}/webhook/${BOT_TOKEN}`);
-app.listen(PORT, () => console.log(`🚀 Bot running on port ${PORT}`));
+app.get('/', (req, res) => {
+  res.send('✅ Bot is running.');
+});
+
+// Set webhook dynamically from PUBLIC_URL
+if (PUBLIC_URL) {
+  bot.setWebHook(`${PUBLIC_URL}/bot${BOT_TOKEN}`);
+  console.log(`🌍 Webhook set to ${PUBLIC_URL}/bot${BOT_TOKEN}`);
+}
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
 
