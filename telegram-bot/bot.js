@@ -36,9 +36,6 @@ const pool = new Pool({
 await runMigrations();
 console.log('✅ Database migrations complete.');
 
-// ==== EXPRESS ====
-const app = express();
-app.use(express.json());
 
 // ==== TELEGRAM BOT ====
 const bot = new TelegramBot(BOT_TOKEN, { webHook: true });
@@ -503,19 +500,27 @@ bot.onText(/\/ticket/, async (msg) => {
     return bot.sendMessage(msg.chat.id, '💳 You have not completed payment for any events yet.');
   }
 
-  for (const e of paidEvents) {
-    const dateStr = new Date(e.datetime).toLocaleString();
-    const ticketText =
-      `🎫 Ticket for event: ${e.name}\n` +
-      `🆔 Ticket ID: ${e.id}\n` +
-      `👤 Username: @${username}\n` +
-      `📅 Date/Time: ${dateStr}\n` +
-      `💰 Price: ${e.price ? `${e.price} USD` : 'Free'}\n` +
-      `📌 Show this ticket at the entrance/staff.\n` +
-      `[{ text: '📌 Event Details', callback_data: `details_${e.id}` }]`;
-    await bot.sendMessage(msg.chat.id, ticketText);
-  }
-});
+for (const e of paidEvents) {
+  const dateStr = new Date(e.datetime).toLocaleString();
+  const ticketText =
+    `🎫 Ticket for event: ${e.name}\n` +
+    `🆔 Ticket ID: ${e.id}\n` +
+    `👤 Username: @${username}\n` +
+    `📅 Date/Time: ${dateStr}\n` +
+    `💰 Price: ${e.price ? `${e.price} USD` : 'Free'}\n` +
+    `📌 Show this ticket at the entrance/staff.`;
+
+  const buttons = [
+    [{ text: '📌 Event Details', callback_data: `details_${e.id}` }],
+  ];
+
+  await bot.sendMessage(msg.chat.id, ticketText, {
+    reply_markup: { inline_keyboard: buttons },
+  });
+}
+
+
+
 
 bot.onText(/\/event_detail_(\d+)/, async (msg, match) => {
   const eventId = parseInt(match[1], 10);
@@ -747,6 +752,10 @@ app.post(`/webhook/${BOT_TOKEN}`, (req, res) => {
   bot.processUpdate(req.body);
   res.sendStatus(200);
 });
+
+// ==== EXPRESS ====
+const app = express();
+app.use(express.json());
 
 bot.setWebHook(`${PUBLIC_URL}/webhook/${BOT_TOKEN}`);
 app.listen(PORT, () => console.log(`🚀 Bot running on port ${PORT}`));
