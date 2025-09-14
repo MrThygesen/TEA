@@ -43,6 +43,32 @@ export default async function handler(req, res) {
       [eventId, user.id]
     )
 
+
+// Count total prebookings
+const { rows: prebookRows } = await pool.query(
+  'SELECT COUNT(*) FROM registrations WHERE event_id=$1',
+  [eventId]
+)
+const registeredCount = Number(prebookRows[0].count)
+
+if (registeredCount >= event.min_attendees && !event.is_confirmed) {
+  // Update event to confirmed
+  await pool.query('UPDATE events SET is_confirmed=true WHERE id=$1', [eventId])
+
+  // Fetch all prebooked users
+  const { rows: users } = await pool.query(
+    `SELECT u.email FROM registrations r
+     JOIN users u ON r.user_id=u.id
+     WHERE r.event_id=$1`,
+    [eventId]
+  )
+
+  const { sendEventConfirmedEmail } = require('../../../lib/email.js')
+  users.forEach(u => sendEventConfirmedEmail(u.email, event))
+}
+
+
+
     // If paid event → Stripe checkout
     if (event.price && Number(event.price) > 0) {
       const session = await stripe.checkout.sessions.create({
@@ -76,4 +102,6 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Internal server error' })
   }
 }
+
+
 

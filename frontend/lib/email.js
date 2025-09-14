@@ -1,15 +1,22 @@
+// lib/email.js
 const SibApiV3Sdk = require('@getbrevo/brevo')
 
+// Initialize Brevo API
 const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi()
 apiInstance.setApiKey(
   SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey,
   process.env.BREVO_API_KEY
 )
 
+/**
+ * Send email verification to a new user
+ * @param {string} to - Recipient email
+ * @param {string} token - Verification token
+ * @param {string} [tgId] - Optional Telegram ID
+ */
 async function sendVerificationEmail(to, token, tgId) {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-    // POINT LINK TO FRONTEND PAGE
     const verifyUrl = `${baseUrl}/verify-email?token=${encodeURIComponent(token)}${tgId ? `&tgId=${encodeURIComponent(tgId)}` : ''}`
 
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
@@ -46,5 +53,45 @@ async function sendVerificationEmail(to, token, tgId) {
   }
 }
 
-module.exports = { sendVerificationEmail }
+/**
+ * Send email to prebooked users when event is confirmed
+ * @param {string} to - Recipient email
+ * @param {object} event - Event object
+ */
+async function sendEventConfirmedEmail(to, event) {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    const eventUrl = `${baseUrl}/events/${event.id}`
+
+    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
+    sendSmtpEmail.sender = {
+      name: 'Edgy Events',
+      email: process.env.MAIL_FROM || 'no-reply@teanet.xyz',
+    }
+    sendSmtpEmail.to = [{ email: to }]
+    sendSmtpEmail.subject = `Event confirmed: ${event.name}!`
+    sendSmtpEmail.htmlContent = `
+      <h1>Event Confirmed 🎉</h1>
+      <p>The event <strong>${event.name}</strong> now has enough prebookings and is open for booking.</p>
+      <p>Click below to book your spot:</p>
+      <p style="margin:20px 0;">
+        <a href="${eventUrl}" style="
+          background-color: #4CAF50;
+          color: white;
+          padding: 12px 24px;
+          text-decoration: none;
+          border-radius: 5px;
+          display: inline-block;
+        ">Book my spot</a>
+      </p>
+    `
+
+    const response = await apiInstance.sendTransacEmail(sendSmtpEmail)
+    console.log('✅ Event confirmation email sent to', to, 'response:', response)
+  } catch (err) {
+    console.error('❌ Failed to send event confirmation email:', err?.response?.body || err)
+  }
+}
+
+module.exports = { sendVerificationEmail, sendEventConfirmedEmail }
 

@@ -35,33 +35,34 @@ function DynamicEventCard({ event, onPreview }) {
     ? `https://t.me/TeaIsHereBot?start=buy_${event.id}`
     : `https://t.me/TeaIsHereBot?start=${event.id}`
 
-  async function handleWebAction() {
-    setLoading(true)
-    try {
-      const token = localStorage.getItem('token')
-      const res = await fetch('/api/events/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token || ''}`,
-        },
-        body: JSON.stringify({ eventId: event.id }),
-      })
-      const data = await res.json()
-      if (data.url) {
-        window.location.href = data.url // Stripe checkout
-      } else if (data.message) {
-        alert(data.message)
-      } else if (data.error) {
-        alert(`Error: ${data.error}`)
-      }
-    } catch (err) {
-      console.error('Web action error', err)
-      alert('Something went wrong')
-    } finally {
-      setLoading(false)
-    }
+async function handleWebAction() {
+  if (!user) {
+    // redirect to login / create account modal
+    setShowAccountModal(true)
+    return
   }
+
+  setLoading(true)
+  try {
+    const token = localStorage.getItem('token')
+    const res = await fetch('/api/events/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token || ''}`,
+      },
+      body: JSON.stringify({ eventId: event.id }),
+    })
+    const data = await res.json()
+    if (data.url) {
+      window.location.href = data.url // Stripe checkout
+    } else if (data.message) {
+      alert(data.message)
+    }
+  } finally {
+    setLoading(false)
+  }
+}
 
   return (
     <>
@@ -220,21 +221,28 @@ export default function Home() {
   }, [])
 
   // --- load user data on auth ---
-  useEffect(() => {
-    if (!authUser) return
-    setProfileName(authUser.username || '')
-    setProfileEmail(authUser.email || '')
+useEffect(() => {
+  async function loadProfile() {
+    const token = localStorage.getItem('token')
+    if (!token) return
 
-    fetch('/api/user/coupons', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : { coupons: [] })
-      .then(d => setCoupons(d.coupons || []))
-      .catch(() => setCoupons([]))
+    try {
+      const res = await fetch('/api/user/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      setProfileName(data.username)
+      setProfileEmail(data.email)
+      setCoupons(data.paid_coupons || [])
+      setPrebookings(data.prebooked_events || [])
+    } catch (err) {
+      console.error(err)
+    }
+  }
+  loadProfile()
+}, [showAccountModal]) // re-fetch every time modal opens
 
-    fetch('/api/user/prebookings', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : { items: [] })
-      .then(d => setPrebookings(d.items || []))
-      .catch(() => setPrebookings([]))
-  }, [authUser])
 
   // --- auth handlers ---
   async function handleLogin(e) {
@@ -287,17 +295,32 @@ export default function Home() {
     setAuthUser(null)
   }
 
-  async function saveProfile(e) {
-    e.preventDefault()
-    try {
-      const res = await fetch('/api/user/me', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ username: profileName, email: profileEmail }) })
-      if (res.ok) {
-        const updated = { ...authUser, username: profileName, email: profileEmail }
-        setAuthUser(updated)
-        saveAuth(updated)
-      }
-    } catch (_) {}
+async function saveProfile(e) {
+  e.preventDefault()
+  const token = localStorage.getItem('token')
+  if (!token) return
+
+  try {
+    const res = await fetch('/api/user/me', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ username: profileName, email: profileEmail }),
+    })
+    if (res.ok) {
+      const updated = await res.json()
+      setProfileName(updated.username)
+      setProfileEmail(updated.email)
+      // update authUser in localStorage
+      setAuthUser(updated)
+      saveAuth(updated)
+    }
+  } catch (err) {
+    console.error(err)
   }
+}
 
   // --- filtered events ---
   const filteredEvents = events.filter((e) => {
@@ -435,59 +458,108 @@ export default function Home() {
         </div>
       )}
 
-      {/* Account Modal */}
-      {showAccountModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" onClick={() => setShowAccountModal(false)}>
-          <div className="bg-zinc-900 rounded-lg max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-xl font-bold mb-4">Your Account</h2>
-            <form onSubmit={saveProfile} className="space-y-3 mb-6">
-              <div>
-                <label className="block text-sm mb-1">User name</label>
-                <input value={profileName} onChange={e => setProfileName(e.target.value)} className="w-full p-2 rounded text-black" placeholder="Your name" />
-              </div>
-              <div>
-                <label className="block text-sm mb-1">Email</label>
-                <input type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} className="w-full p-2 rounded text-black" placeholder="you@example.com" />
-              </div>
-              <div className="flex justify-end">
-                <button type="submit" className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700">Save changes</button>
-              </div>
-            </form>
+{/* Account Modal */}
+{showAccountModal && (
+  <div
+    className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
+    onClick={() => setShowAccountModal(false)}
+  >
+    <div
+      className="bg-zinc-900 rounded-lg max-w-md w-full p-6"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <h2 className="text-xl font-bold mb-4">Your Account</h2>
 
-            <h3 className="text-lg font-semibold mb-2">Paid event coupons</h3>
-            {coupons?.length ? (
-              <ul className="space-y-2 text-sm">
-                {coupons.map((c) => (
-                  <li key={c.id} className="flex justify-between items-center border border-zinc-700 rounded p-3">
-                    <span className="truncate">{c.event_name} — {new Date(c.event_datetime).toLocaleString()}</span>
-                    <span className="text-green-400 font-medium">Paid</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-gray-400 text-sm">No paid coupons yet.</p>
-            )}
-
-            <h3 className="text-lg font-semibold mt-4 mb-2">Prebooked events</h3>
-            {prebookings?.length ? (
-              <ul className="space-y-2 text-sm">
-                {prebookings.map((p) => (
-                  <li key={p.id} className="flex justify-between items-center border border-zinc-700 rounded p-3">
-                    <span className="truncate">{p.event_name} — {new Date(p.event_datetime).toLocaleString()}</span>
-                    <span className={'text-xs px-2 py-1 rounded ' + (p.is_confirmed ? 'bg-green-700' : 'bg-zinc-700')}>{p.is_confirmed ? 'confirmed' : 'idle'}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-gray-400 text-sm">No prebooked events yet.</p>
-            )}
-
-            <div className="mt-6 flex justify-end">
-              <button onClick={() => setShowAccountModal(false)} className="px-4 py-2 rounded bg-zinc-700 hover:bg-zinc-600">Close</button>
-            </div>
-          </div>
+      {/* Profile Form */}
+      <form onSubmit={saveProfile} className="space-y-3 mb-6">
+        <div>
+          <label className="block text-sm mb-1">User name</label>
+          <input
+            value={profileName}
+            onChange={(e) => setProfileName(e.target.value)}
+            className="w-full p-2 rounded text-black"
+            placeholder="Your name"
+          />
         </div>
+        <div>
+          <label className="block text-sm mb-1">Email</label>
+          <input
+            type="email"
+            value={profileEmail}
+            onChange={(e) => setProfileEmail(e.target.value)}
+            className="w-full p-2 rounded text-black"
+            placeholder="you@example.com"
+          />
+        </div>
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+            disabled={!profileName || !profileEmail}
+          >
+            Save changes
+          </button>
+        </div>
+      </form>
+
+      {/* Paid Coupons */}
+      <h3 className="text-lg font-semibold mb-2">Paid event coupons</h3>
+      {coupons?.length ? (
+        <ul className="space-y-2 text-sm">
+          {coupons.map((c) => (
+            <li
+              key={c.id}
+              className="flex justify-between items-center border border-zinc-700 rounded p-3"
+            >
+              <span className="truncate">
+                {c.event_name} — {new Date(c.event_datetime).toLocaleString()}
+              </span>
+              <span className="text-green-400 font-medium">Paid</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-gray-400 text-sm">No paid coupons yet.</p>
       )}
+
+      {/* Prebooked Events */}
+      <h3 className="text-lg font-semibold mt-4 mb-2">Prebooked events</h3>
+      {prebookings?.length ? (
+        <ul className="space-y-2 text-sm">
+          {prebookings.map((p) => (
+            <li
+              key={p.id}
+              className="flex justify-between items-center border border-zinc-700 rounded p-3"
+            >
+              <span className="truncate">
+                {p.event_name} — {new Date(p.event_datetime).toLocaleString()}
+              </span>
+              <span
+                className={
+                  'text-xs px-2 py-1 rounded ' +
+                  (p.is_confirmed ? 'bg-green-700' : 'bg-zinc-700')
+                }
+              >
+                {p.is_confirmed ? 'confirmed' : 'prebooked'}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-gray-400 text-sm">No prebooked events yet.</p>
+      )}
+
+      <div className="mt-6 flex justify-end">
+        <button
+          onClick={() => setShowAccountModal(false)}
+          className="px-4 py-2 rounded bg-zinc-700 hover:bg-zinc-600"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Login Modal */}
       {showLoginModal && (
