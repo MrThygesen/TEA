@@ -290,22 +290,36 @@ const opts = { reply_markup: { inline_keyboard } };
 
 
 // /user_edit (email)
+
+// /user_edit command (either inline or prompt)
 bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const tgId = String(msg.from.id);
   const username = msg.from.username || '';
   const user = await ensureUserForTelegram(tgId, username);
 
+  // Inline email from command
   const inlineEmail = match?.[1]?.trim();
+
   if (!inlineEmail) {
-    return bot.sendMessage(chatId, '❌ Please provide an email. Usage: /user_edit your@email.com');
+    // Prompt user to reply with email
+    const prompt = await bot.sendMessage(
+      chatId,
+      `📧 Current email: ${user?.email || 'N/A'}\nReply to this message with your new email (must include '@' and '.').`,
+      { reply_markup: { force_reply: true, input_field_placeholder: 'you@example.com' } }
+    );
+
+    // Store state for reply
+    userStates[tgId] = { step: 'editingProfile', field: 'email', replyTo: prompt.message_id };
+    return;
   }
 
+  // Validate inline email
   if (!isLikelyEmail(inlineEmail)) {
     return bot.sendMessage(chatId, '❌ Invalid email. Must include "@" and "."');
   }
 
-  // Check if email already exists in any account
+  // Check if email already exists
   const { rows: existingRows } = await pool.query(
     `SELECT * FROM user_profiles WHERE email = $1`,
     [inlineEmail]
@@ -315,11 +329,10 @@ bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
     const existingUser = existingRows[0];
 
     if (existingUser.id === user.id) {
-      // Email is already theirs
       return bot.sendMessage(chatId, `ℹ️ Your email is already set to ${inlineEmail}.`);
     }
 
-    // Merge Telegram into existing account (scenario: user already registered on web)
+    // Merge Telegram into existing account
     await pool.query(
       `UPDATE user_profiles
        SET telegram_user_id = $1,
@@ -329,29 +342,62 @@ bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
       [tgId, username || null, existingUser.id]
     );
 
-    // Remove old Telegram-only account if needed
     if (user.id !== existingUser.id) {
       await pool.query(`DELETE FROM user_profiles WHERE id=$1`, [user.id]);
     }
 
-    // Send verification for merged account
     await sendEmailVerification(existingUser.id, inlineEmail);
 
     return bot.sendMessage(
       chatId,
-      `✅ Your Telegram has been linked to existing email account: ${inlineEmail}. Please check your inbox to verify.`
+      `✅ Your Telegram has been linked to existing email account: ${inlineEmail}. Check your inbox to verify.`
     );
   }
 
-  // No existing email found — safe to update
+  // No existing email → safe to update
   await pool.query(
     `UPDATE user_profiles SET email=$1, updated_at=NOW() WHERE id=$2`,
     [inlineEmail, user.id]
   );
-
   await sendEmailVerification(user.id, inlineEmail);
-  return bot.sendMessage(chatId, `✅ Email updated to: ${inlineEmail}. Please check your inbox to verify.`);
+
+  return bot.sendMessage(chatId, `✅ Email updated to: ${inlineEmail}. Check your inbox to verify.`);
 });
+
+// Capture reply to /user_edit prompt
+bot.on('message', async (msg) => {
+  const tgId = String(msg.from.id);
+  const state = userStates[tgId];
+  if (!state) return;
+  if (!msg.text) return;
+  if (msg.text.startsWith('/')) return; // ignore commands
+
+  if (state.replyTo && (!msg.reply_to_message || msg.reply_to_message.message_id !== state.replyTo)) {
+    return;
+  }
+
+  if (state.field === 'email') {
+    const email = msg.text.trim();
+    if (!isLikelyEmail(email)) {
+      return bot.sendMessage(msg.chat.id, '❌ Invalid email. Must include "@" and "."');
+    }
+
+    const user = await ensureUserForTelegram(tgId, msg.from.username || '');
+
+    // Update DB safely
+    await pool.query(
+      `UPDATE user_profiles SET email=$1, updated_at=NOW() WHERE id=$2`,
+      [email, user.id]
+    );
+
+    // Send verification
+    await sendEmailVerification(user.id, email);
+
+    delete userStates[tgId];
+    return bot.sendMessage(msg.chat.id, `✅ Email updated to: ${email}. Check your inbox to verify.`);
+  }
+});
+
 
     // Update email for current user (new or Telegram-only)
     await pool.query(
