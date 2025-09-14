@@ -1,11 +1,11 @@
 // bot.js
-//import { sendEmailVerification } from './lib/sendEmailVerification.js'
 
 import TelegramBot from 'node-telegram-bot-api';
 import pkg from 'pg';
 import dotenv from 'dotenv';
 import express from 'express';
 import { runMigrations } from './migrations.js';
+//import { sendEmailVerification } from './lib/sendEmailVerification.js'
 import Stripe from 'stripe';
 
 const app = express();
@@ -762,4 +762,5 @@ bot.setWebHook(`${PUBLIC_URL}/webhook/${BOT_TOKEN}`);
 
 app.listen(PORT, () => {
   console.log(`🚀 Bot running on port ${PORT}`);
+export default bot;
 });  
