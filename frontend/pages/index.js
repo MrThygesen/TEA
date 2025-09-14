@@ -26,9 +26,14 @@ function clearAuth() {
 
 function DynamicEventCard({ event, onPreview }) {
   const [loading, setLoading] = useState(false)
-  const [internalModalOpen, setInternalModalOpen] = useState(false) // fixed
+  const [internalModalOpen, setInternalModalOpen] = useState(false)
 
-  const telegramLink = `https://t.me/TeaIsHereBot?start=${event.id}`
+  // Determine if the event has enough prebookings to switch to "Book"
+  const eventConfirmed = (event.registered_users || 0) >= (event.min_attendees || 0)
+
+  const telegramLink = eventConfirmed
+    ? `https://t.me/TeaIsHereBot?start=buy_${event.id}`
+    : `https://t.me/TeaIsHereBot?start=${event.id}`
 
   async function handleWebAction() {
     setLoading(true)
@@ -67,9 +72,7 @@ function DynamicEventCard({ event, onPreview }) {
           className="w-full h-40 object-cover rounded mb-3"
         />
         <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
-        <p className="text-sm mb-2">
-          {event.description?.split(' ').slice(0, 30).join(' ')}...
-        </p>
+        <p className="text-sm mb-2">{event.description?.split(' ').slice(0, 30).join(' ')}...</p>
 
         <div className="flex flex-wrap gap-1 mb-2">
           {[event.tag1, event.tag2, event.tag3].filter(Boolean).map((tag, i) => (
@@ -81,42 +84,32 @@ function DynamicEventCard({ event, onPreview }) {
 
         <div className="flex justify-between items-center mt-auto mb-2 gap-2">
           {/* Telegram button */}
-          {(event.registered_users || 0) < (event.min_attendees || 0) ? (
-            <button
-              onClick={() => window.open(telegramLink, '_blank')}
-              className="flex-1 px-3 py-1 rounded bg-yellow-600 hover:bg-yellow-700 text-white text-sm"
-            >
-              Prebook (Telegram)
-            </button>
-          ) : (
-            <button
-              onClick={() =>
-                window.open(`https://t.me/TeaIsHereBot?start=buy_${event.id}`, '_blank')
-              }
-              className="flex-1 px-3 py-1 rounded bg-green-600 hover:bg-green-700 text-white text-sm"
-            >
-              Book (Telegram)
-            </button>
-          )}
+          <button
+            onClick={() => window.open(telegramLink, '_blank')}
+            className={`flex-1 px-3 py-1 rounded ${
+              eventConfirmed ? 'bg-green-600 hover:bg-green-700' : 'bg-yellow-600 hover:bg-yellow-700'
+            } text-white text-sm`}
+          >
+            {eventConfirmed ? 'Book (Telegram)' : 'Prebook (Telegram)'}
+          </button>
 
           {/* Web button */}
           <button
             onClick={handleWebAction}
             disabled={loading}
-            className="flex-1 px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm disabled:opacity-50"
+            className={`flex-1 px-3 py-1 rounded ${
+              eventConfirmed ? 'bg-blue-600 hover:bg-blue-700' : 'bg-yellow-600 hover:bg-yellow-700'
+            } text-white text-sm`}
           >
-            {event.price && Number(event.price) > 0 ? 'Book (Web)' : 'Prebook (Web)'}
+            {eventConfirmed ? 'Book (Web)' : 'Prebook (Web)'}
           </button>
         </div>
 
         <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
-          <span>
-            💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}
-          </span>
+          <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
           <span>👥 {event.registered_users || 0} Users</span>
         </div>
 
-        {/* Internal preview button */}
         {!onPreview && (
           <button
             onClick={() => setInternalModalOpen(true)}
