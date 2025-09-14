@@ -725,7 +725,7 @@ const session = await stripe.checkout.sessions.create({
 if (data.startsWith('register_')) {
   const eventId = parseInt(data.split('_')[1], 10);
   const user = await ensureUserForTelegram(tgId, query.from.username || '');
-  const res = await registerUserById(eventId, user.id, user.telegram_username, user.email, user.wallet_address);
+  const res = await registerUserById(eventId, user.id);
 
   await bot.sendMessage(
     chatId,
