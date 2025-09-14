@@ -294,52 +294,64 @@ bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const tgId = String(msg.from.id);
   const username = msg.from.username || '';
-
-  // Ensure user exists or create new Telegram-only account
   const user = await ensureUserForTelegram(tgId, username);
 
-  // Extract email provided inline after /user_edit
   const inlineEmail = match?.[1]?.trim();
   if (!inlineEmail) {
-    return bot.sendMessage(chatId, 'ℹ️ Please provide your email. Usage: /user_edit your@email.com');
+    return bot.sendMessage(chatId, '❌ Please provide an email. Usage: /user_edit your@email.com');
   }
 
-  // Basic email validation
   if (!isLikelyEmail(inlineEmail)) {
     return bot.sendMessage(chatId, '❌ Invalid email. Must include "@" and "."');
   }
 
-  try {
-    // Check if email already exists for another account
-    const { rows: existingRows } = await pool.query(
-      `SELECT * FROM user_profiles WHERE email = $1`,
-      [inlineEmail]
+  // Check if email already exists in any account
+  const { rows: existingRows } = await pool.query(
+    `SELECT * FROM user_profiles WHERE email = $1`,
+    [inlineEmail]
+  );
+
+  if (existingRows.length) {
+    const existingUser = existingRows[0];
+
+    if (existingUser.id === user.id) {
+      // Email is already theirs
+      return bot.sendMessage(chatId, `ℹ️ Your email is already set to ${inlineEmail}.`);
+    }
+
+    // Merge Telegram into existing account (scenario: user already registered on web)
+    await pool.query(
+      `UPDATE user_profiles
+       SET telegram_user_id = $1,
+           telegram_username = $2,
+           updated_at = NOW()
+       WHERE id = $3`,
+      [tgId, username || null, existingUser.id]
     );
 
-    if (existingRows.length && existingRows[0].id !== user.id) {
-      const existingUser = existingRows[0];
-
-      // Merge Telegram info into existing email account
-      await pool.query(
-        `UPDATE user_profiles
-         SET telegram_user_id=$1,
-             telegram_username=$2,
-             updated_at=NOW()
-         WHERE id=$3`,
-        [tgId, username || null, existingUser.id]
-      );
-
-      // Delete old Telegram-only account
+    // Remove old Telegram-only account if needed
+    if (user.id !== existingUser.id) {
       await pool.query(`DELETE FROM user_profiles WHERE id=$1`, [user.id]);
-
-      // Send verification email for the existing account
-      await sendEmailVerification(existingUser.id, inlineEmail);
-
-      return bot.sendMessage(
-        chatId,
-        `✅ Your Telegram has been linked to the existing account: ${inlineEmail}. Please check your inbox to verify.`
-      );
     }
+
+    // Send verification for merged account
+    await sendEmailVerification(existingUser.id, inlineEmail);
+
+    return bot.sendMessage(
+      chatId,
+      `✅ Your Telegram has been linked to existing email account: ${inlineEmail}. Please check your inbox to verify.`
+    );
+  }
+
+  // No existing email found — safe to update
+  await pool.query(
+    `UPDATE user_profiles SET email=$1, updated_at=NOW() WHERE id=$2`,
+    [inlineEmail, user.id]
+  );
+
+  await sendEmailVerification(user.id, inlineEmail);
+  return bot.sendMessage(chatId, `✅ Email updated to: ${inlineEmail}. Please check your inbox to verify.`);
+});
 
     // Update email for current user (new or Telegram-only)
     await pool.query(
