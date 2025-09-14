@@ -228,67 +228,91 @@ useEffect(() => {
 
     try {
       const res = await fetch('/api/user/me', {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token}` }
       })
-      if (!res.ok) return
+      if (!res.ok) {
+        console.error('Failed to fetch profile:', res.status)
+        return
+      }
       const data = await res.json()
-      setProfileName(data.username)
-      setProfileEmail(data.email)
+      setProfileName(data.username || '')
+      setProfileEmail(data.email || '')
       setCoupons(data.paid_coupons || [])
       setPrebookings(data.prebooked_events || [])
+
+      // Keep authUser in sync
+      setAuthUser(prev => ({ ...prev, ...data }))
+      saveAuth({ ...authUser, ...data })
     } catch (err) {
-      console.error(err)
+      console.error('Error fetching profile:', err)
     }
   }
-  loadProfile()
-}, [showAccountModal]) // re-fetch every time modal opens
+
+  if (showAccountModal) loadProfile()  // fetch every time modal opens
+}, [showAccountModal])
 
 
   // --- auth handlers ---
-  async function handleLogin(e) {
-    e.preventDefault()
-    setAuthError('')
-    const form = new FormData(e.currentTarget)
-    const username = form.get('username')?.toString().trim()
-    const password = form.get('password')?.toString()
-    if (!username || !password) return setAuthError('Please enter username and password.')
-    try {
-      const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) })
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
-        return setAuthError(j.error || 'Login failed')
-      }
-      const user = await res.json()
-      setAuthUser(user)
-      saveAuth(user)
-      setShowLoginModal(false)
-    } catch (err) {
-      setAuthError('Network error')
-    }
-  }
+async function handleLogin(e) {
+  e.preventDefault()
+  setAuthError('')
+  const form = new FormData(e.currentTarget)
+  const username = form.get('username')?.toString().trim()
+  const password = form.get('password')?.toString()
+  if (!username || !password) return setAuthError('Please enter username and password.')
 
-  async function handleSignup(e) {
-    e.preventDefault()
-    setAuthError('')
-    const form = new FormData(e.currentTarget)
-    const username = form.get('username')?.toString().trim()
-    const email = form.get('email')?.toString().trim()
-    const password = form.get('password')?.toString()
-    if (!username || !email || !password) return setAuthError('All fields are required.')
-    try {
-      const res = await fetch('/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, email, password }) })
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
-        return setAuthError(j.error || 'Sign up failed')
-      }
-      const user = await res.json()
-      setAuthUser(user)
-      saveAuth(user)
-      setShowSignupModal(false)
-    } catch (err) {
-      setAuthError('Network error')
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    })
+
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      return setAuthError(j.error || 'Login failed')
     }
+
+    const user = await res.json()
+    setAuthUser(user)
+    saveAuth(user)
+    localStorage.setItem('token', user.token)  // ✅ save token for /me fetch
+    setShowLoginModal(false)
+  } catch (err) {
+    setAuthError('Network error')
   }
+}
+
+async function handleSignup(e) {
+  e.preventDefault()
+  setAuthError('')
+  const form = new FormData(e.currentTarget)
+  const username = form.get('username')?.toString().trim()
+  const email = form.get('email')?.toString().trim()
+  const password = form.get('password')?.toString()
+  if (!username || !email || !password) return setAuthError('All fields are required.')
+
+  try {
+    const res = await fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, email, password })
+    })
+
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      return setAuthError(j.error || 'Sign up failed')
+    }
+
+    const user = await res.json()
+    setAuthUser(user)
+    saveAuth(user)
+    localStorage.setItem('token', user.token)  // ✅ save token for /me fetch
+    setShowSignupModal(false)
+  } catch (err) {
+    setAuthError('Network error')
+  }
+}
 
   function handleLogout() {
     clearAuth()
@@ -305,20 +329,25 @@ async function saveProfile(e) {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ username: profileName, email: profileEmail }),
+      body: JSON.stringify({ username: profileName, email: profileEmail })
     })
+
     if (res.ok) {
       const updated = await res.json()
       setProfileName(updated.username)
       setProfileEmail(updated.email)
-      // update authUser in localStorage
-      setAuthUser(updated)
-      saveAuth(updated)
+      setAuthUser(prev => ({ ...prev, ...updated }))
+      saveAuth({ ...authUser, ...updated })
+      alert('Profile updated successfully')
+    } else {
+      const j = await res.json().catch(() => ({}))
+      alert(j.error || 'Failed to update profile')
     }
   } catch (err) {
     console.error(err)
+    alert('Network error')
   }
 }
 
