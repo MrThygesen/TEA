@@ -73,40 +73,44 @@ async function getUserByTelegramId(tgId) {
 // -----------------------------
 // Safe upsert for Telegram + email user
 // -----------------------------
+// ==============================
+// Safe upsert for Telegram + email user
+// ==============================
 async function upsertUser({ tgId, tgUsername, email, webUsername }) {
   if (!tgId && !email) throw new Error("No identifier provided");
 
-  const query = `
-    INSERT INTO user_profiles (telegram_user_id, telegram_username, email, username)
-    VALUES ($1, $2, $3, $4)
-    ON CONFLICT (telegram_user_id) DO UPDATE
-      SET telegram_username = EXCLUDED.telegram_username,
-          email = COALESCE(EXCLUDED.email, user_profiles.email),
-          username = COALESCE(EXCLUDED.username, user_profiles.username),
-          updated_at = NOW()
-    RETURNING *;
-  `;
+  // 1️⃣ Check if user exists by telegram_user_id
+  let user = tgId ? await getUserByTelegramId(tgId) : null;
 
-  try {
-    const res = await pool.query(query, [tgId || null, tgUsername || null, email || null, webUsername || null]);
-    return res.rows[0];
-  } catch (err) {
-    // Handle the rare case where email is already used by another Telegram account
-    if (err.code === '23505' && email) {
-      const updateRes = await pool.query(
-        `UPDATE user_profiles
-         SET telegram_user_id = COALESCE($1, telegram_user_id),
-             telegram_username = COALESCE($2, telegram_username),
-             username = COALESCE($3, username),
-             updated_at = NOW()
-         WHERE email = $4
-         RETURNING *;`,
-        [tgId || null, tgUsername || null, webUsername || null, email]
-      );
-      return updateRes.rows[0];
-    }
-    throw err;
+  // 2️⃣ If not, check if user exists by email
+  if (!user && email) {
+    user = await getUserByEmail(email);
   }
+
+  // 3️⃣ If user exists, update
+  if (user) {
+    const res = await pool.query(
+      `UPDATE user_profiles
+       SET telegram_user_id = COALESCE($1, telegram_user_id),
+           telegram_username = COALESCE($2, telegram_username),
+           email = COALESCE($3, email),
+           username = COALESCE($4, username),
+           updated_at = NOW()
+       WHERE id = $5
+       RETURNING *;`,
+      [tgId || null, tgUsername || null, email || null, webUsername || null, user.id]
+    );
+    return res.rows[0];
+  }
+
+  // 4️⃣ Otherwise, insert new
+  const res = await pool.query(
+    `INSERT INTO user_profiles (telegram_user_id, telegram_username, email, username)
+     VALUES ($1, $2, $3, $4)
+     RETURNING *;`,
+    [tgId || null, tgUsername || null, email || null, webUsername || null]
+  );
+  return res.rows[0];
 }
 
 // -----------------------------
@@ -409,23 +413,26 @@ bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
 // ==============================
 // Capture replies for email/password
 // ==============================
+// ==============================
+// Capture replies for email/password safely
+// ==============================
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const tgId = String(msg.from.id);
+  const tgUsername = msg.from.username || '';
   const state = userStates[tgId];
-
-  if (!state) return; // Ignore messages not in a flow
   const text = msg.text?.trim();
-  if (!text) return;
+  if (!state || !text) return; // Ignore irrelevant messages
 
   try {
     if (state.step === 'editingProfile') {
+
       if (state.field === 'email') {
         if (!isLikelyEmail(text)) {
           return bot.sendMessage(chatId, '❌ Invalid email. Please try again.');
         }
 
-        const tgUsername = msg.from.username || '';
+        // Safely upsert user using Telegram ID + email
         const user = await upsertUser({ tgId, tgUsername, email: text });
         await bot.sendMessage(chatId, `✅ Your email is now linked/updated: ${user.email}`);
 
@@ -451,8 +458,11 @@ bot.on('message', async (msg) => {
         } else {
           const hash = await bcrypt.hash(text, 10);
 
+          // Use safe update with Telegram ID
           await pool.query(
-            `UPDATE user_profiles SET password_hash = $1, updated_at = NOW() WHERE telegram_user_id = $2`,
+            `UPDATE user_profiles 
+             SET password_hash = $1, updated_at = NOW() 
+             WHERE telegram_user_id = $2`,
             [hash, tgId]
           );
 
@@ -462,10 +472,17 @@ bot.on('message', async (msg) => {
         delete userStates[tgId]; // Done
         return;
       }
+
     }
   } catch (err) {
-    console.error('Error handling user reply:', err);
-    await bot.sendMessage(chatId, '❌ Something went wrong. Please try again later.');
+    console.error('❌ Error handling user reply:', err);
+
+    // Detect unique violation (should be rare due to safe upsert)
+    if (err.code === '23505') {
+      await bot.sendMessage(chatId, '❌ This email is already linked to another account. Please use a different email.');
+    } else {
+      await bot.sendMessage(chatId, '❌ Something went wrong. Please try again later.');
+    }
   }
 });
 
