@@ -48,17 +48,78 @@ const userStates = {};
 // ==============================
 // DB HELPERS
 // ==============================
-async function getUserByTelegramId(tgId) {
-  const res = await pool.query('SELECT * FROM user_profiles WHERE telegram_user_id = $1', [tgId]);
-  return res.rows[0] || null;
-}
+// ==============================
+// DB HELPERS
+// ==============================
 
+// Fetch by email
 async function getUserByEmail(email) {
+  if (!email) return null;
   const res = await pool.query(
-    'SELECT * FROM user_profiles WHERE email = $1',
+    `SELECT * FROM user_profiles WHERE email=$1 LIMIT 1`,
     [email]
   );
   return res.rows[0] || null;
+}
+
+// Fetch by telegram ID
+async function getUserByTelegramId(tgId) {
+  if (!tgId) return null;
+  const res = await pool.query(
+    `SELECT * FROM user_profiles WHERE telegram_user_id=$1 LIMIT 1`,
+    [tgId]
+  );
+  return res.rows[0] || null;
+}
+
+/**
+ * Safe upsert for Telegram + web/email user
+ */
+async function upsertUser({ tgId, tgUsername, email, webUsername }) {
+  // 1️⃣ Check Telegram ID
+  if (tgId) {
+    const user = await getUserByTelegramId(tgId);
+    if (user) {
+      // Update username/email if needed
+      await pool.query(
+        `UPDATE user_profiles
+         SET telegram_username = $1,
+             email = COALESCE(email, $2),
+             updated_at = NOW()
+         WHERE id=$3`,
+        [tgUsername || user.telegram_username, email, user.id]
+      );
+      return { ...user, telegram_username: tgUsername || user.telegram_username, email: user.email || email };
+    }
+  }
+
+  // 2️⃣ Check email
+  if (email) {
+    const user = await getUserByEmail(email);
+    if (user) {
+      // Link Telegram ID if missing
+      if (!user.telegram_user_id && tgId) {
+        await pool.query(
+          `UPDATE user_profiles
+           SET telegram_user_id=$1,
+               telegram_username=$2,
+               updated_at=NOW()
+           WHERE id=$3`,
+          [tgId, tgUsername || null, user.id]
+        );
+      }
+      return { ...user, telegram_user_id: tgId || user.telegram_user_id, telegram_username: tgUsername || user.telegram_username };
+    }
+  }
+
+  // 3️⃣ Insert new user
+  const res = await pool.query(
+    `INSERT INTO user_profiles (telegram_user_id, telegram_username, email, username)
+     VALUES ($1, $2, $3, $4)
+     RETURNING *`,
+    [tgId || null, tgUsername || null, email || null, webUsername || null]
+  );
+  return res.rows[0];
 }
 
 
@@ -319,48 +380,26 @@ const opts = { reply_markup: { inline_keyboard } };
 bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const tgId = String(msg.from.id);
-  const username = msg.from.username || '';
-  let user = await ensureUserForTelegram(tgId, username);
-
+  const tgUsername = msg.from.username || '';
   const inlineEmail = match?.[1]?.trim();
 
   if (!inlineEmail) {
     const prompt = await bot.sendMessage(
       chatId,
-      `📧 Current email: ${user?.email || 'N/A'}\nReply with your email to link your web account or update it:`,
+      `📧 Reply with your email to link your web account or update it:`,
       { reply_markup: { force_reply: true, input_field_placeholder: 'you@example.com' } }
     );
     userStates[tgId] = { step: 'editingProfile', field: 'email', replyTo: prompt.message_id };
     return;
   }
 
-  // Validate email
   if (!isLikelyEmail(inlineEmail)) {
-    return bot.sendMessage(chatId, '❌ Invalid email. Must include "@" and "."');
+    return bot.sendMessage(chatId, '❌ Invalid email.');
   }
 
-  // Check existing user
-  const existingUser = await getUserByEmail(inlineEmail);
-
-  if (existingUser && existingUser.id !== user.id) {
-    // Merge Telegram into existing web account
-    await pool.query(
-      `UPDATE user_profiles SET telegram_user_id=$1, telegram_username=$2, updated_at=NOW() WHERE id=$3`,
-      [tgId, username || null, existingUser.id]
-    );
-    await pool.query(`DELETE FROM user_profiles WHERE id=$1`, [user.id]);
-    user = existingUser;
-    await bot.sendMessage(chatId, `✅ Linked your Telegram to existing web account: ${inlineEmail}`);
-  } else if (!existingUser) {
-    await pool.query(
-      `UPDATE user_profiles SET email=$1, updated_at=NOW() WHERE id=$2`,
-      [inlineEmail, user.id]
-    );
-    user.email = inlineEmail;
-    await bot.sendMessage(chatId, `✅ Email updated to: ${inlineEmail}`);
-  } else {
-    await bot.sendMessage(chatId, `ℹ️ Your email is already set to ${inlineEmail}`);
-  }
+  // Upsert user safely
+  const user = await upsertUser({ tgId, tgUsername, email: inlineEmail });
+  await bot.sendMessage(chatId, `✅ Your email is now linked/updated: ${user.email}`);
 
   // Optional password setup for web login
   if (!user.password_hash) {
@@ -372,7 +411,6 @@ bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
     userStates[tgId] = { step: 'editingProfile', field: 'password', replyTo: promptPwd.message_id };
   }
 
-  // Send verification email
   await sendEmailVerification({ userId: user.id, tgId, email: user.email });
 });
 
@@ -389,30 +427,15 @@ bot.on('message', async (msg) => {
   // Only accept reply to our prompt
   if (state.replyTo && (!msg.reply_to_message || msg.reply_to_message.message_id !== state.replyTo)) return;
 
-  let user = await ensureUserForTelegram(tgId, msg.from.username || '');
+  let user = await getUserByTelegramId(tgId);
 
   if (state.field === 'email') {
     const email = msg.text.trim();
     if (!isLikelyEmail(email)) return bot.sendMessage(msg.chat.id, '❌ Invalid email.');
 
-    const existingUser = await getUserByEmail(email);
-    if (existingUser && existingUser.id !== user.id) {
-      await pool.query(
-        `UPDATE user_profiles SET telegram_user_id=$1, telegram_username=$2, updated_at=NOW() WHERE id=$3`,
-        [tgId, msg.from.username || null, existingUser.id]
-      );
-      await pool.query(`DELETE FROM user_profiles WHERE id=$1`, [user.id]);
-      user = existingUser;
-      await bot.sendMessage(msg.chat.id, `✅ Linked to existing account: ${email}`);
-    } else if (!existingUser) {
-      await pool.query(`UPDATE user_profiles SET email=$1, updated_at=NOW() WHERE id=$2`, [email, user.id]);
-      user.email = email;
-      await bot.sendMessage(msg.chat.id, `✅ Email updated: ${email}`);
-    } else {
-      await bot.sendMessage(msg.chat.id, `ℹ️ Email already set: ${email}`);
-    }
+    user = await upsertUser({ tgId, tgUsername: msg.from.username || '', email });
+    await bot.sendMessage(msg.chat.id, `✅ Linked/updated email: ${user.email}`);
 
-    // Optional password prompt
     if (!user.password_hash) {
       const promptPwd = await bot.sendMessage(
         msg.chat.id,
@@ -429,7 +452,7 @@ bot.on('message', async (msg) => {
   else if (state.field === 'password') {
     const password = msg.text.trim();
     if (password.toLowerCase() === 'skip') {
-      await bot.sendMessage(msg.chat.id, 'ℹ️ Password setup skipped. You can set it later via /user_edit.');
+      await bot.sendMessage(msg.chat.id, 'ℹ️ Password setup skipped.');
       delete userStates[tgId];
       return;
     }
