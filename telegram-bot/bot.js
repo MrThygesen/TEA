@@ -246,14 +246,26 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
 
   const user = await ensureUserForTelegram(tgId, username);
 
+  // If Telegram-only user without email → prompt verification
+  if (!user.email) {
+    const prompt = await bot.sendMessage(
+      tgId,
+      `📧 You don't have an email associated with your account yet.\nReply with your email (must include '@' and '.') to verify your account.`,
+      { reply_markup: { force_reply: true, input_field_placeholder: 'you@example.com' } }
+    );
+    userStates[tgId] = { step: 'editingProfile', field: 'email', replyTo: prompt.message_id };
+  }
+
+  // Handle deep-link registration
   if (payload && !isNaN(payload)) {
     const eventId = parseInt(payload, 10);
     const res = await registerUserById(eventId, user.id);
-    return bot.sendMessage(msg.chat.id, `🔗 Deep link detected: Event ${eventId}\n${res.statusMsg}`);
+    await bot.sendMessage(tgId, `🔗 Deep link detected: Event ${eventId}\n${res.statusMsg}`);
+    return;
   }
 
   return bot.sendMessage(
-    msg.chat.id,
+    tgId,
     `👋 Welcome ${username || 'there'}! Use /events to see events, /myevents for your registrations, /user_edit to add email, /help for commands.`
   );
 });
@@ -290,8 +302,7 @@ const opts = { reply_markup: { inline_keyboard } };
   bot.sendMessage(chatId, '📍 Select your city:', opts);
 });
 
-// /user_edit (email)
-// /user_edit command (either inline or prompt)
+// /user_edit (email)// /user_edit command (inline or prompt)
 bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const tgId = String(msg.from.id);
@@ -346,7 +357,8 @@ bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
       await pool.query(`DELETE FROM user_profiles WHERE id=$1`, [user.id]);
     }
 
-    await sendEmailVerification(existingUser.id, inlineEmail);
+    // ✅ Updated call
+    await sendEmailVerification({ userId: existingUser.id, email: inlineEmail });
 
     return bot.sendMessage(
       chatId,
@@ -359,10 +371,13 @@ bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
     `UPDATE user_profiles SET email=$1, updated_at=NOW() WHERE id=$2`,
     [inlineEmail, user.id]
   );
-  await sendEmailVerification(user.id, inlineEmail);
+
+  // ✅ Updated call
+  await sendEmailVerification({ userId: user.id, email: inlineEmail });
 
   return bot.sendMessage(chatId, `✅ Email updated to: ${inlineEmail}. Check your inbox to verify.`);
 });
+
 
 // Capture reply to /user_edit prompt
 bot.on('message', async (msg) => {
@@ -390,8 +405,8 @@ bot.on('message', async (msg) => {
       [email, user.id]
     );
 
-    // Send verification
-    await sendEmailVerification(user.id, email);
+    // ✅ Updated call (works even if user only has Telegram)
+    await sendEmailVerification({ userId: user.id, tgId, email });
 
     delete userStates[tgId];
     return bot.sendMessage(msg.chat.id, `✅ Email updated to: ${email}. Check your inbox to verify.`);
