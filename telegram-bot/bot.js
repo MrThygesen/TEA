@@ -76,11 +76,12 @@ async function getUserByTelegramId(tgId) {
  * Safe upsert for Telegram + web/email user
  */
 async function upsertUser({ tgId, tgUsername, email, webUsername }) {
-  // 1️⃣ Check Telegram ID
+  if (!email && !tgId) throw new Error("No identifier provided");
+
+  // 1️⃣ Try to update by telegram ID
   if (tgId) {
     const user = await getUserByTelegramId(tgId);
     if (user) {
-      // Update username/email if needed
       await pool.query(
         `UPDATE user_profiles
          SET telegram_username = $1,
@@ -93,7 +94,7 @@ async function upsertUser({ tgId, tgUsername, email, webUsername }) {
     }
   }
 
-  // 2️⃣ Check email
+  // 2️⃣ Try to update by email
   if (email) {
     const user = await getUserByEmail(email);
     if (user) {
@@ -112,13 +113,19 @@ async function upsertUser({ tgId, tgUsername, email, webUsername }) {
     }
   }
 
-  // 3️⃣ Insert new user
+  // 3️⃣ Insert with conflict handling on email
   const res = await pool.query(
     `INSERT INTO user_profiles (telegram_user_id, telegram_username, email, username)
      VALUES ($1, $2, $3, $4)
+     ON CONFLICT (email) DO UPDATE SET
+       telegram_user_id = COALESCE(user_profiles.telegram_user_id, EXCLUDED.telegram_user_id),
+       telegram_username = COALESCE(user_profiles.telegram_username, EXCLUDED.telegram_username),
+       username = COALESCE(user_profiles.username, EXCLUDED.username),
+       updated_at = NOW()
      RETURNING *`,
     [tgId || null, tgUsername || null, email || null, webUsername || null]
   );
+
   return res.rows[0];
 }
 
