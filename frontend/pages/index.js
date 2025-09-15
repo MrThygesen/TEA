@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useAccount } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import AdminSBTManager from '../components/AdminSBTManager'
+import YourAccountModal from '../components/YourAccountModal'
 
 // ---------------------------
 // Helpers: Auth persistence
@@ -24,45 +25,45 @@ function clearAuth() {
   try { localStorage.removeItem('edgy_auth_user') } catch (_) {}
 }
 
-function DynamicEventCard({ event, onPreview }) {
+// ---------------------------
+// Event Card Component
+// ---------------------------
+function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
   const [loading, setLoading] = useState(false)
   const [internalModalOpen, setInternalModalOpen] = useState(false)
 
-  // Determine if the event has enough prebookings to switch to "Book"
   const eventConfirmed = (event.registered_users || 0) >= (event.min_attendees || 0)
-
   const telegramLink = eventConfirmed
     ? `https://t.me/TeaIsHereBot?start=buy_${event.id}`
     : `https://t.me/TeaIsHereBot?start=${event.id}`
 
-async function handleWebAction() {
-  if (!user) {
-    // redirect to login / create account modal
-    setShowAccountModal(true)
-    return
-  }
-
-  setLoading(true)
-  try {
-    const token = localStorage.getItem('token')
-    const res = await fetch('/api/events/register', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token || ''}`,
-      },
-      body: JSON.stringify({ eventId: event.id }),
-    })
-    const data = await res.json()
-    if (data.url) {
-      window.location.href = data.url // Stripe checkout
-    } else if (data.message) {
-      alert(data.message)
+  async function handleWebAction() {
+    if (!authUser) {
+      setShowAccountModal(true)
+      return
     }
-  } finally {
-    setLoading(false)
+
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch('/api/events/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token || ''}`,
+        },
+        body: JSON.stringify({ eventId: event.id }),
+      })
+      const data = await res.json()
+      if (data.url) {
+        window.location.href = data.url
+      } else if (data.message) {
+        alert(data.message)
+      }
+    } finally {
+      setLoading(false)
+    }
   }
-}
 
   return (
     <>
@@ -84,7 +85,6 @@ async function handleWebAction() {
         </div>
 
         <div className="flex justify-between items-center mt-auto mb-2 gap-2">
-          {/* Telegram button */}
           <button
             onClick={() => window.open(telegramLink, '_blank')}
             className={`flex-1 px-3 py-1 rounded ${
@@ -94,7 +94,6 @@ async function handleWebAction() {
             {eventConfirmed ? 'Book (Telegram)' : 'Prebook (Telegram)'}
           </button>
 
-          {/* Web button */}
           <button
             onClick={handleWebAction}
             disabled={loading}
@@ -121,7 +120,6 @@ async function handleWebAction() {
         )}
       </div>
 
-      {/* Internal preview modal */}
       {!onPreview && internalModalOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
@@ -166,7 +164,6 @@ async function handleWebAction() {
   )
 }
 
-
 // ---------------------------
 // Event List Row
 // ---------------------------
@@ -191,7 +188,8 @@ export default function Home() {
   useEffect(() => { setAdminAddr(process.env.NEXT_PUBLIC_ADMIN?.toLowerCase?.() || null) }, [])
   const isAdmin = !!(address && adminAddr && address.toLowerCase() === adminAddr)
 
-  // --- state ---
+  const [profilePasswordInput, setProfilePasswordInput] = useState('')
+  const [profilePassword, setProfilePassword] = useState(null)
   const [events, setEvents] = useState([])
   const [selectedCity, setSelectedCity] = useState('')
   const [selectedVenueType, setSelectedVenueType] = useState('')
@@ -208,7 +206,6 @@ export default function Home() {
   const [coupons, setCoupons] = useState([])
   const [prebookings, setPrebookings] = useState([])
 
-  // Central event preview modal (used by list view and grid)
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [showEventModal, setShowEventModal] = useState(false)
 
@@ -221,144 +218,139 @@ export default function Home() {
   }, [])
 
   // --- load user data on auth ---
-useEffect(() => {
-  async function loadProfile() {
-    const token = localStorage.getItem('token')
-    if (!token) return
+  useEffect(() => {
+    async function loadProfile() {
+      const token = localStorage.getItem('token')
+      if (!token) return
 
-    try {
-      const res = await fetch('/api/user/me', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      if (!res.ok) {
-        console.error('Failed to fetch profile:', res.status)
-        return
+      try {
+        const res = await fetch('/api/user/me', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        setProfileName(data.username || '')
+        setProfileEmail(data.email || '')
+        setCoupons(data.paid_coupons || [])
+        setPrebookings(data.prebooked_events || [])
+
+        const updatedUser = { ...authUser, ...data }
+        setAuthUser(updatedUser)
+        saveAuth(updatedUser)
+      } catch (err) {
+        console.error('Error fetching profile:', err)
       }
-      const data = await res.json()
-      setProfileName(data.username || '')
-      setProfileEmail(data.email || '')
-      setCoupons(data.paid_coupons || [])
-      setPrebookings(data.prebooked_events || [])
-
-      // Keep authUser in sync
-      setAuthUser(prev => ({ ...prev, ...data }))
-      saveAuth({ ...authUser, ...data })
-    } catch (err) {
-      console.error('Error fetching profile:', err)
     }
-  }
 
-  if (showAccountModal) loadProfile()  // fetch every time modal opens
-}, [showAccountModal])
-
+    if (showAccountModal) loadProfile()
+  }, [showAccountModal])
 
   // --- auth handlers ---
-async function handleLogin(e) {
-  e.preventDefault()
-  setAuthError('')
-  const form = new FormData(e.currentTarget)
-  const username = form.get('username')?.toString().trim()
-  const password = form.get('password')?.toString()
-  if (!username || !password) return setAuthError('Please enter username and password.')
+  async function handleLogin(e) {
+    e.preventDefault()
+    setAuthError('')
+    const form = new FormData(e.currentTarget)
+    const username = form.get('username')?.toString().trim()
+    const password = form.get('password')?.toString()
+    if (!username || !password) return setAuthError('Please enter username and password.')
 
-  try {
-    const res = await fetch('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    })
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      })
 
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}))
-      return setAuthError(j.error || 'Login failed')
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        return setAuthError(j.error || 'Login failed')
+      }
+
+      const user = await res.json()
+      setAuthUser(user)
+      saveAuth(user)
+      localStorage.setItem('token', user.token)
+      setShowLoginModal(false)
+    } catch (err) {
+      setAuthError('Network error')
     }
-
-    const user = await res.json()
-    setAuthUser(user)
-    saveAuth(user)
-    localStorage.setItem('token', user.token)  // ✅ save token for /me fetch
-    setShowLoginModal(false)
-  } catch (err) {
-    setAuthError('Network error')
   }
-}
 
-async function handleSignup(e) {
-  e.preventDefault()
-  setAuthError('')
-  const form = new FormData(e.currentTarget)
-  const username = form.get('username')?.toString().trim()
-  const email = form.get('email')?.toString().trim()
-  const password = form.get('password')?.toString()
-  if (!username || !email || !password) return setAuthError('All fields are required.')
+  async function handleSignup(e) {
+    e.preventDefault()
+    setAuthError('')
+    const form = new FormData(e.currentTarget)
+    const username = form.get('username')?.toString().trim()
+    const email = form.get('email')?.toString().trim()
+    const password = form.get('password')?.toString()
+    if (!username || !email || !password) return setAuthError('All fields are required.')
 
-  try {
-    const res = await fetch('/api/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, email, password })
-    })
+    try {
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, email, password })
+      })
 
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}))
-      return setAuthError(j.error || 'Sign up failed')
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        return setAuthError(j.error || 'Sign up failed')
+      }
+
+      const user = await res.json()
+      setAuthUser(user)
+      saveAuth(user)
+      localStorage.setItem('token', user.token)
+      setShowSignupModal(false)
+    } catch (err) {
+      setAuthError('Network error')
     }
-
-    const user = await res.json()
-    setAuthUser(user)
-    saveAuth(user)
-    localStorage.setItem('token', user.token)  // ✅ save token for /me fetch
-    setShowSignupModal(false)
-  } catch (err) {
-    setAuthError('Network error')
   }
-}
 
   function handleLogout() {
     clearAuth()
     setAuthUser(null)
   }
 
-async function saveProfile(e) {
-  e.preventDefault()
-  const token = localStorage.getItem('token')
-  if (!token) return
+  async function saveProfile(e) {
+    e.preventDefault()
+    const token = localStorage.getItem('token')
+    if (!token) return
 
-  try {
-    const res = await fetch('/api/user/me', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({ username: profileName, email: profileEmail })
-    })
+    try {
+      const res = await fetch('/api/user/me', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ username: profileName, email: profileEmail })
+      })
 
-    if (res.ok) {
-      const updated = await res.json()
-      setProfileName(updated.username)
-      setProfileEmail(updated.email)
-      setAuthUser(prev => ({ ...prev, ...updated }))
-      saveAuth({ ...authUser, ...updated })
-      alert('Profile updated successfully')
-    } else {
-      const j = await res.json().catch(() => ({}))
-      alert(j.error || 'Failed to update profile')
+      if (res.ok) {
+        const updated = await res.json()
+        setProfileName(updated.username)
+        setProfileEmail(updated.email)
+        const updatedUser = { ...authUser, ...updated }
+        setAuthUser(updatedUser)
+        saveAuth(updatedUser)
+        alert('Profile updated successfully')
+      } else {
+        const j = await res.json().catch(() => ({}))
+        alert(j.error || 'Failed to update profile')
+      }
+    } catch (err) {
+      console.error(err)
+      alert('Network error')
     }
-  } catch (err) {
-    console.error(err)
-    alert('Network error')
   }
-}
 
-  // --- filtered events ---
   const filteredEvents = events.filter((e) => {
     const cityMatch = selectedCity ? e.city === selectedCity : true
     const venueMatch = selectedVenueType ? e.venue_type === selectedVenueType : true
     return cityMatch && venueMatch
   })
 
-  // helper to open central preview
   function openPreview(event) {
     setSelectedEvent(event)
     setShowEventModal(true)
@@ -371,8 +363,9 @@ async function saveProfile(e) {
         {/* HEADER */}
         <header className="bg-zinc-900 rounded-3xl p-8 border border-zinc-700 shadow-lg text-center">
           <h1 className="text-4xl font-bold text-blue-400">EDGY EVENT PLATFORM</h1>
-
-          <p className="text-left text-gray-400 mb-6 mt-4">Our event platform and network is the spot where people, venues, and opportunities meet. Our guests receive curated experiences that blend business with social connections. We are happy to help you expanding your network and meet new connections in real life.</p>
+          <p className="text-left text-gray-400 mb-6 mt-4">
+            Our event platform and network is the spot where people, venues, and opportunities meet. Our guests receive curated experiences that blend business with social connections. We are happy to help you expanding your network and meet new connections in real life.
+          </p>
 
           <div className="mt-6 flex gap-3 justify-center">
             {!authUser ? (
@@ -390,7 +383,7 @@ async function saveProfile(e) {
           </div>
         </header>
 
-        {/* Admin SBT Manager (admin only) */}
+        {/* Admin SBT Manager */}
         {isAdmin && <AdminSBTManager darkMode={true} />}
 
         {/* How it works */}
@@ -436,216 +429,101 @@ async function saveProfile(e) {
           </div>
 
           {filteredEvents.length === 0 ? (
-            <p className="text-center text-gray-400">No events match your filter.</p>
+            <p className="text-center text-gray-400">No events found</p>
           ) : viewMode === 'grid' ? (
-            <div className="grid md:grid-cols-3 gap-6">
-              {filteredEvents.map(event => (
-                <DynamicEventCard key={event.id} event={event} onPreview={openPreview} />
+            <div className="grid md:grid-cols-2 gap-6">
+              {filteredEvents.map((event) => (
+                <DynamicEventCard
+                  key={event.id}
+                  event={event}
+                  authUser={authUser}
+                  setShowAccountModal={setShowAccountModal}
+                />
               ))}
             </div>
           ) : (
-            <div className="border border-zinc-700 rounded-lg overflow-hidden">
-              <div className="grid grid-cols-5 gap-2 items-center py-2 px-3 bg-zinc-800 text-xs uppercase tracking-wide text-gray-400">
+            <div className="flex flex-col border border-zinc-700 rounded overflow-hidden">
+              <div className="grid grid-cols-5 gap-2 py-2 px-3 bg-zinc-800 text-gray-400 font-bold text-sm border-b border-zinc-700">
                 <span>Type</span>
                 <span>Date</span>
                 <span>Name</span>
                 <span>City</span>
-                <span className="text-right">Preview</span>
+                <span>Action</span>
               </div>
-              {filteredEvents.map(event => (
+              {filteredEvents.map((event) => (
                 <EventListRow key={event.id} event={event} onPreview={openPreview} />
               ))}
             </div>
           )}
         </section>
-
-        {/* Footer */}
-        <footer className="bg-zinc-900 border border-zinc-700 rounded-3xl p-6 text-center text-gray-400">
-          <p>Docs: <a href="https://github.com/MrThygesen/TEA" className="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">GitHub</a></p>
-          {isAdmin && <div className="mt-2"><ConnectButton /></div>}
-        </footer>
-
       </div>
 
-      {/* Central Event Preview Modal (used by grid/list via openPreview) */}
+      {/* FOOTER */}
+      <footer className="mt-12 w-full max-w-3xl flex justify-center">
+        <ConnectButton />
+      </footer>
+
+{/* Account/Login/Signup Modals */}
+{showAccountModal && authUser && (
+  <YourAccountModal
+    profile={authUser}
+    onClose={() => setShowAccountModal(false)}
+  />
+)}
+
+
+
+      {showLoginModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={() => setShowLoginModal(false)}>
+          <div className="bg-zinc-900 rounded-lg max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-xl font-bold mb-4">Log In</h2>
+            {authError && <p className="text-red-500 text-sm mb-2">{authError}</p>}
+            <form onSubmit={handleLogin} className="flex flex-col gap-2">
+              <input name="username" placeholder="Username" className="p-2 rounded bg-zinc-800 text-white" />
+              <input type="password" name="password" placeholder="Password" className="p-2 rounded bg-zinc-800 text-white" />
+              <button type="submit" className="mt-3 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">Log In</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showSignupModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={() => setShowSignupModal(false)}>
+          <div className="bg-zinc-900 rounded-lg max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-xl font-bold mb-4">Sign Up</h2>
+            {authError && <p className="text-red-500 text-sm mb-2">{authError}</p>}
+            <form onSubmit={handleSignup} className="flex flex-col gap-2">
+              <input name="username" placeholder="Username" className="p-2 rounded bg-zinc-800 text-white" />
+              <input name="email" type="email" placeholder="Email" className="p-2 rounded bg-zinc-800 text-white" />
+              <input name="password" type="password" placeholder="Password" className="p-2 rounded bg-zinc-800 text-white" />
+              <button type="submit" className="mt-3 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">Sign Up</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Event Preview Modal */}
       {showEventModal && selectedEvent && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" onClick={() => setShowEventModal(false)}>
-          <div className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowEventModal(false)}
+        >
+          <div
+            className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="text-xl font-bold mb-4">{selectedEvent.name}</h2>
             <img src={selectedEvent.image_url || '/default-event.jpg'} alt={selectedEvent.name} className="w-full h-56 object-contain rounded mb-4" />
             <p className="mb-2 text-sm text-gray-400">{new Date(selectedEvent.datetime).toLocaleString()} @ {selectedEvent.venue} ({selectedEvent.venue_type || 'N/A'})</p>
             <p className="mb-4">{selectedEvent.details}</p>
 
-            {selectedEvent.basic_perk && (<p className="text-sm text-gray-300"><strong>Basic Perk:</strong> {selectedEvent.basic_perk}</p>)}
-            {selectedEvent.paid_count >= 10 && selectedEvent.advanced_perk && (<p className="text-sm text-gray-300"><strong>Advanced Perk:</strong> {selectedEvent.advanced_perk}</p>)}
+            {selectedEvent.basic_perk && <p className="text-sm text-gray-300"><strong>Basic Perk:</strong> {selectedEvent.basic_perk}</p>}
+            {(selectedEvent.paid_count || 0) >= 10 && selectedEvent.advanced_perk && <p className="text-sm text-gray-300"><strong>Advanced Perk:</strong> {selectedEvent.advanced_perk}</p>}
 
-            <div className="flex gap-2 mt-4">
-              <button onClick={() => setShowEventModal(false)} className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700">Close</button>
-              <button onClick={() => window.open(`https://t.me/TeaIsHereBot?start=buy_${selectedEvent.id}`, '_blank')} className="px-4 py-2 rounded bg-green-600 hover:bg-green-700">Visit Telegram</button>
-            </div>
+            <button onClick={() => setShowEventModal(false)} className="mt-6 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">Close</button>
           </div>
         </div>
       )}
-
-{/* Account Modal */}
-{showAccountModal && (
-  <div
-    className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
-    onClick={() => setShowAccountModal(false)}
-  >
-    <div
-      className="bg-zinc-900 rounded-lg max-w-md w-full p-6"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <h2 className="text-xl font-bold mb-4">Your Account</h2>
-
-      {/* Profile Form */}
-      <form onSubmit={saveProfile} className="space-y-3 mb-6">
-        <div>
-          <label className="block text-sm mb-1">User name</label>
-          <input
-            value={profileName}
-            onChange={(e) => setProfileName(e.target.value)}
-            className="w-full p-2 rounded text-black"
-            placeholder="Your name"
-          />
-        </div>
-        <div>
-          <label className="block text-sm mb-1">Email</label>
-          <input
-            type="email"
-            value={profileEmail}
-            onChange={(e) => setProfileEmail(e.target.value)}
-            className="w-full p-2 rounded text-black"
-            placeholder="you@example.com"
-          />
-        </div>
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-            disabled={!profileName || !profileEmail}
-          >
-            Save changes
-          </button>
-        </div>
-      </form>
-
-
-{!profilePassword && profileEmail && (
-  <div className="mb-4 p-2 border border-yellow-600 rounded">
-    <p>🔐 Set a password for web access to view tickets and history.</p>
-    <input
-      type="password"
-      placeholder="New password"
-      value={profilePasswordInput}
-      onChange={(e) => setProfilePasswordInput(e.target.value)}
-      className="w-full p-2 rounded"
-    />
-    <button onClick={savePassword} className="mt-2 px-4 py-2 bg-blue-600 rounded text-white">
-      Save password
-    </button>
-  </div>
-)}
-
-
-
-      {/* Paid Coupons */}
-      <h3 className="text-lg font-semibold mb-2">Paid event coupons</h3>
-      {coupons?.length ? (
-        <ul className="space-y-2 text-sm">
-          {coupons.map((c) => (
-            <li
-              key={c.id}
-              className="flex justify-between items-center border border-zinc-700 rounded p-3"
-            >
-              <span className="truncate">
-                {c.event_name} — {new Date(c.event_datetime).toLocaleString()}
-              </span>
-              <span className="text-green-400 font-medium">Paid</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-gray-400 text-sm">No paid coupons yet.</p>
-      )}
-
-      {/* Prebooked Events */}
-      <h3 className="text-lg font-semibold mt-4 mb-2">Prebooked events</h3>
-      {prebookings?.length ? (
-        <ul className="space-y-2 text-sm">
-          {prebookings.map((p) => (
-            <li
-              key={p.id}
-              className="flex justify-between items-center border border-zinc-700 rounded p-3"
-            >
-              <span className="truncate">
-                {p.event_name} — {new Date(p.event_datetime).toLocaleString()}
-              </span>
-              <span
-                className={
-                  'text-xs px-2 py-1 rounded ' +
-                  (p.is_confirmed ? 'bg-green-700' : 'bg-zinc-700')
-                }
-              >
-                {p.is_confirmed ? 'confirmed' : 'prebooked'}
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-gray-400 text-sm">No prebooked events yet.</p>
-      )}
-
-      <div className="mt-6 flex justify-end">
-        <button
-          onClick={() => setShowAccountModal(false)}
-          className="px-4 py-2 rounded bg-zinc-700 hover:bg-zinc-600"
-        >
-          Close
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
-      {/* Login Modal */}
-      {showLoginModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" onClick={() => setShowLoginModal(false)}>
-          <div className="bg-zinc-900 rounded-lg max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-xl font-bold mb-4">Log in</h2>
-            <form onSubmit={handleLogin} className="space-y-3">
-              <input name="username" placeholder="Username" className="w-full p-2 rounded text-black" />
-              <input name="password" type="password" placeholder="Password" className="w-full p-2 rounded text-black" />
-              {authError && <p className="text-red-400 text-sm">{authError}</p>}
-              <div className="flex gap-2 justify-end">
-                <button type="button" onClick={() => setShowLoginModal(false)} className="px-3 py-2 rounded bg-zinc-700">Cancel</button>
-                <button type="submit" className="px-3 py-2 rounded bg-blue-600 hover:bg-blue-700">Log in</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Signup Modal */}
-      {showSignupModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" onClick={() => setShowSignupModal(false)}>
-          <div className="bg-zinc-900 rounded-lg max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-xl font-bold mb-4">Create account</h2>
-            <form onSubmit={handleSignup} className="space-y-3">
-              <input name="username" placeholder="Username" className="w-full p-2 rounded text-black" />
-              <input name="email" type="email" placeholder="Email" className="w-full p-2 rounded text-black" />
-              <input name="password" type="password" placeholder="Password" className="w-full p-2 rounded text-black" />
-              {authError && <p className="text-red-400 text-sm">{authError}</p>}
-              <div className="flex gap-2 justify-end">
-                <button type="button" onClick={() => setShowSignupModal(false)} className="px-3 py-2 rounded bg-zinc-700">Cancel</button>
-                <button type="submit" className="px-3 py-2 rounded bg-blue-600 hover:bg-blue-700">Sign up</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
     </main>
   )
 }
