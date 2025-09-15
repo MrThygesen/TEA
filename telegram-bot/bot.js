@@ -75,42 +75,51 @@ async function getUserByTelegramId(tgId) {
 async function upsertUser({ tgId, tgUsername, email, webUsername }) {
   if (!email && !tgId) throw new Error("No identifier provided");
 
-  // 1️⃣ Update existing user by Telegram ID
-  if (tgId) {
-    const user = await getUserByTelegramId(tgId);
-    if (user) {
-      await pool.query(
-        `UPDATE user_profiles
-         SET telegram_username = $1,
-             email = COALESCE($2, email),
-             updated_at = NOW()
-         WHERE id=$3`,
-        [tgUsername || user.telegram_username, email, user.id]
-      );
-      return { ...user, telegram_username: tgUsername || user.telegram_username, email: user.email || email };
-    }
+  let userByTg = null;
+  let userByEmail = null;
+
+  if (tgId) userByTg = await getUserByTelegramId(tgId);
+  if (email) userByEmail = await getUserByEmail(email);
+
+  // If both exist but are different users → merge email into tg user
+  if (userByTg && userByEmail && userByTg.id !== userByEmail.id) {
+    // Merge email into Telegram user
+    await pool.query(
+      `UPDATE user_profiles SET email=$1, updated_at=NOW() WHERE id=$2`,
+      [email, userByTg.id]
+    );
+    // Optionally delete or mark old email row as merged
+    // await pool.query('DELETE FROM user_profiles WHERE id=$1', [userByEmail.id]);
+    return { ...userByTg, email };
   }
 
-  // 2️⃣ Update existing user by email
-  if (email) {
-    const user = await getUserByEmail(email);
-    if (user) {
-      // Link Telegram ID if missing
-      if (!user.telegram_user_id && tgId) {
-        await pool.query(
-          `UPDATE user_profiles
-           SET telegram_user_id=$1,
-               telegram_username=COALESCE($2, telegram_username),
-               updated_at=NOW()
-           WHERE id=$3`,
-          [tgId, tgUsername || null, user.id]
-        );
-      }
-      return { ...user, telegram_user_id: tgId || user.telegram_user_id, telegram_username: tgUsername || user.telegram_username };
-    }
+  // If Telegram user exists → update
+  if (userByTg) {
+    await pool.query(
+      `UPDATE user_profiles
+       SET telegram_username=$1,
+           email=COALESCE($2, email),
+           updated_at=NOW()
+       WHERE id=$3`,
+      [tgUsername || userByTg.telegram_username, email, userByTg.id]
+    );
+    return { ...userByTg, telegram_username: tgUsername || userByTg.telegram_username, email: userByTg.email || email };
   }
 
-  // 3️⃣ Insert new user safely (neither tgId nor email exists)
+  // If email exists → update
+  if (userByEmail) {
+    await pool.query(
+      `UPDATE user_profiles
+       SET telegram_user_id=COALESCE($1, telegram_user_id),
+           telegram_username=COALESCE($2, telegram_username),
+           updated_at=NOW()
+       WHERE id=$3`,
+      [tgId, tgUsername || userByEmail.telegram_username, userByEmail.id]
+    );
+    return { ...userByEmail, telegram_user_id: tgId || userByEmail.telegram_user_id, telegram_username: tgUsername || userByEmail.telegram_username };
+  }
+
+  // Neither exists → insert
   const res = await pool.query(
     `INSERT INTO user_profiles (telegram_user_id, telegram_username, email, username)
      VALUES ($1, $2, $3, $4)
