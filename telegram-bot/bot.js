@@ -78,14 +78,14 @@ async function getUserByTelegramId(tgId) {
 async function upsertUser({ tgId, tgUsername, email, webUsername }) {
   if (!email && !tgId) throw new Error("No identifier provided");
 
-  // 1️⃣ Try to update by telegram ID
+  // Attempt to update by Telegram ID first
   if (tgId) {
     const user = await getUserByTelegramId(tgId);
     if (user) {
       await pool.query(
         `UPDATE user_profiles
          SET telegram_username = $1,
-             email = COALESCE(email, $2),
+             email = COALESCE($2, email),
              updated_at = NOW()
          WHERE id=$3`,
         [tgUsername || user.telegram_username, email, user.id]
@@ -94,7 +94,7 @@ async function upsertUser({ tgId, tgUsername, email, webUsername }) {
     }
   }
 
-  // 2️⃣ Try to update by email
+  // Attempt to update by email
   if (email) {
     const user = await getUserByEmail(email);
     if (user) {
@@ -103,7 +103,7 @@ async function upsertUser({ tgId, tgUsername, email, webUsername }) {
         await pool.query(
           `UPDATE user_profiles
            SET telegram_user_id=$1,
-               telegram_username=$2,
+               telegram_username=COALESCE($2, telegram_username),
                updated_at=NOW()
            WHERE id=$3`,
           [tgId, tgUsername || null, user.id]
@@ -113,14 +113,14 @@ async function upsertUser({ tgId, tgUsername, email, webUsername }) {
     }
   }
 
-  // 3️⃣ Insert with conflict handling on email
+  // Insert new or update existing by email (safe)
   const res = await pool.query(
     `INSERT INTO user_profiles (telegram_user_id, telegram_username, email, username)
      VALUES ($1, $2, $3, $4)
      ON CONFLICT (email) DO UPDATE SET
-       telegram_user_id = COALESCE(user_profiles.telegram_user_id, EXCLUDED.telegram_user_id),
-       telegram_username = COALESCE(user_profiles.telegram_username, EXCLUDED.telegram_username),
-       username = COALESCE(user_profiles.username, EXCLUDED.username),
+       telegram_user_id = COALESCE(EXCLUDED.telegram_user_id, user_profiles.telegram_user_id),
+       telegram_username = COALESCE(EXCLUDED.telegram_username, user_profiles.telegram_username),
+       username = COALESCE(EXCLUDED.username, user_profiles.username),
        updated_at = NOW()
      RETURNING *`,
     [tgId || null, tgUsername || null, email || null, webUsername || null]
