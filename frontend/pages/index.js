@@ -531,6 +531,25 @@ async function saveProfile(e) {
         </div>
       </form>
 
+
+{!profilePassword && profileEmail && (
+  <div className="mb-4 p-2 border border-yellow-600 rounded">
+    <p>🔐 Set a password for web access to view tickets and history.</p>
+    <input
+      type="password"
+      placeholder="New password"
+      value={profilePasswordInput}
+      onChange={(e) => setProfilePasswordInput(e.target.value)}
+      className="w-full p-2 rounded"
+    />
+    <button onClick={savePassword} className="mt-2 px-4 py-2 bg-blue-600 rounded text-white">
+      Save password
+    </button>
+  </div>
+)}
+
+
+
       {/* Paid Coupons */}
       <h3 className="text-lg font-semibold mb-2">Paid event coupons</h3>
       {coupons?.length ? (
