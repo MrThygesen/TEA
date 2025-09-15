@@ -48,11 +48,9 @@ const userStates = {};
 // ==============================
 // DB HELPERS
 // ==============================
-// ==============================
-// DB HELPERS
-// ==============================
-
-// Fetch by email
+// -----------------------------
+// Fetch existing user helpers
+// -----------------------------
 async function getUserByEmail(email) {
   if (!email) return null;
   const res = await pool.query(
@@ -62,7 +60,6 @@ async function getUserByEmail(email) {
   return res.rows[0] || null;
 }
 
-// Fetch by telegram ID
 async function getUserByTelegramId(tgId) {
   if (!tgId) return null;
   const res = await pool.query(
@@ -72,114 +69,76 @@ async function getUserByTelegramId(tgId) {
   return res.rows[0] || null;
 }
 
-/**
- * Safe upsert for Telegram + web/email user
- */
+// -----------------------------
+// Safe upsert for Telegram + email user
+// -----------------------------
 async function upsertUser({ tgId, tgUsername, email, webUsername }) {
-  if (!tgId && !email) throw new Error("No identifier provided");
+  if (!email && !tgId) throw new Error("No identifier provided");
 
-  let user = null;
-
-  // --- Step 1: Try find by Telegram ID ---
+  // 1️⃣ Update existing user by Telegram ID
   if (tgId) {
-    user = await getUserByTelegramId(tgId);
+    const user = await getUserByTelegramId(tgId);
     if (user) {
-      // Update Telegram username + email if provided
-      const newEmail = email || user.email;
       await pool.query(
         `UPDATE user_profiles
          SET telegram_username = $1,
-             email = $2,
-             username = COALESCE($3, username),
+             email = COALESCE($2, email),
              updated_at = NOW()
-         WHERE id=$4`,
-        [tgUsername || user.telegram_username, newEmail, webUsername, user.id]
+         WHERE id=$3`,
+        [tgUsername || user.telegram_username, email, user.id]
       );
-      return { ...user, telegram_username: tgUsername || user.telegram_username, email: newEmail, username: webUsername || user.username };
+      return { ...user, telegram_username: tgUsername || user.telegram_username, email: user.email || email };
     }
   }
 
-  // --- Step 2: Try find by email ---
+  // 2️⃣ Update existing user by email
   if (email) {
-    user = await getUserByEmail(email);
+    const user = await getUserByEmail(email);
     if (user) {
-      // Update Telegram info if missing
-      if (tgId && !user.telegram_user_id) {
+      // Link Telegram ID if missing
+      if (!user.telegram_user_id && tgId) {
         await pool.query(
           `UPDATE user_profiles
-           SET telegram_user_id = $1,
-               telegram_username = COALESCE($2, telegram_username),
-               updated_at = NOW()
+           SET telegram_user_id=$1,
+               telegram_username=COALESCE($2, telegram_username),
+               updated_at=NOW()
            WHERE id=$3`,
           [tgId, tgUsername || null, user.id]
         );
-        user.telegram_user_id = tgId;
-        user.telegram_username = tgUsername || user.telegram_username;
       }
-      return user;
+      return { ...user, telegram_user_id: tgId || user.telegram_user_id, telegram_username: tgUsername || user.telegram_username };
     }
   }
 
-  // --- Step 3: Insert new user safely ---
-  // If email is provided, use ON CONFLICT(email) to avoid duplicates
-  if (email) {
-    const res = await pool.query(
-      `INSERT INTO user_profiles (telegram_user_id, telegram_username, email, username)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (email) DO UPDATE SET
-         telegram_user_id = COALESCE(EXCLUDED.telegram_user_id, user_profiles.telegram_user_id),
-         telegram_username = COALESCE(EXCLUDED.telegram_username, user_profiles.telegram_username),
-         username = COALESCE(EXCLUDED.username, user_profiles.username),
-         updated_at = NOW()
-       RETURNING *`,
-      [tgId || null, tgUsername || null, email, webUsername || null]
-    );
-    return res.rows[0];
-  }
-
-  // --- Step 4: Insert Telegram-only user ---
-  // No email provided, safe to insert
+  // 3️⃣ Insert new user safely (neither tgId nor email exists)
   const res = await pool.query(
-    `INSERT INTO user_profiles (telegram_user_id, telegram_username, username)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (telegram_user_id) DO UPDATE SET
-       telegram_username = EXCLUDED.telegram_username,
-       username = COALESCE(EXCLUDED.username, user_profiles.username),
-       updated_at = NOW()
+    `INSERT INTO user_profiles (telegram_user_id, telegram_username, email, username)
+     VALUES ($1, $2, $3, $4)
      RETURNING *`,
-    [tgId, tgUsername || null, webUsername || null]
+    [tgId || null, tgUsername || null, email || null, webUsername || null]
   );
+
   return res.rows[0];
 }
 
-
-async function createUserWithTelegram(tgId, username, email = null) {
-  if (email) {
-    // Use upsertUser to safely handle email conflict
-    return upsertUser({ tgId, tgUsername: username, email });
-  } else {
-    // Telegram-only user, safe to insert/update
-    const res = await pool.query(
-      `INSERT INTO user_profiles (telegram_user_id, telegram_username)
-       VALUES ($1, $2)
-       ON CONFLICT (telegram_user_id) DO UPDATE SET
-         telegram_username = EXCLUDED.telegram_username,
-         updated_at = CURRENT_TIMESTAMP
-       RETURNING *`,
-      [tgId, username || null]
-    );
-    return res.rows[0];
-  }
+// -----------------------------
+// Create Telegram user safely
+// -----------------------------
+async function createUserWithTelegram(tgId, tgUsername, email = null) {
+  return await upsertUser({ tgId, tgUsername, email });
 }
 
-async function ensureUserForTelegram(tgId, username) {
+// -----------------------------
+// Ensure Telegram user exists (create or update)
+// -----------------------------
+async function ensureUserForTelegram(tgId, tgUsername) {
   let user = await getUserByTelegramId(tgId);
   if (!user) {
-    user = await createUserWithTelegram(tgId, username);
-  } else if (username && user.telegram_username !== username) {
+    user = await createUserWithTelegram(tgId, tgUsername);
+  } else if (tgUsername && user.telegram_username !== tgUsername) {
     const upd = await pool.query(
       `UPDATE user_profiles SET telegram_username=$1, updated_at=NOW() WHERE id=$2 RETURNING *`,
-      [username, user.id]
+      [tgUsername, user.id]
     );
     user = upd.rows[0];
   }
