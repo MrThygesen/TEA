@@ -239,18 +239,21 @@ async function showAttendees(chatId, eventId, messageId = null) {
 // COMMANDS
 // ==============================
 
+// ==============================
+// /start command
+// ==============================
 bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
   const tgId = String(msg.from.id);
   const username = msg.from.username || '';
   const payload = match?.[1];
 
-  const user = await ensureUserForTelegram(tgId, username);
+  let user = await ensureUserForTelegram(tgId, username);
 
-  // If Telegram-only user without email → prompt verification
+  // Option E: Telegram-only user without email → prompt for email
   if (!user.email) {
     const prompt = await bot.sendMessage(
       tgId,
-      `📧 You don't have an email associated with your account yet.\nReply with your email (must include '@' and '.') to verify your account.`,
+      `📧 Welcome ${username || ''}! You don’t have an email associated yet.\nPlease reply with your email to link your web account (required for web login and ticket management).`,
       { reply_markup: { force_reply: true, input_field_placeholder: 'you@example.com' } }
     );
     userStates[tgId] = { step: 'editingProfile', field: 'email', replyTo: prompt.message_id };
@@ -266,9 +269,16 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
 
   return bot.sendMessage(
     tgId,
-    `👋 Welcome ${username || 'there'}! Use /events to see events, /myevents for your registrations, /user_edit to add email, /help for commands.`
+    `👋 Hello ${username || 'there'}! Commands:\n` +
+    `/events - Browse events\n` +
+    `/myevents - Your registrations\n` +
+    `/user_edit - Add/update email & set web password\n` +
+    `/help - More commands`
   );
 });
+
+
+
 
 bot.onText(/\/help/, async (msg) => {
   bot.sendMessage(msg.chat.id,
@@ -302,94 +312,89 @@ const opts = { reply_markup: { inline_keyboard } };
   bot.sendMessage(chatId, '📍 Select your city:', opts);
 });
 
-// /user_edit (email)// /user_edit command (inline or prompt)
+
+// ==============================
+// /user_edit command
+// ==============================
 bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const tgId = String(msg.from.id);
   const username = msg.from.username || '';
-  const user = await ensureUserForTelegram(tgId, username);
+  let user = await ensureUserForTelegram(tgId, username);
 
-  // Inline email from command
   const inlineEmail = match?.[1]?.trim();
 
   if (!inlineEmail) {
-    // Prompt user to reply with email
     const prompt = await bot.sendMessage(
       chatId,
-      `📧 Current email: ${user?.email || 'N/A'}\nReply to this message with your new email (must include '@' and '.').`,
+      `📧 Current email: ${user?.email || 'N/A'}\nReply with your email to link your web account or update it:`,
       { reply_markup: { force_reply: true, input_field_placeholder: 'you@example.com' } }
     );
-
-    // Store state for reply
     userStates[tgId] = { step: 'editingProfile', field: 'email', replyTo: prompt.message_id };
     return;
   }
 
-  // Validate inline email
+  // Validate email
   if (!isLikelyEmail(inlineEmail)) {
     return bot.sendMessage(chatId, '❌ Invalid email. Must include "@" and "."');
   }
 
-  // Check if email already exists
-  const { rows: existingRows } = await pool.query(
-    `SELECT * FROM user_profiles WHERE email = $1`,
-    [inlineEmail]
-  );
+  // Check if email exists in DB
+  const existingUser = await getUserByEmail(inlineEmail);
 
-  if (existingRows.length) {
-    const existingUser = existingRows[0];
-
-    if (existingUser.id === user.id) {
-      return bot.sendMessage(chatId, `ℹ️ Your email is already set to ${inlineEmail}.`);
-    }
-
-    // Merge Telegram into existing account
+  if (existingUser && existingUser.id !== user.id) {
+    // Merge Telegram into existing web account
     await pool.query(
-      `UPDATE user_profiles
-       SET telegram_user_id = $1,
-           telegram_username = $2,
-           updated_at = NOW()
-       WHERE id = $3`,
+      `UPDATE user_profiles SET telegram_user_id=$1, telegram_username=$2, updated_at=NOW() WHERE id=$3`,
       [tgId, username || null, existingUser.id]
     );
-
-    if (user.id !== existingUser.id) {
-      await pool.query(`DELETE FROM user_profiles WHERE id=$1`, [user.id]);
-    }
-
-    // ✅ Updated call
-    await sendEmailVerification({ userId: existingUser.id, email: inlineEmail });
-
-    return bot.sendMessage(
-      chatId,
-      `✅ Your Telegram has been linked to existing email account: ${inlineEmail}. Check your inbox to verify.`
+    // Delete old Telegram-only record
+    await pool.query(`DELETE FROM user_profiles WHERE id=$1`, [user.id]);
+    user = existingUser;
+    await bot.sendMessage(chatId, `✅ Linked your Telegram to existing web account: ${inlineEmail}`);
+  } else if (!existingUser) {
+    // No conflict → safe to update email
+    await pool.query(
+      `UPDATE user_profiles SET email=$1, updated_at=NOW() WHERE id=$2`,
+      [inlineEmail, user.id]
     );
+    user.email = inlineEmail;
+    await bot.sendMessage(chatId, `✅ Email updated to: ${inlineEmail}`);
+  } else {
+    // Same user, no action
+    await bot.sendMessage(chatId, `ℹ️ Your email is already set to ${inlineEmail}`);
   }
 
-  // No existing email → safe to update
-  await pool.query(
-    `UPDATE user_profiles SET email=$1, updated_at=NOW() WHERE id=$2`,
-    [inlineEmail, user.id]
-  );
+  // Prompt for password setup if not yet set
+  if (!user.password_hash) {
+    const promptPwd = await bot.sendMessage(
+      chatId,
+      `🔑 Please set a password for web login (minimum 8 chars):`,
+      { reply_markup: { force_reply: true, input_field_placeholder: 'Enter password' } }
+    );
+    userStates[tgId] = { step: 'editingProfile', field: 'password', replyTo: promptPwd.message_id };
+  }
 
-  // ✅ Updated call
-  await sendEmailVerification({ userId: user.id, email: inlineEmail });
-
-  return bot.sendMessage(chatId, `✅ Email updated to: ${inlineEmail}. Check your inbox to verify.`);
+  // Send verification email for new/updated email
+  await sendEmailVerification({ userId: user.id, tgId, email: user.email });
 });
 
 
-// Capture reply to /user_edit prompt
+// ==============================
+// Capture replies for email/password
+// ==============================
 bot.on('message', async (msg) => {
   const tgId = String(msg.from.id);
   const state = userStates[tgId];
   if (!state) return;
   if (!msg.text) return;
-  if (msg.text.startsWith('/')) return; // ignore commands
+  if (msg.text.startsWith('/')) return;
 
   if (state.replyTo && (!msg.reply_to_message || msg.reply_to_message.message_id !== state.replyTo)) {
     return;
   }
+
+  let user = await ensureUserForTelegram(tgId, msg.from.username || '');
 
   if (state.field === 'email') {
     const email = msg.text.trim();
@@ -397,22 +402,60 @@ bot.on('message', async (msg) => {
       return bot.sendMessage(msg.chat.id, '❌ Invalid email. Must include "@" and "."');
     }
 
-    const user = await ensureUserForTelegram(tgId, msg.from.username || '');
+    const existingUser = await getUserByEmail(email);
 
-    // Update DB safely
+    if (existingUser && existingUser.id !== user.id) {
+      // Merge Telegram into existing web account
+      await pool.query(
+        `UPDATE user_profiles SET telegram_user_id=$1, telegram_username=$2, updated_at=NOW() WHERE id=$3`,
+        [tgId, msg.from.username || null, existingUser.id]
+      );
+      await pool.query(`DELETE FROM user_profiles WHERE id=$1`, [user.id]);
+      user = existingUser;
+      await bot.sendMessage(msg.chat.id, `✅ Linked your Telegram to existing web account: ${email}`);
+    } else if (!existingUser) {
+      await pool.query(
+        `UPDATE user_profiles SET email=$1, updated_at=NOW() WHERE id=$2`,
+        [email, user.id]
+      );
+      user.email = email;
+      await bot.sendMessage(msg.chat.id, `✅ Email updated to: ${email}`);
+    } else {
+      await bot.sendMessage(msg.chat.id, `ℹ️ Your email is already set to ${email}`);
+    }
+
+    // Prompt for password if not set
+    if (!user.password_hash) {
+      const promptPwd = await bot.sendMessage(
+        msg.chat.id,
+        `🔑 Please set a password for web login (minimum 8 chars):`,
+        { reply_markup: { force_reply: true, input_field_placeholder: 'Enter password' } }
+      );
+      userStates[tgId] = { step: 'editingProfile', field: 'password', replyTo: promptPwd.message_id };
+    }
+
+    await sendEmailVerification({ userId: user.id, tgId, email: user.email });
+    delete userStates[tgId];
+  }
+
+  else if (state.field === 'password') {
+    const password = msg.text.trim();
+    if (password.length < 8) {
+      return bot.sendMessage(msg.chat.id, '❌ Password must be at least 8 characters.');
+    }
+
+    const bcrypt = require('bcryptjs');
+    const hash = await bcrypt.hash(password, 12);
+
     await pool.query(
-      `UPDATE user_profiles SET email=$1, updated_at=NOW() WHERE id=$2`,
-      [email, user.id]
+      `UPDATE user_profiles SET password_hash=$1, updated_at=NOW() WHERE id=$2`,
+      [hash, user.id]
     );
 
-    // ✅ Updated call (works even if user only has Telegram)
-    await sendEmailVerification({ userId: user.id, tgId, email });
-
+    await bot.sendMessage(msg.chat.id, '✅ Password set! You can now log in on the web.');
     delete userStates[tgId];
-    return bot.sendMessage(msg.chat.id, `✅ Email updated to: ${email}. Check your inbox to verify.`);
   }
 });
-
 
 
 // ==============================
@@ -774,7 +817,6 @@ app.post(`/webhook/${BOT_TOKEN}`, (req, res) => {
 });
 
 bot.setWebHook(`${PUBLIC_URL}/webhook/${BOT_TOKEN}`);
-
 app.listen(PORT, () => {
   console.log(`🚀 Bot running on port ${PORT}`);
 //export default bot;
