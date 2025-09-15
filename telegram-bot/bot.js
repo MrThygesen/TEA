@@ -410,53 +410,72 @@ bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
 // ==============================
 // Capture replies for email/password
 // ==============================
+
+// Utility: simple email check
+function isLikelyEmail(str) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(str);
+}
+
+// Handle replies for forced reply prompts
 bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
   const tgId = String(msg.from.id);
   const state = userStates[tgId];
-  if (!state || !msg.text) return;
-  if (msg.text.startsWith('/')) return;
 
-  // Only accept reply to our prompt
-  if (state.replyTo && (!msg.reply_to_message || msg.reply_to_message.message_id !== state.replyTo)) return;
+  // Ignore messages that are not part of a forced reply flow
+  if (!state) return;
 
-  let user = await getUserByTelegramId(tgId);
+  const text = msg.text?.trim();
+  if (!text) return;
 
-  if (state.field === 'email') {
-    const email = msg.text.trim();
-    if (!isLikelyEmail(email)) return bot.sendMessage(msg.chat.id, '❌ Invalid email.');
+  try {
+    if (state.step === 'editingProfile' && state.field === 'email') {
+      if (!isLikelyEmail(text)) {
+        return bot.sendMessage(chatId, '❌ Invalid email. Please try again.');
+      }
 
-    user = await upsertUser({ tgId, tgUsername: msg.from.username || '', email });
-    await bot.sendMessage(msg.chat.id, `✅ Linked/updated email: ${user.email}`);
+      const tgUsername = msg.from.username || '';
+      const user = await upsertUser({ tgId, tgUsername, email: text });
+      await bot.sendMessage(chatId, `✅ Your email is now linked/updated: ${user.email}`);
 
-    if (!user.password_hash) {
-      const promptPwd = await bot.sendMessage(
-        msg.chat.id,
-        `🔑 Optional: Set a password for web login (8+ chars) or type 'skip':`,
-        { reply_markup: { force_reply: true } }
-      );
-      userStates[tgId] = { step: 'editingProfile', field: 'password', replyTo: promptPwd.message_id };
-    }
+      // Prompt for optional password if not set
+      if (!user.password_hash) {
+        const promptPwd = await bot.sendMessage(
+          chatId,
+          `🔑 Optional: Set a password for web login (8+ chars). Reply with your desired password or type 'skip':`,
+          { reply_markup: { force_reply: true, input_field_placeholder: 'Enter password or skip' } }
+        );
+        userStates[tgId] = { step: 'editingProfile', field: 'password', replyTo: promptPwd.message_id };
+        return;
+      }
 
-    await sendEmailVerification({ userId: user.id, tgId, email: user.email });
-    delete userStates[tgId];
-  }
+      delete userStates[tgId]; // Done
+      return;
 
-  else if (state.field === 'password') {
-    const password = msg.text.trim();
-    if (password.toLowerCase() === 'skip') {
-      await bot.sendMessage(msg.chat.id, 'ℹ️ Password setup skipped.');
-      delete userStates[tgId];
+    } else if (state.step === 'editingProfile' && state.field === 'password') {
+      if (text.toLowerCase() === 'skip') {
+        await bot.sendMessage(chatId, '⚡ Password setup skipped. You can set it later via /user_edit.');
+      } else if (text.length < 8) {
+        return bot.sendMessage(chatId, '❌ Password too short. Must be 8+ characters.');
+      } else {
+        const bcrypt = require('bcryptjs');
+        const hash = await bcrypt.hash(text, 10);
+
+        // Update password safely
+        await pool.query(
+          `UPDATE user_profiles SET password_hash = $1, updated_at = NOW() WHERE telegram_user_id = $2`,
+          [hash, tgId]
+        );
+
+        await bot.sendMessage(chatId, '✅ Password successfully set. You can now login to the web.');
+      }
+
+      delete userStates[tgId]; // Done
       return;
     }
-
-    if (password.length < 8) return bot.sendMessage(msg.chat.id, '❌ Password must be 8+ chars.');
-
-    const bcrypt = require('bcryptjs');
-    const hash = await bcrypt.hash(password, 12);
-    await pool.query(`UPDATE user_profiles SET password_hash=$1, updated_at=NOW() WHERE id=$2`, [hash, user.id]);
-
-    await bot.sendMessage(msg.chat.id, '✅ Password set! You can now log in on the web.');
-    delete userStates[tgId];
+  } catch (err) {
+    console.error('Error handling user reply:', err);
+    return bot.sendMessage(chatId, '❌ Something went wrong. Please try again later.');
   }
 });
 
