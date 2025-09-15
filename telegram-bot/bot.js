@@ -75,51 +75,37 @@ async function getUserByTelegramId(tgId) {
 async function upsertUser({ tgId, tgUsername, email, webUsername }) {
   if (!tgId && !email) throw new Error("No identifier provided");
 
-  let userByTg = tgId ? await getUserByTelegramId(tgId) : null;
-  let userByEmail = email ? await getUserByEmail(email) : null;
-
-  // Case: both exist but different rows → merge email into Telegram user
-  if (userByTg && userByEmail && userByTg.id !== userByEmail.id) {
-    await pool.query(
-      `UPDATE user_profiles SET email=$1, updated_at=NOW() WHERE id=$2`,
-      [email, userByTg.id]
-    );
-    return { ...userByTg, email };
-  }
-
-  // Case: Telegram user exists → update fields
-  if (userByTg) {
-    await pool.query(
-      `UPDATE user_profiles
-       SET telegram_username=$1,
-           email=COALESCE($2, email),
-           updated_at=NOW()
-       WHERE id=$3`,
-      [tgUsername || userByTg.telegram_username, email, userByTg.id]
-    );
-    return { ...userByTg, telegram_username: tgUsername || userByTg.telegram_username, email: userByTg.email || email };
-  }
-
-  // Case: Email exists → update Telegram info
-  if (userByEmail) {
-    await pool.query(
-      `UPDATE user_profiles
-       SET telegram_user_id=COALESCE($1, telegram_user_id),
-           telegram_username=COALESCE($2, telegram_username),
-           updated_at=NOW()
-       WHERE id=$3`,
-      [tgId, tgUsername || userByEmail.telegram_username, userByEmail.id]
-    );
-    return { ...userByEmail, telegram_user_id: tgId || userByEmail.telegram_user_id, telegram_username: tgUsername || userByEmail.telegram_username };
-  }
-
-  // Case: neither exists → insert new
+  // Use ON CONFLICT on email or telegram_user_id
   const res = await pool.query(
-    `INSERT INTO user_profiles (telegram_user_id, telegram_username, email, username)
-     VALUES ($1, $2, $3, $4)
-     RETURNING *`,
+    `
+    INSERT INTO user_profiles (telegram_user_id, telegram_username, email, username)
+    VALUES ($1, $2, $3, $4)
+    ON CONFLICT (telegram_user_id) DO UPDATE
+      SET telegram_username = EXCLUDED.telegram_username,
+          email = COALESCE(EXCLUDED.email, user_profiles.email),
+          username = COALESCE(EXCLUDED.username, user_profiles.username),
+          updated_at = NOW()
+    RETURNING *;
+    `,
     [tgId || null, tgUsername || null, email || null, webUsername || null]
   );
+
+  // If insertion fails because email exists, fallback to update by email
+  if (!res.rows[0] && email) {
+    const res2 = await pool.query(
+      `
+      UPDATE user_profiles
+      SET telegram_user_id = COALESCE($1, telegram_user_id),
+          telegram_username = COALESCE($2, telegram_username),
+          username = COALESCE($3, username),
+          updated_at = NOW()
+      WHERE email = $4
+      RETURNING *;
+      `,
+      [tgId || null, tgUsername || null, webUsername || null, email]
+    );
+    return res2.rows[0];
+  }
 
   return res.rows[0];
 }
@@ -301,22 +287,20 @@ async function showAttendees(chatId, eventId, messageId = null) {
 // ==============================
 // /start command
 // ==============================
+// /start command
 bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
   const tgId = String(msg.from.id);
   const username = msg.from.username || '';
   const payload = match?.[1];
 
   let user = await getUserByTelegramId(tgId);
-
   if (!user) {
-    // Create Telegram-only user safely
     user = await upsertUser({ tgId, tgUsername: username });
   } else if (user.telegram_username !== username) {
-    // Update username if changed
-    user = await upsertUser({ tgId, tgUsername: username, email: user.email });
+    user = await upsertUser({ tgId, tgUsername: username });
   }
 
-  // If no email → ask for it
+  // Prompt for email if missing
   if (!user.email) {
     const prompt = await bot.sendMessage(
       tgId,
@@ -326,7 +310,7 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
     userStates[tgId] = { step: 'editingProfile', field: 'email', replyTo: prompt.message_id };
   }
 
-  // Deep-link registration
+  // Handle deep-link registration
   if (payload && !isNaN(payload)) {
     const eventId = parseInt(payload, 10);
     const res = await registerUserById(eventId, user.id);
@@ -383,12 +367,14 @@ const opts = { reply_markup: { inline_keyboard } };
 // ==============================
 // /user_edit command
 // ==============================
+// /user_edit command
 bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const tgId = String(msg.from.id);
   const tgUsername = msg.from.username || '';
   const inlineEmail = match?.[1]?.trim();
 
+  // Prompt for email if not provided
   if (!inlineEmail) {
     const prompt = await bot.sendMessage(
       chatId,
@@ -399,13 +385,15 @@ bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
     return;
   }
 
-  if (!isLikelyEmail(inlineEmail)) return bot.sendMessage(chatId, '❌ Invalid email.');
+  if (!isLikelyEmail(inlineEmail)) {
+    return bot.sendMessage(chatId, '❌ Invalid email.');
+  }
 
-  // Upsert safely → avoids duplicates
+  // Upsert safely
   const user = await upsertUser({ tgId, tgUsername, email: inlineEmail });
-
   await bot.sendMessage(chatId, `✅ Your email is now linked/updated: ${user.email}`);
 
+  // Optional password setup
   if (!user.password_hash) {
     const promptPwd = await bot.sendMessage(
       chatId,
