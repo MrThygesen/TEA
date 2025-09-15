@@ -73,27 +73,21 @@ async function getUserByTelegramId(tgId) {
 // Safe upsert for Telegram + email user
 // -----------------------------
 async function upsertUser({ tgId, tgUsername, email, webUsername }) {
-  if (!email && !tgId) throw new Error("No identifier provided");
+  if (!tgId && !email) throw new Error("No identifier provided");
 
-  let userByTg = null;
-  let userByEmail = null;
+  let userByTg = tgId ? await getUserByTelegramId(tgId) : null;
+  let userByEmail = email ? await getUserByEmail(email) : null;
 
-  if (tgId) userByTg = await getUserByTelegramId(tgId);
-  if (email) userByEmail = await getUserByEmail(email);
-
-  // If both exist but are different users → merge email into tg user
+  // Case: both exist but different rows → merge email into Telegram user
   if (userByTg && userByEmail && userByTg.id !== userByEmail.id) {
-    // Merge email into Telegram user
     await pool.query(
       `UPDATE user_profiles SET email=$1, updated_at=NOW() WHERE id=$2`,
       [email, userByTg.id]
     );
-    // Optionally delete or mark old email row as merged
-    // await pool.query('DELETE FROM user_profiles WHERE id=$1', [userByEmail.id]);
     return { ...userByTg, email };
   }
 
-  // If Telegram user exists → update
+  // Case: Telegram user exists → update fields
   if (userByTg) {
     await pool.query(
       `UPDATE user_profiles
@@ -106,7 +100,7 @@ async function upsertUser({ tgId, tgUsername, email, webUsername }) {
     return { ...userByTg, telegram_username: tgUsername || userByTg.telegram_username, email: userByTg.email || email };
   }
 
-  // If email exists → update
+  // Case: Email exists → update Telegram info
   if (userByEmail) {
     await pool.query(
       `UPDATE user_profiles
@@ -119,7 +113,7 @@ async function upsertUser({ tgId, tgUsername, email, webUsername }) {
     return { ...userByEmail, telegram_user_id: tgId || userByEmail.telegram_user_id, telegram_username: tgUsername || userByEmail.telegram_username };
   }
 
-  // Neither exists → insert
+  // Case: neither exists → insert new
   const res = await pool.query(
     `INSERT INTO user_profiles (telegram_user_id, telegram_username, email, username)
      VALUES ($1, $2, $3, $4)
@@ -312,9 +306,17 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
   const username = msg.from.username || '';
   const payload = match?.[1];
 
-  let user = await ensureUserForTelegram(tgId, username);
+  let user = await getUserByTelegramId(tgId);
 
-  // Option E: Telegram-only user without email → prompt via modal (force reply)
+  if (!user) {
+    // Create Telegram-only user safely
+    user = await upsertUser({ tgId, tgUsername: username });
+  } else if (user.telegram_username !== username) {
+    // Update username if changed
+    user = await upsertUser({ tgId, tgUsername: username, email: user.email });
+  }
+
+  // If no email → ask for it
   if (!user.email) {
     const prompt = await bot.sendMessage(
       tgId,
@@ -397,15 +399,13 @@ bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
     return;
   }
 
-  if (!isLikelyEmail(inlineEmail)) {
-    return bot.sendMessage(chatId, '❌ Invalid email.');
-  }
+  if (!isLikelyEmail(inlineEmail)) return bot.sendMessage(chatId, '❌ Invalid email.');
 
-  // Upsert user safely
+  // Upsert safely → avoids duplicates
   const user = await upsertUser({ tgId, tgUsername, email: inlineEmail });
+
   await bot.sendMessage(chatId, `✅ Your email is now linked/updated: ${user.email}`);
 
-  // Optional password setup for web login
   if (!user.password_hash) {
     const promptPwd = await bot.sendMessage(
       chatId,
