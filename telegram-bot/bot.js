@@ -411,10 +411,6 @@ bot.onText(/\/user_edit(?:\s+(.+))?/, async (msg, match) => {
 // Capture replies for email/password
 // ==============================
 
-// Utility: simple email check
-function isLikelyEmail(str) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(str);
-}
 
 // Handle replies for forced reply prompts
 bot.on('message', async (msg) => {
