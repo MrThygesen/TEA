@@ -75,39 +75,40 @@ async function getUserByTelegramId(tgId) {
 async function upsertUser({ tgId, tgUsername, email, webUsername }) {
   if (!tgId && !email) throw new Error("No identifier provided");
 
-  // Use ON CONFLICT on email or telegram_user_id
-  const res = await pool.query(
-    `
-    INSERT INTO user_profiles (telegram_user_id, telegram_username, email, username)
-    VALUES ($1, $2, $3, $4)
-    ON CONFLICT (telegram_user_id) DO UPDATE
-      SET telegram_username = EXCLUDED.telegram_username,
-          email = COALESCE(EXCLUDED.email, user_profiles.email),
-          username = COALESCE(EXCLUDED.username, user_profiles.username),
-          updated_at = NOW()
-    RETURNING *;
-    `,
-    [tgId || null, tgUsername || null, email || null, webUsername || null]
-  );
-
-  // If insertion fails because email exists, fallback to update by email
-  if (!res.rows[0] && email) {
-    const res2 = await pool.query(
+  try {
+    const res = await pool.query(
       `
-      UPDATE user_profiles
-      SET telegram_user_id = COALESCE($1, telegram_user_id),
-          telegram_username = COALESCE($2, telegram_username),
-          username = COALESCE($3, username),
-          updated_at = NOW()
-      WHERE email = $4
+      INSERT INTO user_profiles (telegram_user_id, telegram_username, email, username)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (telegram_user_id) DO UPDATE
+        SET telegram_username = EXCLUDED.telegram_username,
+            email = COALESCE(EXCLUDED.email, user_profiles.email),
+            username = COALESCE(EXCLUDED.username, user_profiles.username),
+            updated_at = NOW()
       RETURNING *;
       `,
-      [tgId || null, tgUsername || null, webUsername || null, email]
+      [tgId || null, tgUsername || null, email || null, webUsername || null]
     );
-    return res2.rows[0];
+    return res.rows[0];
+  } catch (err) {
+    // 💡 Catch the duplicate email case
+    if (err.code === "23505" && email) {
+      const res2 = await pool.query(
+        `
+        UPDATE user_profiles
+        SET telegram_user_id = COALESCE($1, telegram_user_id),
+            telegram_username = COALESCE($2, telegram_username),
+            username = COALESCE($3, username),
+            updated_at = NOW()
+        WHERE email = $4
+        RETURNING *;
+        `,
+        [tgId || null, tgUsername || null, webUsername || null, email]
+      );
+      return res2.rows[0];
+    }
+    throw err; // rethrow unexpected errors
   }
-
-  return res.rows[0];
 }
 
 // -----------------------------
