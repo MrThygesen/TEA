@@ -13,6 +13,14 @@ const MAIL_FROM = process.env.MAIL_FROM || 'no-reply@teanet.xyz'
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 
 /**
+ * Generate base64 QR code for a ticket
+ */
+async function generateTicketQRCode(eventId, userId) {
+  const qrData = `ticket:${eventId}:${userId}`
+  return await QRCode.toDataURL(qrData)
+}
+
+/**
  * Send email verification to a new user
  */
 async function sendVerificationEmail(to, token, tgId) {
@@ -95,8 +103,7 @@ async function sendBookingReminderEmail(to, event) {
  */
 async function sendTicketEmail(to, event, user) {
   try {
-    const qrData = `ticket:${event.id}:${user.id}`
-    const qrImage = await QRCode.toDataURL(qrData)
+    const qrImage = await generateTicketQRCode(event.id, user.id)
 
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
     sendSmtpEmail.sender = { name: 'Edgy Events', email: MAIL_FROM }
@@ -114,14 +121,17 @@ async function sendTicketEmail(to, event, user) {
     `
     await apiInstance.sendTransacEmail(sendSmtpEmail)
     console.log('✅ Ticket email sent to', to)
+    return true
   } catch (err) {
     console.error('❌ Failed to send ticket email:', err?.response?.body || err)
+    throw new Error('Failed to send ticket email')
   }
 }
 
 module.exports = {
+  generateTicketQRCode, // shared helper for QR
   sendVerificationEmail,
-  sendEventConfirmedEmail: sendBookingReminderEmail, // keep old name for compatibility
+  sendEventConfirmedEmail: sendBookingReminderEmail,
   sendPrebookEmail,
   sendBookingReminderEmail,
   sendTicketEmail,
