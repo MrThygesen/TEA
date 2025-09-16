@@ -2,6 +2,11 @@
 import { pool } from '../../../lib/postgres.js'
 import Stripe from 'stripe'
 import { auth } from '../../../lib/auth.js'
+import {
+  sendPrebookEmail,
+  sendBookingReminderEmail,
+  sendTicketEmail,
+} from '../../../lib/email.js'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
@@ -10,66 +15,63 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' })
   }
 
+  // --- auth ---
   const token = auth.getTokenFromReq(req)
-  if (!token) {
-    return res.status(401).json({ error: 'Not authenticated' })
-  }
+  if (!token) return res.status(401).json({ error: 'Not authenticated' })
 
   let user
   try {
-    user = auth.verifyToken(token)
-  } catch (err) {
+    user = auth.verifyToken(token) // must contain { id, email, username }
+  } catch {
     return res.status(401).json({ error: 'Invalid token' })
   }
 
   const { eventId } = req.body
-  if (!eventId) {
-    return res.status(400).json({ error: 'Missing eventId' })
-  }
+  if (!eventId) return res.status(400).json({ error: 'Missing eventId' })
 
   try {
-    // Fetch event
+    // --- fetch event ---
     const { rows } = await pool.query('SELECT * FROM events WHERE id=$1', [eventId])
     const event = rows[0]
-    if (!event) {
-      return res.status(404).json({ error: 'Event not found' })
-    }
+    if (!event) return res.status(404).json({ error: 'Event not found' })
 
-    // Insert registration (idempotent)
+    // --- prebook (always add user to registrations) ---
     await pool.query(
-      `INSERT INTO registrations (event_id, user_id)
-       VALUES ($1, $2)
+      `INSERT INTO registrations (event_id, user_id, email)
+       VALUES ($1, $2, $3)
        ON CONFLICT (event_id, user_id) DO NOTHING`,
-      [eventId, user.id]
+      [eventId, user.id, user.email]
     )
 
+    // ✅ send prebook confirmation immediately
+    if (user.email) {
+      await sendPrebookEmail(user.email, event)
+    }
 
-// Count total prebookings
-const { rows: prebookRows } = await pool.query(
-  'SELECT COUNT(*) FROM registrations WHERE event_id=$1',
-  [eventId]
-)
-const registeredCount = Number(prebookRows[0].count)
+    // --- check if event becomes confirmed ---
+    const { rows: prebookRows } = await pool.query(
+      'SELECT COUNT(*)::int AS count FROM registrations WHERE event_id=$1',
+      [eventId]
+    )
+    const registeredCount = prebookRows[0]?.count || 0
 
-if (registeredCount >= event.min_attendees && !event.is_confirmed) {
-  // Update event to confirmed
-  await pool.query('UPDATE events SET is_confirmed=true WHERE id=$1', [eventId])
+    if (registeredCount >= event.min_attendees && !event.is_confirmed) {
+      await pool.query('UPDATE events SET is_confirmed=true WHERE id=$1', [eventId])
 
-  // Fetch all prebooked users
-  const { rows: users } = await pool.query(
-    `SELECT u.email FROM registrations r
-     JOIN users u ON r.user_id=u.id
-     WHERE r.event_id=$1`,
-    [eventId]
-  )
+      // email all prebooked users
+      const { rows: users } = await pool.query(
+        `SELECT u.email, u.username
+         FROM registrations r
+         JOIN web_user_profiles u ON r.user_id=u.id
+         WHERE r.event_id=$1`,
+        [eventId]
+      )
+      await Promise.all(
+        users.map(u => sendBookingReminderEmail(u.email, event))
+      )
+    }
 
-  const { sendEventConfirmedEmail } = require('../../../lib/email.js')
-  users.forEach(u => sendEventConfirmedEmail(u.email, event))
-}
-
-
-
-    // If paid event → Stripe checkout
+    // --- if paid event → stripe checkout ---
     if (event.price && Number(event.price) > 0) {
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
@@ -95,13 +97,15 @@ if (registeredCount >= event.min_attendees && !event.is_confirmed) {
       return res.status(200).json({ url: session.url })
     }
 
-    // Free event → success
+    // --- free event → send ticket immediately ---
+    if (user.email) {
+      await sendTicketEmail(user.email, event, user)
+    }
+
     return res.status(200).json({ message: 'Registered successfully' })
   } catch (err) {
     console.error('❌ register error:', err)
     return res.status(500).json({ error: 'Internal server error' })
   }
 }
-
-
 

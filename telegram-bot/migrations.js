@@ -1,20 +1,61 @@
 // migrations.js
 import pkg from 'pg';
+const { Pool } = pkg;
 import dotenv from 'dotenv';
 dotenv.config();
-const { Pool } = pkg;
 
-export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL, // or individual PGHOST, PGUSER, etc.
 });
 
-export async function runMigrations() {
+async function runMigrations() {
+  const client = await pool.connect();
   try {
-    // ----------------------------
-    // user_profiles
-    // ----------------------------
-    await pool.query(`
+    await client.query('BEGIN');
+
+    // ---------------------------
+    // WEB USER PROFILES
+    // ---------------------------
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS web_user_profiles (
+        id SERIAL PRIMARY KEY,
+        username TEXT UNIQUE,
+        email TEXT UNIQUE,
+        password_hash TEXT,
+        email_verified BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS web_email_verification_tokens (
+        token TEXT PRIMARY KEY,
+        user_id INTEGER REFERENCES web_user_profiles(id) ON DELETE CASCADE,
+        email TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMPTZ NOT NULL
+      );
+    `);
+
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_web_email_verif_userid
+      ON web_email_verification_tokens(user_id);
+    `);
+
+    // ---------------------------
+    // ALTER REGISTRATIONS
+    // ---------------------------
+    await client.query(`
+      ALTER TABLE registrations
+      ADD COLUMN IF NOT EXISTS ticket_sent BOOLEAN DEFAULT FALSE;
+    `);
+
+    // ---------------------------
+    // TEA EVENTS SCHEMA
+    // ---------------------------
+    // USER PROFILES
+    await client.query(`
       CREATE TABLE IF NOT EXISTS user_profiles (
         id SERIAL PRIMARY KEY,
         telegram_user_id TEXT UNIQUE,
@@ -33,10 +74,8 @@ export async function runMigrations() {
       );
     `);
 
-    // ----------------------------
-    // email_verification_tokens
-    // ----------------------------
-    await pool.query(`
+    // EMAIL VERIFICATION TOKENS
+    await client.query(`
       CREATE TABLE IF NOT EXISTS email_verification_tokens (
         token TEXT PRIMARY KEY,
         user_id INTEGER REFERENCES user_profiles(id) ON DELETE CASCADE,
@@ -44,24 +83,24 @@ export async function runMigrations() {
         email TEXT NOT NULL,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         expires_at TIMESTAMPTZ NOT NULL,
-        CONSTRAINT email_verif_user_or_telegram CHECK (user_id IS NOT NULL OR telegram_user_id IS NOT NULL)
+        CONSTRAINT email_verif_user_or_telegram CHECK (
+          user_id IS NOT NULL OR telegram_user_id IS NOT NULL
+        )
       );
     `);
 
-    await pool.query(`
+    await client.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_userid
       ON email_verification_tokens(user_id);
     `);
 
-    await pool.query(`
+    await client.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_tgid
       ON email_verification_tokens(telegram_user_id);
     `);
 
-    // ----------------------------
-    // events
-    // ----------------------------
-    await pool.query(`
+    // EVENTS
+    await client.query(`
       CREATE TABLE IF NOT EXISTS events (
         id SERIAL PRIMARY KEY,
         group_id INTEGER,
@@ -87,15 +126,13 @@ export async function runMigrations() {
       );
     `);
 
-    await pool.query(`
+    await client.query(`
       CREATE INDEX IF NOT EXISTS idx_events_city
       ON events(LOWER(city));
     `);
 
-    // ----------------------------
-    // registrations
-    // ----------------------------
-    await pool.query(`
+    // REGISTRATIONS
+    await client.query(`
       CREATE TABLE IF NOT EXISTS registrations (
         id SERIAL PRIMARY KEY,
         event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
@@ -117,10 +154,8 @@ export async function runMigrations() {
       );
     `);
 
-    // ----------------------------
-    // invitations
-    // ----------------------------
-    await pool.query(`
+    // INVITATIONS
+    await client.query(`
       CREATE TABLE IF NOT EXISTS invitations (
         id SERIAL PRIMARY KEY,
         event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
@@ -133,10 +168,8 @@ export async function runMigrations() {
       );
     `);
 
-    // ----------------------------
-    // user_emails
-    // ----------------------------
-    await pool.query(`
+    // USER EMAILS
+    await client.query(`
       CREATE TABLE IF NOT EXISTS user_emails (
         user_id INTEGER PRIMARY KEY REFERENCES user_profiles(id) ON DELETE CASCADE,
         email TEXT NOT NULL,
@@ -144,10 +177,8 @@ export async function runMigrations() {
       );
     `);
 
-    // ----------------------------
-    // updated_at trigger
-    // ----------------------------
-    await pool.query(`
+    // TRIGGER FUNCTION
+    await client.query(`
       CREATE OR REPLACE FUNCTION update_updated_at_column()
       RETURNS TRIGGER AS $$
       BEGIN
@@ -157,32 +188,37 @@ export async function runMigrations() {
       $$ LANGUAGE 'plpgsql';
     `);
 
-    // Drop triggers if they exist, then create them
-    await pool.query(`
-      DROP TRIGGER IF EXISTS trg_update_user_profiles_updated_at ON user_profiles;
-      CREATE TRIGGER trg_update_user_profiles_updated_at
-      BEFORE UPDATE ON user_profiles
-      FOR EACH ROW
-      EXECUTE FUNCTION update_updated_at_column();
+    // ATTACH TRIGGERS
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_update_user_profiles_updated_at') THEN
+          CREATE TRIGGER trg_update_user_profiles_updated_at
+          BEFORE UPDATE ON user_profiles
+          FOR EACH ROW
+          EXECUTE FUNCTION update_updated_at_column();
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_update_events_updated_at') THEN
+          CREATE TRIGGER trg_update_events_updated_at
+          BEFORE UPDATE ON events
+          FOR EACH ROW
+          EXECUTE FUNCTION update_updated_at_column();
+        END IF;
+      END
+      $$;
     `);
 
-    await pool.query(`
-      DROP TRIGGER IF EXISTS trg_update_events_updated_at ON events;
-      CREATE TRIGGER trg_update_events_updated_at
-      BEFORE UPDATE ON events
-      FOR EACH ROW
-      EXECUTE FUNCTION update_updated_at_column();
-    `);
-
-    console.log('✅ All migrations applied.');
+    await client.query('COMMIT');
+    console.log('Migrations completed successfully!');
   } catch (err) {
-    console.error('❌ Migration failed:', err);
-    throw err;
+    await client.query('ROLLBACK');
+    console.error('Migration failed:', err);
+  } finally {
+    client.release();
+    pool.end();
   }
 }
 
-// Optional auto-run
-if (import.meta.url === `file://${process.argv[1]}`) {
-  runMigrations().then(() => process.exit(0)).catch(() => process.exit(1));
-}
+runMigrations();
 

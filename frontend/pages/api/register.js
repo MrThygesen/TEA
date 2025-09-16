@@ -50,6 +50,21 @@ export default async function handler(req, res) {
       [user.id, token, expiresAt, email]
     )
 
+
+// --- free event → send ticket immediately ---
+if (user.email) {
+  await sendTicketEmail(user.email, event, user)
+
+  // Mark ticket_sent = TRUE
+  await pool.query(
+    `UPDATE registrations
+     SET ticket_sent = TRUE
+     WHERE event_id=$1 AND user_id=$2`,
+    [eventId, user.id]
+  )
+}
+
+
     // Send verification email
     try {
       await sendVerificationEmail(email, token)
