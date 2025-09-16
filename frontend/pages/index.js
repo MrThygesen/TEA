@@ -32,7 +32,6 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
   const [loading, setLoading] = useState(false)
   const [internalModalOpen, setInternalModalOpen] = useState(false)
   const [registeredUsers, setRegisteredUsers] = useState(event.registered_users || 0)
-  const [userRegistered, setUserRegistered] = useState(event.user_registered || false)
 
   const eventConfirmed = registeredUsers >= (event.min_attendees || 0)
   const telegramLink = eventConfirmed
@@ -42,11 +41,6 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
   async function handleWebAction() {
     if (!authUser) {
       setShowAccountModal(true)
-      return
-    }
-
-    if (userRegistered) {
-      alert('You are already registered for this event.')
       return
     }
 
@@ -63,12 +57,18 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
       })
       const data = await res.json()
 
-      if (data.success) {
-        setRegisteredUsers(prev => prev + 1)
-        setUserRegistered(true)
-        alert('Successfully registered!')
+      if (data.url) {
+        // Paid ticket flow via Stripe
+        window.location.href = data.url
       } else if (data.message) {
         alert(data.message)
+        // Update local count if registration succeeded without redirect
+        if (data.registered) {
+          setRegisteredUsers(prev => prev + 1)
+        }
+      } else {
+        // Assume registration succeeded
+        setRegisteredUsers(prev => prev + 1)
       }
     } finally {
       setLoading(false)
@@ -76,7 +76,6 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
   }
 
   function getWebButtonLabel() {
-    if (userRegistered) return 'Registered'
     return eventConfirmed ? 'Buy Access (Web)' : 'Guestlist (Web)'
   }
 
@@ -115,13 +114,9 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
 
           <button
             onClick={handleWebAction}
-            disabled={loading || userRegistered}
+            disabled={loading}
             className={`flex-1 px-3 py-1 rounded ${
-              userRegistered
-                ? 'bg-gray-500 cursor-not-allowed'
-                : eventConfirmed
-                ? 'bg-blue-600 hover:bg-blue-700'
-                : 'bg-yellow-600 hover:bg-yellow-700'
+              eventConfirmed ? 'bg-blue-600 hover:bg-blue-700' : 'bg-yellow-600 hover:bg-yellow-700'
             } text-white text-sm`}
           >
             {getWebButtonLabel()}
