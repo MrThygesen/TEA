@@ -1,141 +1,111 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import QRCode from 'qrcode.react'
+import QRCode from 'react-qr-code'
 
 export default function YourAccountModal({ profile, onClose }) {
+  const [tickets, setTickets] = useState([])
   const [profilePasswordInput, setProfilePasswordInput] = useState('')
   const [saving, setSaving] = useState(false)
-  const [tickets, setTickets] = useState([])
 
   useEffect(() => {
+    if (!profile) return
+
     const fetchTickets = async () => {
       try {
-        const res = await fetch('/api/user/myTickets')
-        if (!res.ok) throw new Error('Failed to fetch tickets')
+        const res = await fetch('/api/user/myTickets', {
+          headers: {
+            'Authorization': `Bearer ${profile.token}`,
+          },
+        })
         const data = await res.json()
         setTickets(data.tickets || [])
       } catch (err) {
-        console.error('❌ Failed to load tickets', err)
+        console.error('Failed to fetch tickets', err)
       }
     }
+
     fetchTickets()
-  }, [])
+  }, [profile])
 
   const savePassword = async () => {
-    if (!profilePasswordInput || profilePasswordInput.length < 8) {
-      alert('❌ Password must be at least 8 characters')
-      return
-    }
+    if (!profilePasswordInput) return
     setSaving(true)
     try {
       const res = await fetch('/api/user/updatePassword', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${profile.token}`,
+        },
         body: JSON.stringify({ password: profilePasswordInput }),
       })
-      if (!res.ok) throw new Error('Failed to save password')
-
+      if (!res.ok) throw new Error('Password update failed')
+      alert('Password updated successfully!')
       setProfilePasswordInput('')
-      alert('✅ Password saved!')
     } catch (err) {
       console.error(err)
-      alert('❌ Failed to save password')
-    } finally {
-      setSaving(false)
+      alert('Error updating password')
     }
+    setSaving(false)
   }
 
+  if (!profile) return null
+
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0, left: 0, right: 0, bottom: 0,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000
-      }}
-    >
-      <div style={{
-        background: '#fff',
-        padding: '1.5rem',
-        borderRadius: '12px',
-        width: '420px',
-        maxHeight: '85vh',
-        overflowY: 'auto'
-      }}>
-        <h2 className="text-xl font-semibold mb-4">Your Account</h2>
-
-        <p><strong>Username:</strong> {profile.username}</p>
-        <p><strong>Email:</strong> {profile.email}</p>
-        <p><strong>City:</strong> {profile.city || '-'}</p>
-        <p><strong>Tier:</strong> {profile.tier}</p>
-
-        {/* Tickets list */}
-        <div className="mt-4">
-          <h3 className="text-lg font-semibold mb-2">🎟 Your Tickets</h3>
-          {tickets.length === 0 ? (
-            <p className="text-gray-600">No tickets yet.</p>
-          ) : (
-            <ul className="space-y-4">
-              {tickets.map((t) => (
-                <li
-                  key={t.id}
-                  className="border rounded p-3 bg-gray-50 text-sm"
-                >
-                  <strong>{t.event_name}</strong> ({t.city}) <br />
-                  {new Date(t.datetime).toLocaleString()} <br />
-                  {t.has_paid || t.price === 0 ? (
-                    t.ticket_sent ? (
-                      <div className="mt-2">
-                        <span className="text-green-700">✅ Ticket issued</span>
-                        {t.qrData && (
-                          <div className="mt-2 flex justify-center">
-                            <QRCode value={t.qrData} size={128} />
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-yellow-600">⏳ Processing</span>
-                    )
-                  ) : (
-                    <span className="text-red-600">❌ Not paid</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-zinc-900 text-white rounded-xl p-6 max-w-3xl w-full relative">
+        <button
+          className="absolute top-3 right-3 text-white font-bold text-xl"
+          onClick={onClose}
+        >
+          ×
+        </button>
+        <h2 className="text-2xl font-semibold mb-4">Your Account</h2>
+        <div className="mb-6">
+          <p><strong>Username:</strong> {profile.username}</p>
+          <p><strong>Email:</strong> {profile.email}</p>
         </div>
 
-        {/* Password setup block */}
-        {!profile.hasPassword && profile.email && (
-          <div className="mb-4 p-2 border border-yellow-600 rounded mt-4">
-            <p>🔐 Set a password for web access to view tickets and history.</p>
-            <input
-              type="password"
-              placeholder="New password"
-              value={profilePasswordInput}
-              onChange={(e) => setProfilePasswordInput(e.target.value)}
-              className="w-full p-2 rounded mt-2 border"
-            />
-            <button
-              onClick={savePassword}
-              disabled={saving}
-              className="mt-2 px-4 py-2 bg-blue-600 rounded text-white w-full"
-            >
-              {saving ? 'Saving...' : 'Save password'}
-            </button>
-          </div>
-        )}
+        <div className="mb-6">
+          <h3 className="text-xl font-semibold mb-2">Change Password</h3>
+          <input
+            type="password"
+            placeholder="New password"
+            value={profilePasswordInput}
+            onChange={(e) => setProfilePasswordInput(e.target.value)}
+            className="p-2 rounded text-black w-full"
+          />
+          <button
+            onClick={savePassword}
+            disabled={saving}
+            className="mt-2 px-4 py-2 bg-blue-500 rounded hover:bg-blue-600 disabled:opacity-50"
+          >
+            {saving ? 'Saving...' : 'Update Password'}
+          </button>
+        </div>
 
-        <button
-          onClick={onClose}
-          className="mt-4 px-4 py-2 bg-gray-300 rounded w-full"
-        >
-          Close
-        </button>
+        <div>
+          <h3 className="text-xl font-semibold mb-2">Your Tickets</h3>
+          {tickets.length === 0 ? (
+            <p>No tickets yet.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {tickets.map((t) => (
+                <div key={t.id} className="border border-zinc-700 p-3 rounded">
+                  <h4 className="font-semibold">{t.event_name}</h4>
+                  <p>{t.city} - {new Date(t.datetime).toLocaleString()}</p>
+                  <p>{t.has_paid ? 'Paid' : 'Pending'}</p>
+                  {t.qrData && (
+                    <div className="mt-2 bg-white p-1 inline-block">
+                      <QRCode value={t.qrData} size={64} />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

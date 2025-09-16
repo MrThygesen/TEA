@@ -31,8 +31,10 @@ function clearAuth() {
 function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
   const [loading, setLoading] = useState(false)
   const [internalModalOpen, setInternalModalOpen] = useState(false)
+  const [registeredUsers, setRegisteredUsers] = useState(event.registered_users || 0)
+  const [userRegistered, setUserRegistered] = useState(event.user_registered || false)
 
-  const eventConfirmed = (event.registered_users || 0) >= (event.min_attendees || 0)
+  const eventConfirmed = registeredUsers >= (event.min_attendees || 0)
   const telegramLink = eventConfirmed
     ? `https://t.me/TeaIsHereBot?start=buy_${event.id}`
     : `https://t.me/TeaIsHereBot?start=${event.id}`
@@ -40,6 +42,11 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
   async function handleWebAction() {
     if (!authUser) {
       setShowAccountModal(true)
+      return
+    }
+
+    if (userRegistered) {
+      alert('You are already registered for this event.')
       return
     }
 
@@ -55,14 +62,26 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
         body: JSON.stringify({ eventId: event.id }),
       })
       const data = await res.json()
-      if (data.url) {
-        window.location.href = data.url
+
+      if (data.success) {
+        setRegisteredUsers(prev => prev + 1)
+        setUserRegistered(true)
+        alert('Successfully registered!')
       } else if (data.message) {
         alert(data.message)
       }
     } finally {
       setLoading(false)
     }
+  }
+
+  function getWebButtonLabel() {
+    if (userRegistered) return 'Registered'
+    return eventConfirmed ? 'Buy Access (Web)' : 'Guestlist (Web)'
+  }
+
+  function getTelegramButtonLabel() {
+    return eventConfirmed ? 'Buy Access (Telegram)' : 'Guestlist (Telegram)'
   }
 
   return (
@@ -91,23 +110,27 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
               eventConfirmed ? 'bg-green-600 hover:bg-green-700' : 'bg-yellow-600 hover:bg-yellow-700'
             } text-white text-sm`}
           >
-            {eventConfirmed ? 'Book (Telegram)' : 'Prebook (Telegram)'}
+            {getTelegramButtonLabel()}
           </button>
 
           <button
             onClick={handleWebAction}
-            disabled={loading}
+            disabled={loading || userRegistered}
             className={`flex-1 px-3 py-1 rounded ${
-              eventConfirmed ? 'bg-blue-600 hover:bg-blue-700' : 'bg-yellow-600 hover:bg-yellow-700'
+              userRegistered
+                ? 'bg-gray-500 cursor-not-allowed'
+                : eventConfirmed
+                ? 'bg-blue-600 hover:bg-blue-700'
+                : 'bg-yellow-600 hover:bg-yellow-700'
             } text-white text-sm`}
           >
-            {eventConfirmed ? 'Book (Web)' : 'Prebook (Web)'}
+            {getWebButtonLabel()}
           </button>
         </div>
 
         <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
           <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
-          <span>👥 {event.registered_users || 0} Users</span>
+          <span>👥 {registeredUsers} Users</span>
         </div>
 
         {!onPreview && (
