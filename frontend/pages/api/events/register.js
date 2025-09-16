@@ -62,7 +62,7 @@ export default async function handler(req, res) {
       const { rows: users } = await pool.query(
         `SELECT u.email, u.username
          FROM registrations r
-         JOIN web_user_profiles u ON r.user_id=u.id
+         JOIN user_profiles u ON r.user_id=u.id
          WHERE r.event_id=$1`,
         [eventId]
       )
