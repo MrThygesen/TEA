@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import QRCode from 'react-qr-code'
-
+import QRCode from 'qrcode.react'
 export default function YourAccountModal({ profile, onClose }) {
   const [tickets, setTickets] = useState([])
   const [profilePasswordInput, setProfilePasswordInput] = useState('')
