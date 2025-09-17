@@ -38,50 +38,42 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
     ? `https://t.me/TeaIsHereBot?start=buy_${event.id}`
     : `https://t.me/TeaIsHereBot?start=${event.id}`
 
-  async function handleWebAction() {
-    if (!authUser) {
-      setShowAccountModal(true)
-      return
-    }
-
-    setLoading(true)
-    try {
-      const token = localStorage.getItem('token')
-      const res = await fetch('/api/events/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token || ''}`,
-        },
-        body: JSON.stringify({ eventId: event.id }),
-      })
-      const data = await res.json()
-
-      if (data.url) {
-        // Paid ticket flow via Stripe
-        window.location.href = data.url
-      } else if (data.message) {
-        alert(data.message)
-        // Update local count if registration succeeded without redirect
-        if (data.registered) {
-          setRegisteredUsers(prev => prev + 1)
-        }
-      } else {
-        // Assume registration succeeded
-        setRegisteredUsers(prev => prev + 1)
-      }
-    } finally {
-      setLoading(false)
-    }
+async function handleWebAction() {
+  if (!authUser) {
+    setShowAccountModal(true)
+    return
   }
 
-  function getWebButtonLabel() {
-    return eventConfirmed ? 'Buy Access (Web)' : 'Guestlist (Web)'
-  }
+  setLoading(true)
+  try {
+    const token = localStorage.getItem('token')
+    // Determine stage
+    const stage = registeredUsers >= (event.min_attendees || 0) ? 'pay' : 'guestlist'
 
-  function getTelegramButtonLabel() {
-    return eventConfirmed ? 'Buy Access (Telegram)' : 'Guestlist (Telegram)'
+    const res = await fetch('/api/events/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token || ''}`,
+      },
+      body: JSON.stringify({ eventId: event.id, stage }),
+    })
+    const data = await res.json()
+
+    if (data.message) alert(data.message)
+    if (data.registered) setRegisteredUsers(prev => stage === 'guestlist' ? prev : prev + 1)
+
+  } finally {
+    setLoading(false)
   }
+}
+
+function getWebButtonLabel() {
+  return registeredUsers >= (event.min_attendees || 0) ? 'Pay Access (Web)' : 'Guestlist (Web)'
+}
+function getTelegramButtonLabel() {
+  return registeredUsers >= (event.min_attendees || 0) ? 'Pay Access (Telegram)' : 'Guestlist (Telegram)'
+}
 
   return (
     <>
@@ -103,16 +95,7 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
         </div>
 
         <div className="flex justify-between items-center mt-auto mb-2 gap-2">
-          <button
-            onClick={() => window.open(telegramLink, '_blank')}
-            className={`flex-1 px-3 py-1 rounded ${
-              eventConfirmed ? 'bg-green-600 hover:bg-green-700' : 'bg-yellow-600 hover:bg-yellow-700'
-            } text-white text-sm`}
-          >
-            {getTelegramButtonLabel()}
-          </button>
-
-          <button
+           <button
             onClick={handleWebAction}
             disabled={loading}
             className={`flex-1 px-3 py-1 rounded ${
@@ -438,18 +421,23 @@ export default function Home() {
               ))}
             </select>
 
-            <select className="bg-zinc-800 text-white p-2 rounded" onChange={(e) => setSelectedVenueType(e.target.value)} value={selectedVenueType}>
-              <option value="">Event Types</option>
-              {[...new Set((events || []).map(e => e.venue_type).filter(Boolean))].map((type, i) => (
-                <option key={i} value={type}>{type}</option>
-              ))}
-            </select>
+            <select
+  className="bg-zinc-800 text-white p-2 rounded"
+  onChange={(e) => setSelectedVenueType(e.target.value)}
+  value={selectedVenueType}
+>
+  <option value="">All Event Types</option>
+  {[...new Set((events || []).map(e => e.venue_type).filter(Boolean))].map((type, i) => (
+    <option key={i} value={type}>{type}</option>
+  ))}
+</select>
+
           </div>
 
           {filteredEvents.length === 0 ? (
             <p className="text-center text-gray-400">No events found</p>
           ) : viewMode === 'grid' ? (
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-3 gap-4">
               {filteredEvents.map((event) => (
                 <DynamicEventCard
                   key={event.id}
@@ -475,6 +463,24 @@ export default function Home() {
           )}
         </section>
       </div>
+
+
+{/* Telegram Bot Section */}
+<section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg mt-8 text-center">
+  <h2 className="text-2xl font-semibold text-blue-400 mb-4">Try Our Telegram Bot</h2>
+  <p className="text-gray-300 mb-6">
+    Manage your bookings, confirm attendance, and join group chats directly through Telegram.
+  </p>
+  <a
+    href="https://t.me/TeaIsHereBot"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold inline-block"
+  >
+    Open Telegram Bot
+  </a>
+</section>
+
 
       {/* FOOTER */}
       <footer className="mt-12 w-full max-w-3xl flex justify-center">
