@@ -13,11 +13,12 @@ const MAIL_FROM = process.env.MAIL_FROM || 'no-reply@teanet.xyz'
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 
 /**
- * Generate base64 QR code for a ticket
+ * Generate QR data + base64 QR code for a ticket
  */
 async function generateTicketQRCode(eventId, userId) {
   const qrData = `ticket:${eventId}:${userId}`
-  return await QRCode.toDataURL(qrData)
+  const qrImage = await QRCode.toDataURL(qrData) // base64 image
+  return { qrData, qrImage }
 }
 
 /**
@@ -99,11 +100,11 @@ async function sendBookingReminderEmail(to, event) {
 }
 
 /**
- * Send ticket email with QR code
+ * Send ticket email with embedded QR code (data + image)
  */
 async function sendTicketEmail(to, event, user) {
   try {
-    const qrImage = await generateTicketQRCode(event.id, user.id)
+    const { qrData, qrImage } = await generateTicketQRCode(event.id, user.id)
 
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
     sendSmtpEmail.sender = { name: 'Edgy Events', email: MAIL_FROM }
@@ -116,7 +117,8 @@ async function sendTicketEmail(to, event, user) {
       <p>Date/Time: ${new Date(event.datetime).toLocaleString()}</p>
       <p>Venue: ${event.venue || 'TBA'}</p>
       <p>Please show this QR code at the entrance:</p>
-      <img src="${qrImage}" alt="QR Ticket" style="max-width:250px;"/>
+      <p><img src="${qrImage}" alt="QR Ticket" style="max-width:250px;"/></p>
+      <p><small>QR Data: ${qrData}</small></p>
       <p>You can also save this into Google Wallet or Apple Wallet.</p>
     `
     await apiInstance.sendTransacEmail(sendSmtpEmail)
@@ -129,9 +131,8 @@ async function sendTicketEmail(to, event, user) {
 }
 
 module.exports = {
-  generateTicketQRCode, // shared helper for QR
+  generateTicketQRCode,
   sendVerificationEmail,
-  sendEventConfirmedEmail: sendBookingReminderEmail,
   sendPrebookEmail,
   sendBookingReminderEmail,
   sendTicketEmail,
