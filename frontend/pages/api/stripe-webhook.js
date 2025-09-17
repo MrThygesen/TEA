@@ -16,11 +16,7 @@ export default async function handler(req, res) {
 
   let event
   try {
-    event = stripe.webhooks.constructEvent(
-      buf,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    )
+    event = stripe.webhooks.constructEvent(buf, sig, process.env.STRIPE_WEBHOOK_SECRET)
   } catch (err) {
     console.error('❌ Webhook signature verification failed:', err.message)
     return res.status(400).send(`Webhook Error: ${err.message}`)
@@ -38,8 +34,9 @@ export default async function handler(req, res) {
         return res.status(400).send('Missing metadata')
       }
 
+      // --- WEB USER FLOW ---
       if (userId) {
-        // --- WEB FLOW ---
+        // Ensure registration exists
         await pool.query(
           `INSERT INTO registrations (event_id, user_id, email)
            VALUES ($1, $2, $3)
@@ -47,6 +44,7 @@ export default async function handler(req, res) {
           [eventId, userId, session.customer_details?.email || null]
         )
 
+        // Mark as paid
         const { rows: regRows } = await pool.query(
           `UPDATE registrations
            SET has_paid = TRUE, paid_at = NOW()
@@ -60,7 +58,7 @@ export default async function handler(req, res) {
           console.log(`✅ Payment recorded (WEB) for event ${eventId}, user ${userId}`)
 
           if (!reg.ticket_sent) {
-            // Fetch event + user
+            // Fetch user + event
             const { rows: userRows } = await pool.query(
               'SELECT id, username, email FROM user_profiles WHERE id=$1',
               [userId]
@@ -74,21 +72,28 @@ export default async function handler(req, res) {
             const eventObj = eventRows[0]
 
             if (user && eventObj && user.email) {
-              await sendTicketEmail(user.email, eventObj, user)
+              try {
+                // Send ticket email with QR + ICS
+                await sendTicketEmail(user.email, eventObj, user)
 
-              await pool.query(
-                'UPDATE registrations SET ticket_sent = TRUE WHERE id = $1',
-                [reg.id]
-              )
-
-              console.log(`🎟 Ticket email sent → ${user.email}`)
+                // Mark ticket as sent
+                await pool.query(
+                  'UPDATE registrations SET ticket_sent = TRUE WHERE id = $1',
+                  [reg.id]
+                )
+                console.log(`🎟 Ticket email sent → ${user.email}`)
+              } catch (err) {
+                console.error('❌ Failed to send ticket email:', err)
+              }
             }
           } else {
-            console.log(`ℹ Ticket already sent for reg ${reg.id}, skipping`)
+            console.log(`ℹ Ticket already sent for registration ${reg.id}, skipping`)
           }
         }
-      } else if (telegramUserId) {
-        // --- TELEGRAM FLOW ---
+      }
+
+      // --- TELEGRAM USER FLOW ---
+      else if (telegramUserId) {
         await pool.query(
           `INSERT INTO registrations (event_id, telegram_user_id, email)
            VALUES ($1, $2, $3)
@@ -107,7 +112,7 @@ export default async function handler(req, res) {
           console.log(
             `✅ Payment recorded (TELEGRAM) for event ${eventId}, user ${telegramUserId}`
           )
-          // No email here — Telegram handles notifications
+          // Telegram users do not receive email
         }
       }
     }
