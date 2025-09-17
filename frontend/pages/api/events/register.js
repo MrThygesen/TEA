@@ -7,6 +7,7 @@ import {
   sendBookingReminderEmail,
   sendTicketEmail,
 } from '../../../lib/email.js'
+import QRCode from 'qrcode'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
@@ -66,9 +67,7 @@ export default async function handler(req, res) {
          WHERE r.event_id=$1`,
         [eventId]
       )
-      await Promise.all(
-        users.map(u => sendBookingReminderEmail(u.email, event))
-      )
+      await Promise.all(users.map(u => sendBookingReminderEmail(u.email, event)))
     }
 
     // --- if paid event → stripe checkout ---
@@ -97,12 +96,23 @@ export default async function handler(req, res) {
       return res.status(200).json({ url: session.url })
     }
 
-    // --- free event → send ticket immediately ---
+    // --- free event → issue ticket immediately ---
+    const qrData = `ticket:${event.id}:${user.id}`
+    const qrImage = await QRCode.toDataURL(qrData)
+
+    // mark ticket as sent
+    await pool.query(
+      `UPDATE registrations 
+       SET ticket_sent=true 
+       WHERE event_id=$1 AND user_id=$2`,
+      [event.id, user.id]
+    )
+
     if (user.email) {
-      await sendTicketEmail(user.email, event, user)
+      await sendTicketEmail(user.email, event, user, qrImage)
     }
 
-    return res.status(200).json({ message: 'Registered successfully' })
+    return res.status(200).json({ message: 'Registered successfully (free ticket issued)' })
   } catch (err) {
     console.error('❌ register error:', err)
     return res.status(500).json({ error: 'Internal server error' })

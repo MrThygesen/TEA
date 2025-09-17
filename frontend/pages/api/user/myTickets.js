@@ -28,14 +28,13 @@ export default async function handler(req, res) {
     // Attach QR data + inline QR image for issued tickets
     const tickets = await Promise.all(
       rows.map(async (t) => {
-        const qrData = t.ticket_sent ? `ticket:${t.event_id}:${user.id}` : null
-        const qrImage = qrData ? await QRCode.toDataURL(qrData) : null
-
-        return {
-          ...t,
-          qrData,
-          qrImage, // base64 QR image for inline display
+        if (!t.ticket_sent) {
+          return { ...t, qrData: null, qrImage: null }
         }
+        const qrData = `ticket:${t.event_id}:${user.id}`
+        const qrImage = await QRCode.toDataURL(qrData)
+
+        return { ...t, qrData, qrImage }
       })
     )
 
