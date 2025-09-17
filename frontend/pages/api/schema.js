@@ -1,19 +1,17 @@
-// schema.js
+// pages/api/schema.js
 import pkg from 'pg'
 import dotenv from 'dotenv'
 dotenv.config()
 
 const { Pool } = pkg
 
-async function showSchema() {
+export default async function handler(req, res) {
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }, // important for Render
+    ssl: { rejectUnauthorized: false },
   })
 
   try {
-    console.log('🔍 Fetching schema info...')
-
     const query = `
       SELECT 
         table_name,
@@ -27,7 +25,6 @@ async function showSchema() {
     `
     const { rows } = await pool.query(query)
 
-    // Group by table name
     const schema = {}
     rows.forEach(row => {
       if (!schema[row.table_name]) schema[row.table_name] = []
@@ -39,13 +36,12 @@ async function showSchema() {
       })
     })
 
-    console.log(JSON.stringify(schema, null, 2))
+    res.status(200).json(schema)
   } catch (err) {
     console.error('❌ Error fetching schema:', err)
+    res.status(500).json({ error: 'Failed to fetch schema' })
   } finally {
     await pool.end()
   }
 }
-
-showSchema()
 
