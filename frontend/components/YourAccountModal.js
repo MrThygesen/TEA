@@ -11,7 +11,14 @@ export default function YourAccountModal({ profile, onClose }) {
   useEffect(() => {
     const fetchTickets = async () => {
       try {
-        const res = await fetch('/api/user/myTickets')
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('Missing token')
+
+        const res = await fetch('/api/user/myTickets', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
         if (!res.ok) throw new Error('Failed to fetch tickets')
         const data = await res.json()
         setTickets(data.tickets || [])
@@ -65,12 +72,10 @@ export default function YourAccountModal({ profile, onClose }) {
                 )}
               </p>
 
-              {t.qrData && (
+              {t.qrImage && (
                 <div className="mt-2">
                   <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
-                      t.qrData
-                    )}`}
+                    src={t.qrImage}
                     alt="QR Ticket"
                     className="rounded-lg border border-zinc-700"
                   />
