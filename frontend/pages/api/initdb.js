@@ -18,6 +18,37 @@ export default async function handler(req, res) {
     console.log('🔹 Initializing database...');
 
     // ----------------------------
+    // WEB USER PROFILES
+    // ----------------------------
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS web_user_profiles (
+        id SERIAL PRIMARY KEY,
+        username TEXT UNIQUE,
+        email TEXT UNIQUE,
+        password_hash TEXT,
+        email_verified BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // ----------------------------
+    // WEB EMAIL VERIFICATION TOKENS
+    // ----------------------------
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS web_email_verification_tokens (
+        token TEXT PRIMARY KEY,
+        user_id INTEGER REFERENCES web_user_profiles(id) ON DELETE CASCADE,
+        email TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMPTZ NOT NULL
+      );
+    `);
+
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_web_email_verif_userid
+      ON web_email_verification_tokens(user_id);`);
+
+    // ----------------------------
     // USER PROFILES
     // ----------------------------
     await pool.query(`
@@ -112,6 +143,7 @@ export default async function handler(req, res) {
         validated_at TIMESTAMPTZ,
         has_paid BOOLEAN DEFAULT FALSE,
         paid_at TIMESTAMPTZ,
+        ticket_sent BOOLEAN DEFAULT FALSE,
         UNIQUE(event_id, user_id)
       );
     `);
@@ -184,6 +216,8 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error('❌ InitDB error:', err);
     res.status(500).json({ error: 'Server error', details: err.message });
+  } finally {
+    await pool.end();
   }
 }
 
