@@ -90,7 +90,7 @@ export default async function handler(req, res) {
             console.log(`ℹ Ticket already sent for registration ${reg.id}, skipping`)
           }
         }
-      }
+      } 
 
       // --- TELEGRAM USER FLOW ---
       else if (telegramUserId) {
