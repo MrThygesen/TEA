@@ -28,8 +28,10 @@ function clearAuth() {
 // ---------------------------
 // Event Card Component
 // ---------------------------
+
 function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
   const [loading, setLoading] = useState(false)
+  const [statusMsg, setStatusMsg] = useState('')
   const [internalModalOpen, setInternalModalOpen] = useState(false)
   const [registeredUsers, setRegisteredUsers] = useState(event.registered_users || 0)
 
@@ -38,39 +40,59 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
     ? `https://t.me/TeaIsHereBot?start=buy_${event.id}`
     : `https://t.me/TeaIsHereBot?start=${event.id}`
 
-async function handleWebAction() {
-  if (!authUser) {
-    setShowAccountModal(true)
-    return
+  async function handleWebAction() {
+    if (!authUser) {
+      setShowAccountModal(true)
+      return
+    }
+
+    setLoading(true)
+    setStatusMsg('Booking...')
+    try {
+      const token = localStorage.getItem('token')
+      const stage = registeredUsers >= (event.min_attendees || 0) ? 'pay' : 'guestlist'
+
+      const res = await fetch('/api/events/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token || ''}`,
+        },
+        body: JSON.stringify({ eventId: event.id, stage }),
+      })
+      const data = await res.json()
+
+      if (data.registered) {
+        setRegisteredUsers(prev => stage === 'guestlist' ? prev : prev + 1)
+        setStatusMsg('Ticket booked!')
+      } else {
+        setStatusMsg(data.message || 'Something went wrong')
+      }
+    } catch {
+      setStatusMsg('Network error')
+    } finally {
+      setLoading(false)
+      setTimeout(() => setStatusMsg(''), 2000) // clear message after 2s
+    }
   }
 
-  setLoading(true)
-  try {
-    const token = localStorage.getItem('token')
-    // Determine stage
-    const stage = registeredUsers >= (event.min_attendees || 0) ? 'pay' : 'guestlist'
-
-    const res = await fetch('/api/events/register', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token || ''}`,
-      },
-      body: JSON.stringify({ eventId: event.id, stage }),
-    })
-    const data = await res.json()
-
-    if (data.message) alert(data.message)
-    if (data.registered) setRegisteredUsers(prev => stage === 'guestlist' ? prev : prev + 1)
-
-  } finally {
-    setLoading(false)
+  function getWebButtonLabel() {
+    if (loading) return (
+      <span className="flex items-center justify-center gap-2">
+        <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10"
+            stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor"
+            d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+        </svg>
+        {statusMsg || 'Booking...'}
+      </span>
+    )
+    if (statusMsg) return statusMsg
+    return registeredUsers >= (event.min_attendees || 0) ? 'Pay Access' : 'Guestlist'
   }
-}
 
-function getWebButtonLabel() {
-  return registeredUsers >= (event.min_attendees || 0) ? 'Pay Access (Web)' : 'Guestlist (Web)'
-}
+
 function getTelegramButtonLabel() {
   return registeredUsers >= (event.min_attendees || 0) ? 'Pay Access (Telegram)' : 'Guestlist (Telegram)'
 }
