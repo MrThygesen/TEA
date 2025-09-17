@@ -10,9 +10,11 @@ export default async function handler(req, res) {
         e.city,
         e.datetime,
         e.description,
+        e.details,
         e.venue,
-        e.min_attendees,              -- added field
-        e.max_attendees,              -- optional but good to include
+        e.venue_type,                 -- ✅ include venue_type
+        e.min_attendees,
+        e.max_attendees,
         e.basic_perk,
         e.advanced_perk,
         e.tag1,
@@ -20,6 +22,9 @@ export default async function handler(req, res) {
         e.tag3,
         e.price,
         e.image_url,
+        e.is_confirmed,               -- optional but useful
+        e.created_at,
+        e.updated_at,
         COALESCE(COUNT(r.id), 0)::int AS registered_users,
         COALESCE(SUM(CASE WHEN r.has_paid = TRUE THEN 1 ELSE 0 END), 0)::int AS paid_count
       FROM events e
@@ -27,9 +32,11 @@ export default async function handler(req, res) {
         ON e.id = r.event_id
       WHERE e.datetime > NOW()
       GROUP BY 
-        e.id, e.name, e.city, e.datetime, e.description, e.venue, 
-        e.min_attendees, e.max_attendees,   -- added to group by
-        e.basic_perk, e.advanced_perk, e.tag1, e.tag2, e.tag3, e.price, e.image_url
+        e.id, e.name, e.city, e.datetime, e.description, e.details, e.venue, e.venue_type,
+        e.min_attendees, e.max_attendees,
+        e.basic_perk, e.advanced_perk,
+        e.tag1, e.tag2, e.tag3,
+        e.price, e.image_url, e.is_confirmed, e.created_at, e.updated_at
       ORDER BY e.datetime ASC
       LIMIT 50
     `)
