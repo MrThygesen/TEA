@@ -28,30 +28,25 @@ function clearAuth() {
 // ---------------------------
 // Event Card Component
 // ---------------------------
-
 function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
   const [internalModalOpen, setInternalModalOpen] = useState(false)
   const [registeredUsers, setRegisteredUsers] = useState(event.registered_users || 0)
 
-  const eventConfirmed = registeredUsers >= (event.min_attendees || 0)
-  const telegramLink = eventConfirmed
-    ? `https://t.me/TeaIsHereBot?start=buy_${event.id}`
-    : `https://t.me/TeaIsHereBot?start=${event.id}`
+  const eventConfirmed = event.is_confirmed === true
 
-  async function handleWebAction() {
+  async function handleWebAction(stage) {
     if (!authUser) {
       setShowAccountModal(true)
       return
     }
 
     setLoading(true)
-    setStatusMsg('Booking...')
+    setStatusMsg('Processing...')
+
     try {
       const token = localStorage.getItem('token')
-      const stage = registeredUsers >= (event.min_attendees || 0) ? 'pay' : 'guestlist'
-
       const res = await fetch('/api/events/register', {
         method: 'POST',
         headers: {
@@ -68,38 +63,59 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
         return
       }
 
-      if (data.message?.includes('Free ticket')) {
-        // Free event: ticket email already sent
+      if (res.ok) {
+        if (stage === 'prebook') {
+          setStatusMsg('✅ Prebook confirmed! Check your email.')
+        } else if (stage === 'book') {
+          if (!event.price || Number(event.price) === 0) {
+            setStatusMsg('🎟 Ticket booked! Check your email for QR code.')
+          } else {
+            setStatusMsg('Redirecting to payment...')
+          }
+        }
         setRegisteredUsers(prev => prev + 1)
-        setStatusMsg('Ticket sent!')
-      } else if (data.registered) {
-        setRegisteredUsers(prev => stage === 'guestlist' ? prev : prev + 1)
-        setStatusMsg('Registered!')
       } else {
-        setStatusMsg(data.message || 'Something went wrong')
+        setStatusMsg(data.error || 'Something went wrong.')
       }
-    } catch {
-      setStatusMsg('Network error')
+    } catch (err) {
+      console.error(err)
+      setStatusMsg('❌ Network error')
     } finally {
       setLoading(false)
-      setTimeout(() => setStatusMsg(''), 2000) // clear message after 2s
+      setTimeout(() => setStatusMsg(''), 2500) // clear msg after 2.5s
     }
   }
 
-  function getWebButtonLabel() {
-    if (loading) return (
-      <span className="flex items-center justify-center gap-2">
-        <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10"
-            stroke="currentColor" strokeWidth="4"></circle>
-          <path className="opacity-75" fill="currentColor"
-            d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-        </svg>
-        {statusMsg || 'Booking...'}
-      </span>
-    )
-    if (statusMsg) return statusMsg
-    return registeredUsers >= (event.min_attendees || 0) ? 'Pay Access' : 'Guestlist'
+  function getWebButton() {
+    if (loading) {
+      return (
+        <span className="flex items-center justify-center gap-2">
+          <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10"
+              stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor"
+              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+          </svg>
+          {statusMsg || 'Processing...'}
+        </span>
+      )
+    }
+
+    if (!eventConfirmed) {
+      return 'Guestlist'
+    }
+    if (eventConfirmed && (!event.price || Number(event.price) === 0)) {
+      return 'Free Access'
+    }
+    if (eventConfirmed && Number(event.price) > 0) {
+      return 'Pay Access'
+    }
+    return 'Book'
+  }
+
+  function getStage() {
+    if (!eventConfirmed) return 'prebook'
+    return 'book'
   }
 
   return (
@@ -123,13 +139,16 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
 
         <div className="flex justify-between items-center mt-auto mb-2 gap-2">
           <button
-            onClick={handleWebAction}
+            onClick={() => handleWebAction(getStage())}
             disabled={loading}
             className={`flex-1 px-3 py-1 rounded ${
-              eventConfirmed ? 'bg-blue-600 hover:bg-blue-700' : 'bg-yellow-600 hover:bg-yellow-700'
+              !eventConfirmed ? 'bg-yellow-600 hover:bg-yellow-700' 
+              : (!event.price || Number(event.price) === 0)
+              ? 'bg-green-600 hover:bg-green-700'
+              : 'bg-blue-600 hover:bg-blue-700'
             } text-white text-sm`}
           >
-            {getWebButtonLabel()}
+            {getWebButton()}
           </button>
         </div>
 
@@ -148,6 +167,7 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
         )}
       </div>
 
+      {/* Event details modal */}
       {!onPreview && internalModalOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"

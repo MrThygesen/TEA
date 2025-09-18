@@ -113,7 +113,8 @@ async function sendTicketEmail(to, event, user) {
     sendSmtpEmail.to = [{ email: to }]
     sendSmtpEmail.subject = `Your Ticket: ${event.name}`
 
-    sendSmtpEmail.htmlContent = `
+    // build main body
+    let htmlContent = `
       <h1>Your Ticket 🎟</h1>
       <p>Hello ${user.username || ''}, here is your ticket for:</p>
       <p><strong>${event.name}</strong> (${event.city})</p>
@@ -125,6 +126,13 @@ async function sendTicketEmail(to, event, user) {
       <p>You can also save this into Google Wallet or Apple Wallet.</p>
     `
 
+    // append event.detailsBlock if present
+    if (event.detailsBlock) {
+      htmlContent += event.detailsBlock
+    }
+
+    sendSmtpEmail.htmlContent = htmlContent
+
     sendSmtpEmail.attachment = [
       {
         content: qrBuffer.toString('base64'),
@@ -133,38 +141,6 @@ async function sendTicketEmail(to, event, user) {
       }
     ]
 
-    await apiInstance.sendTransacEmail(sendSmtpEmail)
-    console.log('✅ Ticket email sent to', to)
-    return true
-  } catch (err) {
-    console.error('❌ Failed to send ticket email:', err?.response?.body || err)
-    throw new Error('Failed to send ticket email')
-  }
-}
-
-
-
-/**
- * Send ticket email with embedded QR code (data + image)
-async function sendTicketEmail(to, event, user) {
-  try {
-    const { qrData, qrImage } = await generateTicketQRCode(event.id, user.id)
-
-    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
-    sendSmtpEmail.sender = { name: 'Edgy Events', email: MAIL_FROM }
-    sendSmtpEmail.to = [{ email: to }]
-    sendSmtpEmail.subject = `Your Ticket: ${event.name}`
-    sendSmtpEmail.htmlContent = `
-      <h1>Your Ticket 🎟</h1>
-      <p>Hello ${user.username || ''}, here is your ticket for:</p>
-      <p><strong>${event.name}</strong> (${event.city})</p>
-      <p>Date/Time: ${new Date(event.datetime).toLocaleString()}</p>
-      <p>Venue: ${event.venue || 'TBA'}</p>
-      <p>Please show this QR code at the entrance:</p>
-      <p><img src="${qrImage}" alt="QR Ticket" style="max-width:250px;"/></p>
-      <p><small>QR Data: ${qrData}</small></p>
-      <p>You can also save this into Google Wallet or Apple Wallet.</p>
-    `
     await apiInstance.sendTransacEmail(sendSmtpEmail)
     console.log('✅ Ticket email sent to', to)
     return true
