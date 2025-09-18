@@ -60,20 +60,21 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
         },
         body: JSON.stringify({ eventId: event.id, stage }),
       })
-      const data = await res.json()
 
-      if (data.registered) {
-        setRegisteredUsers(prev => stage === 'guestlist' ? prev : prev + 1)
-        setStatusMsg('Ticket booked!')
-      } else {
-        setStatusMsg(data.message || 'Something went wrong')
-      }
-    } catch {
-      setStatusMsg('Network error')
-    } finally {
-      setLoading(false)
-      setTimeout(() => setStatusMsg(''), 2000) // clear message after 2s
-    }
+const data = await res.json()
+
+if (data.url) {
+  // Paid event: redirect to Stripe
+  window.location.href = data.url
+  return
+}
+
+if (data.registered) {
+  setRegisteredUsers(prev => stage === 'guestlist' ? prev : prev + 1)
+  setStatusMsg('Ticket booked!')
+} else {
+  setStatusMsg(data.message || 'Something went wrong')
+}
   }
 
   function getWebButtonLabel() {
@@ -431,7 +432,7 @@ export default function Home() {
         {/* Event Grid/List Section */}
         <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-semibold text-blue-400">Explore Events</h2>
+            <h2 className="text-2xl font-semibold text-blue-400">Explore Network Events</h2>
             <button onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} className="text-sm px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600">{viewMode === 'grid' ? 'List view' : 'Grid view'}</button>
           </div>
 
