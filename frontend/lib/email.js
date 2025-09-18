@@ -149,7 +149,6 @@ async function sendTicketEmail(to, event, user) {
     throw new Error('Failed to send ticket email')
   }
 }
- */
 
 module.exports = {
   generateTicketQRCode,
