@@ -65,16 +65,27 @@ export default async function handler(req, res) {
       await Promise.all(users.map(u => sendBookingReminderEmail(u.email, event)))
     }
 
-    // --- FREE EVENT: send ticket immediately ---
-    if (!event.price || Number(event.price) === 0) {
-      const { sendTicketEmail } = await import('../../../lib/email.js')
-      await pool.query(
-        `UPDATE registrations SET ticket_sent=true WHERE event_id=$1 AND user_id=$2`,
-        [event.id, user.id]
-      )
-      if (user.email) await sendTicketEmail(user.email, event, user)
-      return res.status(200).json({ message: 'Free ticket sent successfully' })
-    }
+// --- FREE EVENT: send ticket immediately ---
+if (!event.price || Number(event.price) === 0) {
+  const { sendTicketEmail } = await import('../../../lib/email.js')
+  // Fetch full user info (with id, username, email)
+  const { rows: userRows } = await pool.query(
+    'SELECT id, username, email FROM user_profiles WHERE id=$1',
+    [user.id]
+  )
+  const dbUser = userRows[0]
+
+  await pool.query(
+    `UPDATE registrations SET ticket_sent=true WHERE event_id=$1 AND user_id=$2`,
+    [event.id, dbUser.id]
+  )
+
+  if (dbUser?.email) {
+    await sendTicketEmail(dbUser.email, event, dbUser)
+  }
+
+  return res.status(200).json({ message: 'Free ticket sent successfully' })
+}
 
     // --- PAID EVENT: Stripe checkout session ---
     const session = await stripe.checkout.sessions.create({
