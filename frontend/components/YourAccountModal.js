@@ -48,11 +48,13 @@ export default function YourAccountModal({ profile, onClose }) {
   })
 
   // --- Status resolver ---
-  function getStatus(t) {
-    if (t.stage === 'guestlist') return 'Not confirmed'
-    if (t.has_paid || t.is_free) return 'Confirmed'
-    return '—'
-  }
+function getStatus(t) {
+  if (t.stage === 'guestlist') return 'Not confirmed'
+  if (t.stage === 'book' && (t.is_free || t.has_paid)) return 'Confirmed'
+  return '—'
+}
+
+
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
