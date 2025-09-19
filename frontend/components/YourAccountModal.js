@@ -6,7 +6,7 @@ export default function YourAccountModal({ profile, onClose }) {
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [qrModal, setQrModal] = useState(null) // store ticket for QR modal
+  const [qrModal, setQrModal] = useState(null)
 
   useEffect(() => {
     const fetchTickets = async () => {
@@ -33,33 +33,25 @@ export default function YourAccountModal({ profile, onClose }) {
 
   // --- Filtering rules ---
   const now = new Date()
-  const cutoff = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000) // 2 days ago
+  const cutoff = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000)
 
-  const visibleTickets = tickets.filter((t) => {
-    const eventDate = new Date(t.datetime)
+  const visibleTickets = tickets.filter((t) => new Date(t.datetime) >= cutoff)
 
-    // hide if older than 2 days
-    if (eventDate < cutoff) return false
-
-    // hide guestlist if event is now book stage
-    if (t.stage === 'guestlist' && t.is_book_stage) return false
-
-    return true
-  })
-
-  // --- Status resolver ---
-function getStatus(t) {
-  if (t.stage === 'guestlist') return 'Not confirmed'
-  if (t.stage === 'book' && (t.is_free || t.has_paid)) return 'Confirmed'
-  return '—'
-}
-
-
+  // Group tickets
+  const confirmed = visibleTickets.filter(
+    (t) => t.stage === 'book' && (t.is_free || t.has_paid) && t.ticket_sent
+  )
+  const showedInterest = visibleTickets.filter(
+    (t) => t.stage === 'guestlist' && t.is_book_stage && !t.has_paid && !t.ticket_sent
+  )
+  const guestlist = visibleTickets.filter(
+    (t) => t.stage === 'guestlist' && !t.is_book_stage
+  )
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-zinc-900 text-white rounded-2xl shadow-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 relative">
-        {/* Close button */}
+        {/* Close */}
         <button
           onClick={onClose}
           className="absolute top-3 right-3 px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm"
@@ -67,58 +59,88 @@ function getStatus(t) {
           Close
         </button>
 
-        {/* Header */}
         <h2 className="text-xl font-semibold text-blue-400 mb-4">Your Account</h2>
 
-        {/* Profile Info */}
         <div className="mb-6">
           <p><strong>Username:</strong> {profile?.username || '—'}</p>
           <p><strong>Email:</strong> {profile?.email || '—'}</p>
         </div>
 
-        {/* Tickets Section */}
-        <h3 className="text-lg font-semibold text-blue-300 mb-2">Your Tickets</h3>
         {loading && <p>Loading tickets…</p>}
         {error && <p className="text-red-400">{error}</p>}
-        {visibleTickets.length === 0 && !loading && (
-          <p className="text-gray-400">You have no tickets yet.</p>
-        )}
 
-        {visibleTickets.length > 0 && (
-          <div className="divide-y divide-zinc-700 border border-zinc-700 rounded-lg">
-            <div className="grid grid-cols-4 text-sm text-gray-400 bg-zinc-800 px-3 py-2 font-semibold">
-              <span>Date</span>
-              <span>Event</span>
-              <span>Status</span>
-              <span>Ticket</span>
-            </div>
-            {visibleTickets.map((t) => (
-              <div
-                key={t.id}
-                className="grid grid-cols-4 px-3 py-2 items-center text-sm"
-              >
-                <span>{new Date(t.datetime).toLocaleDateString()}</span>
-                <span>{t.event_name}</span>
-                <span>
-                  {getStatus(t) === 'Confirmed' ? (
+        {!loading && (
+          <>
+            {/* Confirmed Tickets */}
+            <h3 className="text-lg font-semibold text-green-400 mt-6 mb-2">Confirmed Tickets</h3>
+            {confirmed.length === 0 ? (
+              <p className="text-gray-400 text-sm">No confirmed tickets.</p>
+            ) : (
+              <div className="divide-y divide-zinc-700 border border-zinc-700 rounded-lg">
+                <div className="grid grid-cols-4 text-sm text-gray-400 bg-zinc-800 px-3 py-2 font-semibold">
+                  <span>Date</span>
+                  <span>Event</span>
+                  <span>Status</span>
+                  <span>Ticket</span>
+                </div>
+                {confirmed.map((t) => (
+                  <div key={t.id} className="grid grid-cols-4 px-3 py-2 items-center text-sm">
+                    <span>{new Date(t.datetime).toLocaleDateString()}</span>
+                    <span>{t.event_name}</span>
                     <span className="text-green-400">✅ Confirmed</span>
-                  ) : (
-                    <span className="text-yellow-400">⏳ Not confirmed</span>
-                  )}
-                </span>
-                {t.qrImage ? (
-                  <button
-                    onClick={() => setQrModal(t)}
-                    className="text-blue-400 hover:underline"
-                  >
-                    Open QR
-                  </button>
-                ) : (
-                  <span className="text-gray-400">—</span>
-                )}
+                    <button
+                      onClick={() => setQrModal(t)}
+                      className="text-blue-400 hover:underline"
+                    >
+                      Open QR
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            )}
+
+            {/* Showed Interest */}
+            <h3 className="text-lg font-semibold text-yellow-400 mt-6 mb-2">You Showed Interest</h3>
+            {showedInterest.length === 0 ? (
+              <p className="text-gray-400 text-sm">No pending interests.</p>
+            ) : (
+              <div className="divide-y divide-zinc-700 border border-zinc-700 rounded-lg">
+                <div className="grid grid-cols-3 text-sm text-gray-400 bg-zinc-800 px-3 py-2 font-semibold">
+                  <span>Date</span>
+                  <span>Event</span>
+                  <span>Status</span>
+                </div>
+                {showedInterest.map((t) => (
+                  <div key={t.id} className="grid grid-cols-3 px-3 py-2 items-center text-sm">
+                    <span>{new Date(t.datetime).toLocaleDateString()}</span>
+                    <span>{t.event_name}</span>
+                    <span className="text-yellow-400">👀 You showed interest</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Guestlist (Not confirmed) */}
+            <h3 className="text-lg font-semibold text-gray-400 mt-6 mb-2">Guestlist</h3>
+            {guestlist.length === 0 ? (
+              <p className="text-gray-400 text-sm">No guestlist entries.</p>
+            ) : (
+              <div className="divide-y divide-zinc-700 border border-zinc-700 rounded-lg">
+                <div className="grid grid-cols-3 text-sm text-gray-400 bg-zinc-800 px-3 py-2 font-semibold">
+                  <span>Date</span>
+                  <span>Event</span>
+                  <span>Status</span>
+                </div>
+                {guestlist.map((t) => (
+                  <div key={t.id} className="grid grid-cols-3 px-3 py-2 items-center text-sm">
+                    <span>{new Date(t.datetime).toLocaleDateString()}</span>
+                    <span>{t.event_name}</span>
+                    <span className="text-yellow-400">⏳ Not confirmed</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 
