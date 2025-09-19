@@ -16,9 +16,9 @@ export default async function handler(req, res) {
 
   try {
     const { rows } = await pool.query(
-      `SELECT r.id, r.has_paid, r.ticket_sent, e.id AS event_id, e.name AS event_name,
-              e.city, e.datetime, e.price, e.is_confirmed,
-              r.created_at
+      `SELECT r.id, r.has_paid, r.ticket_sent,
+              e.id AS event_id, e.name AS event_name,
+              e.city, e.datetime, e.price, e.is_confirmed
        FROM registrations r
        JOIN events e ON r.event_id = e.id
        WHERE r.user_id = $1
