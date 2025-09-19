@@ -6,6 +6,7 @@ export default function YourAccountModal({ profile, onClose }) {
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [qrModal, setQrModal] = useState(null) // store ticket for QR modal
 
   useEffect(() => {
     const fetchTickets = async () => {
@@ -30,9 +31,32 @@ export default function YourAccountModal({ profile, onClose }) {
     fetchTickets()
   }, [])
 
+  // --- Filtering rules ---
+  const now = new Date()
+  const cutoff = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000) // 2 days ago
+
+  const visibleTickets = tickets.filter((t) => {
+    const eventDate = new Date(t.datetime)
+
+    // hide if older than 2 days
+    if (eventDate < cutoff) return false
+
+    // hide guestlist if event is now book stage
+    if (t.stage === 'guestlist' && t.is_book_stage) return false
+
+    return true
+  })
+
+  // --- Status resolver ---
+  function getStatus(t) {
+    if (t.stage === 'guestlist') return 'Not confirmed'
+    if (t.has_paid || t.is_free) return 'Confirmed'
+    return '—'
+  }
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-zinc-900 text-white rounded-2xl shadow-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 relative">
+      <div className="bg-zinc-900 text-white rounded-2xl shadow-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 relative">
         {/* Close button */}
         <button
           onClick={onClose}
@@ -54,33 +78,39 @@ export default function YourAccountModal({ profile, onClose }) {
         <h3 className="text-lg font-semibold text-blue-300 mb-2">Your Tickets</h3>
         {loading && <p>Loading tickets…</p>}
         {error && <p className="text-red-400">{error}</p>}
-        {tickets.length === 0 && !loading && (
+        {visibleTickets.length === 0 && !loading && (
           <p className="text-gray-400">You have no tickets yet.</p>
         )}
 
-        {tickets.length > 0 && (
+        {visibleTickets.length > 0 && (
           <div className="divide-y divide-zinc-700 border border-zinc-700 rounded-lg">
-            <div className="grid grid-cols-3 text-sm text-gray-400 bg-zinc-800 px-3 py-2 font-semibold">
+            <div className="grid grid-cols-4 text-sm text-gray-400 bg-zinc-800 px-3 py-2 font-semibold">
               <span>Date</span>
               <span>Event</span>
+              <span>Status</span>
               <span>Ticket</span>
             </div>
-            {tickets.map((t) => (
+            {visibleTickets.map((t) => (
               <div
                 key={t.id}
-                className="grid grid-cols-3 px-3 py-2 items-center text-sm"
+                className="grid grid-cols-4 px-3 py-2 items-center text-sm"
               >
                 <span>{new Date(t.datetime).toLocaleDateString()}</span>
                 <span>{t.event_name}</span>
+                <span>
+                  {getStatus(t) === 'Confirmed' ? (
+                    <span className="text-green-400">✅ Confirmed</span>
+                  ) : (
+                    <span className="text-yellow-400">⏳ Not confirmed</span>
+                  )}
+                </span>
                 {t.qrImage ? (
-                  <a
-                    href={t.qrImage}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    onClick={() => setQrModal(t)}
                     className="text-blue-400 hover:underline"
                   >
                     Open QR
-                  </a>
+                  </button>
                 ) : (
                   <span className="text-gray-400">—</span>
                 )}
@@ -89,6 +119,32 @@ export default function YourAccountModal({ profile, onClose }) {
           </div>
         )}
       </div>
+
+      {/* QR Modal */}
+      {qrModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          onClick={() => setQrModal(null)}
+        >
+          <div
+            className="bg-zinc-900 rounded-xl p-6 max-w-sm w-full text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold mb-4">{qrModal.event_name}</h3>
+            <img
+              src={qrModal.qrImage}
+              alt="QR Ticket"
+              className="rounded-lg border border-zinc-700 mx-auto mb-4"
+            />
+            <button
+              onClick={() => setQrModal(null)}
+              className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
