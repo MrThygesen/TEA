@@ -28,121 +28,313 @@ function clearAuth() {
 // ---------------------------
 // Event Card Component
 // ---------------------------
-// inside DynamicEventCard
+function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
+  const [loading, setLoading] = useState(false)
+  const [statusMsg, setStatusMsg] = useState('')
+  const [internalModalOpen, setInternalModalOpen] = useState(false)
+  const [registeredUsers, setRegisteredUsers] = useState(event.registered_users || 0)
 
-const [confirmModalOpen, setConfirmModalOpen] = useState(false)
-const [agree, setAgree] = useState(false)
-const [selectedStage, setSelectedStage] = useState(null)
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false)
+  const [agree, setAgree] = useState(false)
+  const [selectedStage, setSelectedStage] = useState(null)
 
-// Open confirmation modal
-function openConfirmModal(stage) {
-  if (!authUser) {
-    setShowAccountModal(true)
-    return
+  const eventConfirmed = event.is_confirmed === true
+
+  async function handleWebAction(stage) {
+    if (!authUser) {
+      setShowAccountModal(true)
+      return
+    }
+
+    setLoading(true)
+    setStatusMsg('Processing...')
+
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch('/api/events/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token || ''}`,
+        },
+        body: JSON.stringify({ eventId: event.id, stage }),
+      })
+      const data = await res.json()
+
+      if (data.url) {
+        // Paid event: redirect to Stripe Checkout
+        window.location.href = data.url
+        return
+      }
+
+      if (res.ok) {
+        if (stage === 'prebook') {
+          setStatusMsg('✅ Prebook confirmed! Check your email.')
+        } else if (stage === 'book') {
+          if (!event.price || Number(event.price) === 0) {
+            setStatusMsg('🎟 Ticket booked! Check your email for QR code.')
+          } else {
+            setStatusMsg('Redirecting to payment...')
+          }
+        }
+        setRegisteredUsers((prev) => prev + 1)
+      } else {
+        setStatusMsg(data.error || 'Something went wrong.')
+      }
+    } catch (err) {
+      console.error(err)
+      setStatusMsg('❌ Network error')
+    } finally {
+      setLoading(false)
+      setTimeout(() => setStatusMsg(''), 2500) // clear msg after 2.5s
+    }
   }
-  setSelectedStage(stage)
-  setConfirmModalOpen(true)
-  setAgree(false)
-}
 
-...
+  function getWebButton() {
+    if (loading) {
+      return (
+        <span className="flex items-center justify-center gap-2">
+          <svg
+            className="animate-spin h-4 w-4 text-white"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            ></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+            ></path>
+          </svg>
+          {statusMsg || 'Processing...'}
+        </span>
+      )
+    }
 
-<div className="flex justify-between items-center mt-auto mb-2 gap-2">
-  <button
-    onClick={() => openConfirmModal(getStage())}
-    disabled={loading}
-    className={`flex-1 px-3 py-1 rounded ${
-      !eventConfirmed ? 'bg-yellow-600 hover:bg-yellow-700' 
-      : (!event.price || Number(event.price) === 0)
-      ? 'bg-green-600 hover:bg-green-700'
-      : 'bg-blue-600 hover:bg-blue-700'
-    } text-white text-sm`}
-  >
-    {getWebButton()}
-  </button>
-</div>
+    if (!eventConfirmed) return 'Guestlist'
+    if (eventConfirmed && (!event.price || Number(event.price) === 0)) return 'Free Access'
+    if (eventConfirmed && Number(event.price) > 0) return 'Pay Access'
+    return 'Book'
+  }
 
-...
+  function getStage() {
+    if (!eventConfirmed) return 'prebook'
+    return 'book'
+  }
 
-{/* Confirmation Modal */}
-{confirmModalOpen && (
-  <div
-    className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
-    onClick={() => setConfirmModalOpen(false)}
-  >
-    <div
-      className="bg-zinc-900 rounded-lg max-w-md w-full p-6 text-white"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <h2 className="text-lg font-semibold mb-4">{event.name}</h2>
+  // Open confirmation modal
+  function openConfirmModal(stage) {
+    if (!authUser) {
+      setShowAccountModal(true)
+      return
+    }
+    setSelectedStage(stage)
+    setConfirmModalOpen(true)
+    setAgree(false)
+  }
 
-      {/* Case-specific text */}
-      {selectedStage === 'prebook' && (
-        <p className="mb-4 text-sm text-gray-300">
-          I want to participate in the event and meet the network. This is not an
-          access ticket, but a registration of interest. You will receive an email
-          when the event is confirmed and you can buy the ticket/coupon.
-        </p>
-      )}
-      {selectedStage === 'book' && (!event.price || Number(event.price) === 0) && (
-        <p className="mb-4 text-sm text-gray-300">
-          I want to participate in the event and meet the network. The perks offered
-          as part of the package are contingent on a minimum amount of people showing
-          up.
-        </p>
-      )}
-      {selectedStage === 'book' && Number(event.price) > 0 && (
-        <p className="mb-4 text-sm text-gray-300">
-          I want to participate in the event and meet the network. The perks offered
-          as part of the package are contingent on a minimum amount of people showing
-          up.
-        </p>
-      )}
-
-      {/* Policy text */}
-      <p className="mt-4 text-xs text-gray-400">
-        This offer is made between you ({authUser?.username || 'the user'}) and the
-        specific venue/organizing organization: <strong>{event.venue || 'TBA'}</strong>.
-      </p>
-
-      {/* Checkbox */}
-      <label className="flex items-center gap-2 my-4 text-sm">
-        <input
-          type="checkbox"
-          checked={agree}
-          onChange={(e) => setAgree(e.target.checked)}
+  return (
+    <>
+      <div className="border border-zinc-700 rounded-lg p-4 text-left bg-zinc-800 shadow flex flex-col justify-between">
+        <img
+          src={event.image_url || '/default-event.jpg'}
+          alt={event.name}
+          className="w-full h-40 object-cover rounded mb-3"
         />
-        I agree to the{' '}
-        <a href="/policies" className="text-blue-400 underline">policies</a> and approve
-        to receive email information on the event.
-      </label>
+        <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
+        <p className="text-sm mb-2">
+          {event.description?.split(' ').slice(0, 30).join(' ')}...
+        </p>
 
-      {/* Actions */}
-      <div className="flex justify-end gap-2">
-        <button
-          onClick={() => setConfirmModalOpen(false)}
-          className="px-4 py-2 rounded bg-zinc-700 hover:bg-zinc-600"
-        >
-          Cancel
-        </button>
-        <button
-          disabled={!agree || loading}
-          onClick={() => {
-            setConfirmModalOpen(false)
-            handleWebAction(selectedStage)
-          }}
-          className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-        >
-          {selectedStage === 'prebook'
-            ? 'Join Guestlist'
-            : !event.price || Number(event.price) === 0
-            ? 'Book Free'
-            : 'Pay Now'}
-        </button>
+        <div className="flex flex-wrap gap-1 mb-2">
+          {[event.tag1, event.tag2, event.tag3]
+            .filter(Boolean)
+            .map((tag, i) => (
+              <span
+                key={i}
+                className="bg-blue-700 text-xs px-2 py-1 rounded"
+              >
+                {tag}
+              </span>
+            ))}
+        </div>
+
+        <div className="flex justify-between items-center mt-auto mb-2 gap-2">
+          <button
+            onClick={() => openConfirmModal(getStage())}
+            disabled={loading}
+            className={`flex-1 px-3 py-1 rounded ${
+              !eventConfirmed
+                ? 'bg-yellow-600 hover:bg-yellow-700'
+                : !event.price || Number(event.price) === 0
+                ? 'bg-green-600 hover:bg-green-700'
+                : 'bg-blue-600 hover:bg-blue-700'
+            } text-white text-sm`}
+          >
+            {getWebButton()}
+          </button>
+        </div>
+
+        <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
+          <span>
+            💰{' '}
+            {event.price && Number(event.price) > 0
+              ? `${event.price} USD`
+              : 'Free'}
+          </span>
+          <span>👥 {registeredUsers} Users</span>
+        </div>
+
+        {!onPreview && (
+          <button
+            onClick={() => setInternalModalOpen(true)}
+            className="mt-2 w-full px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-sm"
+          >
+            Preview
+          </button>
+        )}
       </div>
-    </div>
-  </div>
-)}
+
+      {/* Confirmation Modal */}
+      {confirmModalOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          onClick={() => setConfirmModalOpen(false)}
+        >
+          <div
+            className="bg-zinc-900 rounded-lg max-w-md w-full p-6 text-white"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold mb-4">{event.name}</h2>
+
+            {/* Case-specific text */}
+            {selectedStage === 'prebook' && (
+              <p className="mb-4 text-sm text-gray-300">
+                I want to participate in the event and meet the network. This is not
+                an access ticket, but a registration of interest. You will receive an
+                email when the event is confirmed and you can buy the ticket/coupon.
+              </p>
+            )}
+            {selectedStage === 'book' &&
+              (!event.price || Number(event.price) === 0) && (
+                <p className="mb-4 text-sm text-gray-300">
+                  I want to participate in the event and meet the network. The perks
+                  offered as part of the package are contingent on a minimum amount of
+                  people showing up.
+                </p>
+              )}
+            {selectedStage === 'book' && Number(event.price) > 0 && (
+              <p className="mb-4 text-sm text-gray-300">
+                I want to participate in the event and meet the network. The perks
+                offered as part of the package are contingent on a minimum amount of
+                people showing up.
+              </p>
+            )}
+
+            {/* Policy text */}
+            <p className="mt-4 text-xs text-gray-400">
+              This offer is made between you ({authUser?.username || 'the user'}) and
+              the specific venue/organizing organization:{' '}
+              <strong>{event.venue || 'TBA'}</strong>.
+            </p>
+
+            {/* Checkbox */}
+            <label className="flex items-center gap-2 my-4 text-sm">
+              <input
+                type="checkbox"
+                checked={agree}
+                onChange={(e) => setAgree(e.target.checked)}
+              />
+              I agree to the{' '}
+              <a
+                href="/policies"
+                className="text-blue-400 underline"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                policies
+              </a>{' '}
+              and approve to receive email information on the event.
+            </label>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmModalOpen(false)}
+                className="px-4 py-2 rounded bg-zinc-700 hover:bg-zinc-600"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={!agree || loading}
+                onClick={() => {
+                  setConfirmModalOpen(false)
+                  handleWebAction(selectedStage)
+                }}
+                className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+              >
+                {selectedStage === 'prebook'
+                  ? 'Join Guestlist'
+                  : !event.price || Number(event.price) === 0
+                  ? 'Book Free'
+                  : 'Pay Now'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Event details modal */}
+      {!onPreview && internalModalOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          onClick={() => setInternalModalOpen(false)}
+        >
+          <div
+            className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold mb-4">{event.name}</h2>
+            <img
+              src={event.image_url || '/default-event.jpg'}
+              alt={event.name}
+              className="w-full h-56 object-contain rounded mb-4"
+            />
+            <p className="mb-2 text-sm text-gray-400">
+              {new Date(event.datetime).toLocaleString()} @ {event.venue} (
+              {event.venue_type || 'N/A'})
+            </p>
+            <p className="mb-4">{event.details}</p>
+
+            {event.basic_perk && (
+              <p className="text-sm text-gray-300">
+                <strong>Basic Perk:</strong> {event.basic_perk}
+              </p>
+            )}
+            {(event.paid_count || 0) >= 10 && event.advanced_perk && (
+              <p className="text-sm text-gray-300">
+                <strong>Advanced Perk:</strong> {event.advanced_perk}
+              </p>
+            )}
+
+            <button
+              onClick={() => setInternalModalOpen(false)}
+              className="mt-6 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
 
 
 // ---------------------------
