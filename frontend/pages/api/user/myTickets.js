@@ -16,8 +16,9 @@ export default async function handler(req, res) {
 
   try {
     const { rows } = await pool.query(
-      `SELECT r.id, r.has_paid, r.ticket_sent, e.id AS event_id, e.name AS event_name, 
-              e.city, e.datetime, e.price
+      `SELECT r.id, r.has_paid, r.ticket_sent, e.id AS event_id, e.name AS event_name,
+              e.city, e.datetime, e.price, e.is_confirmed,
+              r.created_at
        FROM registrations r
        JOIN events e ON r.event_id = e.id
        WHERE r.user_id = $1
@@ -25,16 +26,28 @@ export default async function handler(req, res) {
       [user.id]
     )
 
-    // Attach QR data + inline QR image for issued tickets
+    // Attach computed fields + QR if applicable
     const tickets = await Promise.all(
       rows.map(async (t) => {
-        if (!t.ticket_sent) {
-          return { ...t, qrData: null, qrImage: null }
-        }
-        const qrData = `ticket:${t.event_id}:${user.id}`
-        const qrImage = await QRCode.toDataURL(qrData)
+        const isFree = !t.price || Number(t.price) === 0
+        const stage = t.is_confirmed ? 'book' : 'guestlist'
 
-        return { ...t, qrData, qrImage }
+        let qrData = null
+        let qrImage = null
+
+        if (t.ticket_sent && (isFree || t.has_paid)) {
+          qrData = `ticket:${t.event_id}:${user.id}`
+          qrImage = await QRCode.toDataURL(qrData)
+        }
+
+        return {
+          ...t,
+          is_free: isFree,
+          stage,
+          is_book_stage: !!t.is_confirmed,
+          qrData,
+          qrImage,
+        }
       })
     )
 
