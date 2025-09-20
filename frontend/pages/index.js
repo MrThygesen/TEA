@@ -201,94 +201,100 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
         )}
       </div>
 
-      {/* Confirmation Modal */}
-      {confirmModalOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
-          onClick={() => setConfirmModalOpen(false)}
-        >
-          <div
-            className="bg-zinc-900 rounded-lg max-w-md w-full p-6 text-white"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-lg font-semibold mb-4">{event.name}</h2>
+{/* Confirmation Modal */}
+{confirmModalOpen && (
+  <div
+    className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
+    onClick={() => setConfirmModalOpen(false)}
+  >
+    <div
+      className="bg-zinc-900 rounded-2xl shadow-xl max-w-md w-full p-6 text-white relative"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Header */}
+      <h2 className="text-xl font-semibold mb-3 text-center">{event.name}</h2>
 
-            {/* Case-specific text */}
-            {selectedStage === 'prebook' && (
-              <p className="mb-4 text-sm text-gray-300">
-                I want to participate in the event and meet the network. This is not
-                an access ticket, but a registration of interest. You will receive an
-                email when the event is confirmed and you can buy the ticket/coupon.
-              </p>
-            )}
-            {selectedStage === 'book' &&
-              (!event.price || Number(event.price) === 0) && (
-                <p className="mb-4 text-sm text-gray-300">
-                  I want to participate in the event and meet the network. The perks
-                  offered as part of the package are contingent on a minimum amount of
-                  people showing up.
-                </p>
-              )}
-            {selectedStage === 'book' && Number(event.price) > 0 && (
-              <p className="mb-4 text-sm text-gray-300">
-                I want to participate in the event and meet the network. The perks
-                offered as part of the package are contingent on a minimum amount of
-                people showing up.
-              </p>
-            )}
-
-            {/* Policy text */}
-            <p className="mt-4 text-xs text-gray-400">
-              This offer is made between you ({authUser?.username || 'the user'}) and
-              the specific venue/organizing organization:{' '}
-              <strong>{event.venue || 'TBA'}</strong>.
-            </p>
-
-            {/* Checkbox */}
-            <label className="flex items-center gap-2 my-4 text-sm">
-              <input
-                type="checkbox"
-                checked={agree}
-                onChange={(e) => setAgree(e.target.checked)}
-              />
-              I agree to the{' '}
-              <a
-                href="/policies"
-                className="text-blue-400 underline"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                policies
-              </a>{' '}
-              and approve to receive email information on the event.
-            </label>
-
-            {/* Actions */}
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setConfirmModalOpen(false)}
-                className="px-4 py-2 rounded bg-zinc-700 hover:bg-zinc-600"
-              >
-                Cancel
-              </button>
-              <button
-                disabled={!agree || loading}
-                onClick={() => {
-                  setConfirmModalOpen(false)
-                  handleWebAction(selectedStage)
-                }}
-                className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-              >
-                {selectedStage === 'prebook'
-                  ? 'Join Guestlist'
-                  : !event.price || Number(event.price) === 0
-                  ? 'Book Free'
-                  : 'Pay Now'}
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Case-specific text */}
+      {selectedStage === 'prebook' && (
+        <p className="mb-4 text-sm text-gray-300 text-center">
+          This is a <span className="font-medium">guestlist registration</span>.
+          You’ll receive an email once the event is confirmed, and then you can
+          buy your ticket/coupon.
+        </p>
       )}
+      {selectedStage === 'book' && (!event.price || Number(event.price) === 0) && (
+        <p className="mb-4 text-sm text-gray-300 text-center">
+          You’re booking a free spot for this event. Perks depend on a minimum
+          number of participants showing up.
+        </p>
+      )}
+      {selectedStage === 'book' && Number(event.price) > 0 && (
+        <p className="mb-4 text-sm text-gray-300 text-center">
+          You’re booking a paid spot for this event. Perks depend on a minimum
+          number of participants showing up.
+        </p>
+      )}
+
+      {/* Venue text */}
+      <div className="bg-zinc-800 rounded-lg p-3 mb-4 text-xs text-gray-400">
+        Agreement is made between you 
+        <span className="text-gray-300"> ({authUser?.username || 'the user'}) </span> 
+        and the venue/organizer: <strong>{event.venue || 'TBA'}</strong>.
+      </div>
+
+      {/* Checkbox */}
+      <div className="flex items-start gap-2 mb-4">
+        <input
+          type="checkbox"
+          checked={agree}
+          onChange={(e) => setAgree(e.target.checked)}
+          className="mt-1"
+        />
+        <span className="text-sm text-gray-300">
+          I confirm my participation and agree to receive event updates by email.
+        </span>
+      </div>
+
+      {/* Actions */}
+      <div className="flex justify-end gap-3">
+        <button
+          onClick={() => setConfirmModalOpen(false)}
+          className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-sm"
+        >
+          Cancel
+        </button>
+        <button
+          disabled={!agree || loading}
+          onClick={() => {
+            setConfirmModalOpen(false)
+            handleWebAction(selectedStage)
+          }}
+          className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm disabled:opacity-50"
+        >
+          {selectedStage === 'prebook'
+            ? 'Join Guestlist'
+            : !event.price || Number(event.price) === 0
+            ? 'Book Free'
+            : 'Pay Now'}
+        </button>
+      </div>
+
+      {/* Policies footer */}
+      <p className="mt-6 text-xs text-gray-500 text-center">
+        By proceeding, you agree to our{' '}
+        <a
+          href="/policies"
+          className="text-blue-400 underline hover:text-blue-300"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          policies
+        </a>.
+      </p>
+    </div>
+  </div>
+)}
+
 
       {/* Event details modal */}
       {!onPreview && internalModalOpen && (
@@ -614,7 +620,7 @@ export default function Home() {
  
 {/* Video Section */}
 <VideoHero />
-'
+
 
 {/* Three Images Section */}
 <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg mt-10">
