@@ -577,17 +577,17 @@ export default function Home() {
   <h2 className="text-2xl font-semibold mb-6 text-center text-blue-400">Our Network Highlights</h2>
   <div className="grid md:grid-cols-3 gap-6">
     <div className="flex flex-col items-center">
-      <img src="/images/perks.jpg" alt="Perks" className="w-full h-48 object-cover rounded-lg mb-2" />
+      <img src="/images/image1.jpg" alt="Perks" className="w-full h-48 object-cover rounded-lg mb-2" />
       <h3 className="text-lg font-semibold">Perks & Benefits</h3>
       <p className="text-gray-300 text-sm text-center">Enjoy curated perks at every event you join.</p>
     </div>
     <div className="flex flex-col items-center">
-      <img src="/images/venue.jpg" alt="Venues" className="w-full h-48 object-cover rounded-lg mb-2" />
+      <img src="/images/image2.jpg" alt="Venues" className="w-full h-48 object-cover rounded-lg mb-2" />
       <h3 className="text-lg font-semibold">Venue Partners</h3>
       <p className="text-gray-300 text-sm text-center">We collaborate with the best cafés, pubs, and event spaces.</p>
     </div>
     <div className="flex flex-col items-center">
-      <img src="/images/organizers.jpg" alt="Organizers" className="w-full h-48 object-cover rounded-lg mb-2" />
+      <img src="/images/image3.jpg" alt="Organizers" className="w-full h-48 object-cover rounded-lg mb-2" />
       <h3 className="text-lg font-semibold">Event Organizers</h3>
       <p className="text-gray-300 text-sm text-center">Connect with organizers who craft unique experiences.</p>
     </div>
