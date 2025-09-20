@@ -556,6 +556,45 @@ export default function Home() {
           </div>
         </header>
 
+{/* Video Section */}
+<section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg mt-10 text-center">
+  <h2 className="text-2xl font-semibold mb-6 text-blue-400">Watch How It Works</h2>
+  <div className="aspect-w-16 aspect-h-9">
+    <iframe
+      className="w-full h-full rounded-lg"
+      src="https://www.youtube.com/embed/YOUR_VIDEO_ID"
+      title="Event Platform Video"
+      frameBorder="0"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      allowFullScreen
+    ></iframe>
+  </div>
+</section>
+
+
+{/* Three Images Section */}
+<section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg mt-10">
+  <h2 className="text-2xl font-semibold mb-6 text-center text-blue-400">Our Network Highlights</h2>
+  <div className="grid md:grid-cols-3 gap-6">
+    <div className="flex flex-col items-center">
+      <img src="/images/perks.jpg" alt="Perks" className="w-full h-48 object-cover rounded-lg mb-2" />
+      <h3 className="text-lg font-semibold">Perks & Benefits</h3>
+      <p className="text-gray-300 text-sm text-center">Enjoy curated perks at every event you join.</p>
+    </div>
+    <div className="flex flex-col items-center">
+      <img src="/images/venue.jpg" alt="Venues" className="w-full h-48 object-cover rounded-lg mb-2" />
+      <h3 className="text-lg font-semibold">Venue Partners</h3>
+      <p className="text-gray-300 text-sm text-center">We collaborate with the best cafés, pubs, and event spaces.</p>
+    </div>
+    <div className="flex flex-col items-center">
+      <img src="/images/organizers.jpg" alt="Organizers" className="w-full h-48 object-cover rounded-lg mb-2" />
+      <h3 className="text-lg font-semibold">Event Organizers</h3>
+      <p className="text-gray-300 text-sm text-center">Connect with organizers who craft unique experiences.</p>
+    </div>
+  </div>
+</section>
+
+
         {/* Admin SBT Manager */}
         {isAdmin && <AdminSBTManager darkMode={true} />}
 
