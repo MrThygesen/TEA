@@ -577,7 +577,7 @@ export default function Home() {
   <h2 className="text-2xl font-semibold mb-6 text-center text-blue-400">Our Network Highlights</h2>
   <div className="grid md:grid-cols-3 gap-6">
     <div className="flex flex-col items-center">
-      <img src="/images/image1.jpg" alt="Perks" className="w-full h-48 object-cover rounded-lg mb-2" />
+      <img src="/public/new.png" alt="Perks" className="w-full h-48 object-cover rounded-lg mb-2" />
       <h3 className="text-lg font-semibold">Perks & Benefits</h3>
       <p className="text-gray-300 text-sm text-center">Enjoy curated perks at every event you join.</p>
     </div>
