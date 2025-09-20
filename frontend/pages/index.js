@@ -230,7 +230,7 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
             checked={agree}
             onChange={(e) => setAgree(e.target.checked)}
           />
-          I agree
+          I agree to guidelines and receival of emails for the event.
         </label>
 
         <div className="flex gap-2">
