@@ -562,7 +562,7 @@ export default function Home() {
   <div className="aspect-w-16 aspect-h-9">
     <iframe
       className="w-full h-full rounded-lg"
-      src="https://youtu.be/FN_sOmPuuec"
+      src="https://www.youtube.com/watch?v=FN_sOmPuuec"
       title="Event Platform Video"
       frameBorder="0"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
