@@ -77,7 +77,10 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
             setStatusMsg('Redirecting to payment...')
           }
         }
-        setRegisteredUsers((prev) => prev + 1)
+        if (typeof data.registeredCount === 'number') {
+  setRegisteredUsers(data.registeredCount)
+}
+
       } else {
         setStatusMsg(data.error || 'Something went wrong.')
       }

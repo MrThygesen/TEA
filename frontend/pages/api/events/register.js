@@ -1,5 +1,6 @@
+// pages/api/events/register.js
 import { pool } from '../../../lib/postgres.js'
-import Stripe from 'stripe' 
+import Stripe from 'stripe'
 import { auth } from '../../../lib/auth.js'
 import {
   sendPrebookEmail,
@@ -42,6 +43,15 @@ export default async function handler(req, res) {
       [eventId, user.id, user.email]
     )
 
+    // helper: always fetch latest registered count
+    async function getRegisteredCount() {
+      const { rows } = await pool.query(
+        'SELECT COUNT(*)::int AS count FROM registrations WHERE event_id=$1',
+        [eventId]
+      )
+      return rows[0]?.count || 0
+    }
+
     // -------------------------------------------------
     // STAGE: PREBOOK
     // -------------------------------------------------
@@ -50,13 +60,9 @@ export default async function handler(req, res) {
         await sendPrebookEmail(user.email, event)
       }
 
-      // check if event becomes confirmed
-      const { rows: prebookRows } = await pool.query(
-        'SELECT COUNT(*)::int AS count FROM registrations WHERE event_id=$1',
-        [eventId]
-      )
-      const registeredCount = prebookRows[0]?.count || 0
+      const registeredCount = await getRegisteredCount()
 
+      // check if event becomes confirmed
       if (registeredCount >= event.min_attendees && !event.is_confirmed) {
         await pool.query('UPDATE events SET is_confirmed=true WHERE id=$1', [eventId])
 
@@ -71,15 +77,15 @@ export default async function handler(req, res) {
         await Promise.all(users.map(u => sendBookingReminderEmail(u.email, event)))
       }
 
-      return res.status(200).json({ message: 'Prebook confirmed' })
+      return res.status(200).json({ message: 'Prebook confirmed', registeredCount })
     }
 
     // -------------------------------------------------
     // STAGE: BOOK
     // -------------------------------------------------
     if (stage === 'book') {
-      // FREE EVENT → send ticket with QR
       if (!event.price || Number(event.price) === 0) {
+        // FREE EVENT → send ticket with QR
         const { rows: userRows } = await pool.query(
           'SELECT id, username, email FROM user_profiles WHERE id=$1',
           [user.id]
@@ -97,7 +103,11 @@ export default async function handler(req, res) {
           await sendTicketEmail(dbUser.email, event, dbUser)
         }
 
-        return res.status(200).json({ message: 'Free ticket sent successfully' })
+        const registeredCount = await getRegisteredCount()
+        return res.status(200).json({
+          message: 'Free ticket sent successfully',
+          registeredCount,
+        })
       }
 
       // PAID EVENT → Stripe checkout session
@@ -120,16 +130,18 @@ export default async function handler(req, res) {
         customer_email: user.email || undefined,
       })
 
-      return res.status(200).json({ url: session.url })
+      const registeredCount = await getRegisteredCount()
+      return res.status(200).json({ url: session.url, registeredCount })
     }
 
     // -------------------------------------------------
     // fallback (invalid stage)
     // -------------------------------------------------
-    return res.status(400).json({ error: 'Invalid stage value' })
+    const registeredCount = await getRegisteredCount()
+    return res.status(400).json({ error: 'Invalid stage value', registeredCount })
   } catch (err) {
     console.error('❌ register error:', err)
-    return res.status(500).json({ error: 'Internal server error' })
+    return res.status(500).json({ error: 'Internal server error', details: err.message })
   }
 }
 
