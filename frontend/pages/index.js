@@ -25,9 +25,6 @@ function clearAuth() {
   try { localStorage.removeItem('edgy_auth_user') } catch (_) {}
 }
 
-'use client'
-
-import { useState } from 'react'
 
 // ---------------------------
 // Event Card Component
