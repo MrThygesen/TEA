@@ -1,4 +1,4 @@
-// pages/api/events/register.js
+// pages/api/events/register.js 
 import { pool } from '../../../lib/postgres.js'
 import Stripe from 'stripe'
 import { auth } from '../../../lib/auth.js'
@@ -29,34 +29,38 @@ export default async function handler(req, res) {
     const event = rows[0]
     if (!event) return res.status(404).json({ error: 'Event not found' })
 
-    // --- upsert registration ---
-    await pool.query(
-      `INSERT INTO registrations (event_id, user_id, email, wallet_address)
-       VALUES ($1,$2,$3,$4)
-       ON CONFLICT (event_id,user_id) DO NOTHING`,
-      [eventId, user.id, user.email, user.wallet_address]
-    )
-
-    // helper: get updated count
-    const { rows: countRows } = await pool.query(
-      'SELECT COUNT(*)::int AS count FROM registrations WHERE event_id=$1',
-      [eventId]
-    )
-    const registeredCount = countRows[0]?.count || 0
-
     // --- STAGE: PREBOOK / guestlist ---
     if (stage === 'prebook') {
+      await pool.query(
+        `INSERT INTO prebookings (event_id, user_id, email, wallet_address)
+         VALUES ($1,$2,$3,$4)
+         ON CONFLICT (event_id,user_id) DO NOTHING`,
+        [eventId, user.id, user.email, user.wallet_address]
+      )
+
+      // increment registered_users
+      await pool.query(
+        'UPDATE events SET registered_users = registered_users + 1 WHERE id=$1',
+        [eventId]
+      )
+
       if (user.email) await sendPrebookEmail(user.email, event)
 
       // auto-confirm event if min_attendees reached
+      const { rows: countRows } = await pool.query(
+        'SELECT COUNT(*)::int AS count FROM prebookings WHERE event_id=$1',
+        [eventId]
+      )
+      const registeredCount = countRows[0]?.count || 0
+
       if (registeredCount >= event.min_attendees && !event.is_confirmed) {
         await pool.query('UPDATE events SET is_confirmed=true WHERE id=$1', [eventId])
 
         const { rows: users } = await pool.query(
           `SELECT u.email
-           FROM registrations r
-           JOIN user_profiles u ON r.user_id=u.id
-           WHERE r.event_id=$1`,
+           FROM prebookings p
+           JOIN user_profiles u ON p.user_id=u.id
+           WHERE p.event_id=$1`,
           [eventId]
         )
 
@@ -73,20 +77,24 @@ export default async function handler(req, res) {
 
     // --- STAGE: BOOK ---
     if (stage === 'book') {
-      if (!event.price || Number(event.price) === 0) {
-        // free event → send ticket
-        await pool.query(
-          `UPDATE registrations 
-           SET ticket_sent=true 
-           WHERE event_id=$1 AND user_id=$2`,
-          [eventId, user.id]
-        )
+      await pool.query(
+        `INSERT INTO bookings (event_id, user_id, email, wallet_address)
+         VALUES ($1,$2,$3,$4)
+         ON CONFLICT (event_id,user_id) DO NOTHING`,
+        [eventId, user.id, user.email, user.wallet_address]
+      )
 
+      await pool.query(
+        'UPDATE events SET registered_users = registered_users + 1 WHERE id=$1',
+        [eventId]
+      )
+
+      if (!event.price || Number(event.price) === 0) {
+        // free event → send ticket immediately
         if (user.email) await sendTicketEmail(user.email, event, user)
 
         return res.status(200).json({
           message: 'Ticket sent successfully 🎟️',
-          registeredCount,
         })
       }
 
@@ -110,11 +118,10 @@ export default async function handler(req, res) {
 
       return res.status(200).json({
         url: session.url,
-        registeredCount,
       })
     }
 
-    return res.status(400).json({ error: 'Invalid stage', registeredCount })
+    return res.status(400).json({ error: 'Invalid stage' })
   } catch (err) {
     console.error('❌ register error:', err)
     return res.status(500).json({ error: 'Internal server error', details: err.message })
