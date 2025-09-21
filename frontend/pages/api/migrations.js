@@ -1,21 +1,17 @@
-// pages/api/initdb.js
+// migrations.js
 import pkg from 'pg'
 import dotenv from 'dotenv'
 dotenv.config()
 const { Pool } = pkg
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed. Use POST.' })
-  }
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+})
 
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
-  })
-
+async function runMigrations() {
   try {
-    console.log('🔹 Initializing database...')
+    console.log('🔹 Running migrations...')
 
     // ----------------------------
     // TELEGRAM USER PROFILES
@@ -44,7 +40,6 @@ export default async function handler(req, res) {
         expires_at TIMESTAMPTZ NOT NULL
       );
     `)
-
     await pool.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_web_email_verif_userid
       ON web_email_verification_tokens(user_id);
@@ -88,12 +83,10 @@ export default async function handler(req, res) {
         )
       );
     `)
-
     await pool.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_userid
       ON email_verification_tokens(user_id);
     `)
-
     await pool.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_tgid
       ON email_verification_tokens(telegram_user_id);
@@ -127,8 +120,9 @@ export default async function handler(req, res) {
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `)
-
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_events_city ON events(LOWER(city));`)
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_events_city ON events(LOWER(city));
+    `)
 
     // ----------------------------
     // REGISTRATIONS
@@ -147,7 +141,7 @@ export default async function handler(req, res) {
         voucher_applied BOOLEAN DEFAULT FALSE,
         basic_perk_applied BOOLEAN DEFAULT FALSE,
         advanced_perk_applied BOOLEAN DEFAULT FALSE,
-        ticket_code TEXT UNIQUE,
+        ticket_code TEXT UNIQUE, 
         ticket_validated BOOLEAN DEFAULT FALSE,
         validated_by TEXT,
         validated_at TIMESTAMPTZ,
@@ -204,7 +198,6 @@ export default async function handler(req, res) {
         UNIQUE(event_id, user_id, telegram_user_id)
       );
     `)
-
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_favorites_event ON favorites(event_id);`)
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_favorites_web ON favorites(user_id);`)
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_favorites_tg ON favorites(telegram_user_id);`)
@@ -222,7 +215,7 @@ export default async function handler(req, res) {
       $$ LANGUAGE 'plpgsql';
     `)
 
-    // drop triggers first
+    // drop existing triggers if exist
     await pool.query(`DROP TRIGGER IF EXISTS trg_update_user_profiles_updated_at ON user_profiles;`)
     await pool.query(`DROP TRIGGER IF EXISTS trg_update_telegram_user_profiles_updated_at ON telegram_user_profiles;`)
     await pool.query(`DROP TRIGGER IF EXISTS trg_update_events_updated_at ON events;`)
@@ -234,14 +227,12 @@ export default async function handler(req, res) {
       FOR EACH ROW
       EXECUTE FUNCTION update_updated_at_column();
     `)
-
     await pool.query(`
       CREATE TRIGGER trg_update_telegram_user_profiles_updated_at
       BEFORE UPDATE ON telegram_user_profiles
       FOR EACH ROW
       EXECUTE FUNCTION update_updated_at_column();
     `)
-
     await pool.query(`
       CREATE TRIGGER trg_update_events_updated_at
       BEFORE UPDATE ON events
@@ -249,13 +240,15 @@ export default async function handler(req, res) {
       EXECUTE FUNCTION update_updated_at_column();
     `)
 
-    console.log('✅ Database fully initialized.')
-    res.status(200).json({ success: true, message: 'Database fully initialized' })
+    console.log('✅ Migrations applied successfully')
+    process.exit(0)
   } catch (err) {
-    console.error('❌ InitDB error:', err)
-    res.status(500).json({ error: 'Server error', details: err.message })
+    console.error('❌ Migration failed', err)
+    process.exit(1)
   } finally {
     await pool.end()
   }
 }
+
+//runMigrations()
 
