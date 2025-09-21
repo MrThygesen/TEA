@@ -42,48 +42,67 @@ export function DynamicEventCard({ event, onPreview, authUser, setShowAccountMod
   const eventConfirmed = event.is_confirmed === true
 
   // --- handle registration / booking ---
-  async function handleWebAction(stage) {
-    if (!authUser) {
-      setShowAccountModal(true)
+async function handleWebAction(stage) {
+  if (!authUser) {
+    setShowAccountModal(true)
+    return
+  }
+
+  setLoading(true)
+  setStatusMsg('Processing...')
+
+  try {
+    const token = authUser?.token || localStorage.getItem('token')
+    const res = await fetch('/api/events/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ eventId: event.id, stage }),
+    })
+
+    const data = await res.json()
+
+    if (!res.ok) throw new Error(data.error || 'Failed to register')
+
+    // Update registered users count
+    if (typeof data.registeredCount === 'number') {
+      setRegisteredUsers(data.registeredCount)
+    }
+
+    // Handle free events → ticket sent
+    if (stage === 'book' && (!event.price || Number(event.price) === 0)) {
+      setHasTicket(true)
+      setStatusMsg(data.message || 'Ticket sent successfully!')
+      setTimeout(() => setStatusMsg(''), 2500)
       return
     }
- 
-    setLoading(true)
-    setStatusMsg('Processing...')
 
-    try {
-      const token = authUser?.token || localStorage.getItem('token')
-      const res = await fetch('/api/events/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ eventId: event.id, stage }),
-      })
-
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to register')
-
-      // Update registered users count from backend response
-      if (typeof data.registeredCount === 'number') {
-        setRegisteredUsers(data.registeredCount)
-      }
-
-      if (stage === 'book') {
-        setHasTicket(true)
-      }
-
-      setStatusMsg('Success!')
-      setTimeout(() => setStatusMsg(''), 2500)
-    } catch (err) {
-      console.error(err)
-      setStatusMsg(err.message || 'Error occurred')
-      setTimeout(() => setStatusMsg(''), 2500)
-    } finally {
-      setLoading(false)
+    // Handle paid events → redirect to Stripe checkout
+    if (stage === 'book' && Number(event.price) > 0 && data.url) {
+      setStatusMsg('Redirecting to payment...')
+      setTimeout(() => {
+        window.location.href = data.url
+      }, 500)
+      return
     }
+
+    // Handle prebook / guestlist
+    if (stage === 'prebook') {
+      setStatusMsg(data.message || 'Prebook confirmed!')
+      setTimeout(() => setStatusMsg(''), 2500)
+      return
+    }
+
+  } catch (err) {
+    console.error(err)
+    setStatusMsg(err.message || 'Error occurred')
+    setTimeout(() => setStatusMsg(''), 2500)
+  } finally {
+    setLoading(false)
   }
+}
 
   // --- determine button label and stage ---
   function getWebButton() {
