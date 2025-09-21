@@ -103,8 +103,8 @@ CREATE INDEX IF NOT EXISTS idx_events_city
 CREATE TABLE IF NOT EXISTS registrations (
     id SERIAL PRIMARY KEY,
     event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-    user_id INTEGER NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
-    telegram_user_id INTEGER NOT NULL REFERENCES telegram_user_profiles(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES user_profiles(id) ON DELETE CASCADE,
+    telegram_user_id INTEGER REFERENCES telegram_user_profiles(id) ON DELETE CASCADE,
     telegram_username TEXT,
     email TEXT,
     wallet_address TEXT,
@@ -121,10 +121,20 @@ CREATE TABLE IF NOT EXISTS registrations (
     paid_at TIMESTAMPTZ,
     ticket_sent BOOLEAN DEFAULT FALSE,
     CONSTRAINT registrations_user_check CHECK (
-    user_id IS NOT NULL OR telegram_user_id IS NOT NULL
-    ),
-    UNIQUE(event_id, user_id, telegram_user_id)
+        user_id IS NOT NULL OR telegram_user_id IS NOT NULL
+    )
 );
+
+-- Partial unique index for web users (user_id not null)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_registrations_event_user
+ON registrations(event_id, user_id)
+WHERE user_id IS NOT NULL;
+
+-- Partial unique index for Telegram users (telegram_user_id not null)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_registrations_event_tguser
+ON registrations(event_id, telegram_user_id)
+WHERE telegram_user_id IS NOT NULL;
+
 
 -- ----------------------------
 -- INVITATIONS

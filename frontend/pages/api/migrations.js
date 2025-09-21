@@ -46,7 +46,7 @@ async function runMigrations() {
     `)
 
     // ----------------------------
-    // USER PROFILES (web users)
+    // USER PROFILES
     // ----------------------------
     await pool.query(`
       CREATE TABLE IF NOT EXISTS user_profiles (
@@ -120,9 +120,7 @@ async function runMigrations() {
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `)
-    await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_events_city ON events(LOWER(city));
-    `)
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_events_city ON events(LOWER(city));`)
 
     // ----------------------------
     // REGISTRATIONS
@@ -141,7 +139,7 @@ async function runMigrations() {
         voucher_applied BOOLEAN DEFAULT FALSE,
         basic_perk_applied BOOLEAN DEFAULT FALSE,
         advanced_perk_applied BOOLEAN DEFAULT FALSE,
-        ticket_code TEXT UNIQUE, 
+        ticket_code TEXT UNIQUE,
         ticket_validated BOOLEAN DEFAULT FALSE,
         validated_by TEXT,
         validated_at TIMESTAMPTZ,
@@ -150,9 +148,19 @@ async function runMigrations() {
         ticket_sent BOOLEAN DEFAULT FALSE,
         CONSTRAINT registrations_user_check CHECK (
           user_id IS NOT NULL OR telegram_user_id IS NOT NULL
-        ),
-        UNIQUE(event_id, user_id, telegram_user_id)
+        )
       );
+    `)
+    // partial unique indexes
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_registrations_event_user
+      ON registrations(event_id, user_id)
+      WHERE user_id IS NOT NULL;
+    `)
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_registrations_event_tguser
+      ON registrations(event_id, telegram_user_id)
+      WHERE telegram_user_id IS NOT NULL;
     `)
 
     // ----------------------------
@@ -194,8 +202,7 @@ async function runMigrations() {
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT favorites_user_check CHECK (
           user_id IS NOT NULL OR telegram_user_id IS NOT NULL
-        ),
-        UNIQUE(event_id, user_id, telegram_user_id)
+        )
       );
     `)
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_favorites_event ON favorites(event_id);`)
@@ -215,12 +222,11 @@ async function runMigrations() {
       $$ LANGUAGE 'plpgsql';
     `)
 
-    // drop existing triggers if exist
+    // attach triggers
     await pool.query(`DROP TRIGGER IF EXISTS trg_update_user_profiles_updated_at ON user_profiles;`)
     await pool.query(`DROP TRIGGER IF EXISTS trg_update_telegram_user_profiles_updated_at ON telegram_user_profiles;`)
     await pool.query(`DROP TRIGGER IF EXISTS trg_update_events_updated_at ON events;`)
 
-    // attach triggers
     await pool.query(`
       CREATE TRIGGER trg_update_user_profiles_updated_at
       BEFORE UPDATE ON user_profiles
@@ -250,5 +256,5 @@ async function runMigrations() {
   }
 }
 
-//runMigrations()
+runMigrations()
 

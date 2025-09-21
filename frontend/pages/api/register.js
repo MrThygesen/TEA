@@ -1,69 +1,60 @@
-// pages/api/register.js
-import bcrypt from 'bcryptjs'
+// pages/api/events/register.js
 import crypto from 'crypto'
-import { pool } from '../../lib/postgres.js'
-import { sendVerificationEmail } from '../../lib/email.js'
+import { pool } from '../../../lib/postgres.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' })
   }
 
-  const { email, password, username } = req.body
-  if (!email || !password || !username) {
-    return res.status(400).json({ error: 'Username, email and password are required.' })
+  const { eventId, userId, telegramUserId, email, walletAddress } = req.body
+
+  if (!eventId || (!userId && !telegramUserId)) {
+    return res.status(400).json({ error: 'eventId and either userId or telegramUserId are required' })
   }
 
   try {
-    console.log('🔹 Registration started for:', email)
+    // Generate a globally unique ticket code
+    const ticketCode = `ticket:${eventId}:${userId || telegramUserId}:${crypto.randomUUID()}`
 
-    const hashedPassword = await bcrypt.hash(password, 10)
+    let query, values
 
-    const result = await pool.query(
-      `INSERT INTO user_profiles (email, password_hash, username, email_verified)
-       VALUES ($1, $2, $3, TRUE)
-       ON CONFLICT (email) DO NOTHING
-       RETURNING id, email, username`,
-      [email, hashedPassword, username]
-    )
-
-    if (result.rows.length === 0) {
-      return res.status(400).json({ error: 'Email already registered' })
+    if (userId) {
+      // Web user registration
+      query = `
+        INSERT INTO registrations (event_id, user_id, email, wallet_address, ticket_code)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (event_id, user_id)
+        DO UPDATE SET email = EXCLUDED.email,
+                      wallet_address = EXCLUDED.wallet_address,
+                      ticket_code = EXCLUDED.ticket_code,
+                      timestamp = CURRENT_TIMESTAMP
+        RETURNING *
+      `
+      values = [eventId, userId, email || null, walletAddress || null, ticketCode]
+    } else {
+      // Telegram user registration
+      query = `
+        INSERT INTO registrations (event_id, telegram_user_id, email, wallet_address, ticket_code)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (event_id, telegram_user_id)
+        DO UPDATE SET email = EXCLUDED.email,
+                      wallet_address = EXCLUDED.wallet_address,
+                      ticket_code = EXCLUDED.ticket_code,
+                      timestamp = CURRENT_TIMESTAMP
+        RETURNING *
+      `
+      values = [eventId, telegramUserId, email || null, walletAddress || null, ticketCode]
     }
 
-    const user = result.rows[0]
+    const result = await pool.query(query, values)
 
-    // ✅ Generate token
-    const token = crypto.randomBytes(32).toString('hex')
-
-    // ✅ Use ISO string for Postgres TIMESTAMPTZ
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-
-    // Insert token
-    await pool.query(
-      `INSERT INTO email_verification_tokens (user_id, token, expires_at, email)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (user_id) 
-       DO UPDATE SET token = EXCLUDED.token,
-                     expires_at = EXCLUDED.expires_at,
-                     email = EXCLUDED.email`,
-      [user.id, token, expiresAt, email]
-    )
-
-    // Send verification email
-    try {
-      await sendVerificationEmail(email, token)
-    } catch (emailErr) {
-      console.warn('⚠️ Failed to send verification email:', emailErr)
-    }
-
-    return res.status(201).json({
-      message: '✅ Registration successful. Please check your email to verify your account.',
-      debug: { token, expiresAt }, // optional for debugging
+    return res.status(200).json({
+      message: '✅ Registered successfully',
+      registration: result.rows[0],
     })
-
   } catch (err) {
-    console.error('❌ Registration error:', err)
+    console.error('❌ Event registration error:', err)
     return res.status(500).json({ error: 'Internal server error', details: err.message })
   }
 }

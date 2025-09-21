@@ -1,12 +1,18 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import QRCode from 'qrcode.react'
 
 export default function YourAccountModal({ profile, onClose }) {
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [qrModal, setQrModal] = useState(null)
+  const [qrModal, setQrModal] = useState(null) 
+
+
+
+
+
 
   useEffect(() => {
     const fetchTickets = async () => {
@@ -89,11 +95,16 @@ export default function YourAccountModal({ profile, onClose }) {
                     <span>{t.event_name}</span>
                     <span className="text-green-400">✅ Confirmed</span>
                     <button
-                      onClick={() => setQrModal(t)}
-                      className="text-blue-400 hover:underline"
-                    >
-                      Open QR
-                    </button>
+                onClick={() =>
+                setQrModal({
+                ...t,
+                qrCode: t.ticket_code, // pass ticket_code for QR
+                })
+                  }
+                  className="text-blue-400 hover:underline"
+                >
+                  Open QR
+                </button>
                   </div>
                 ))}
               </div>
@@ -144,32 +155,30 @@ export default function YourAccountModal({ profile, onClose }) {
         )}
       </div>
 
-      {/* QR Modal */}
-      {qrModal && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
-          onClick={() => setQrModal(null)}
-        >
-          <div
-            className="bg-zinc-900 rounded-xl p-6 max-w-sm w-full text-center"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-lg font-semibold mb-4">{qrModal.event_name}</h3>
-            <img
-              src={qrModal.qrImage}
-              alt="QR Ticket"
-              className="rounded-lg border border-zinc-700 mx-auto mb-4"
-            />
-            <button
-              onClick={() => setQrModal(null)}
-              className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
+{/* QR Modal */}
+{qrModal && (
+  <div
+    className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+    onClick={() => setQrModal(null)}
+  >
+    <div
+      className="bg-zinc-900 rounded-xl p-6 max-w-sm w-full text-center"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <h3 className="text-lg font-semibold mb-4">{qrModal.event_name}</h3>
+      <QRCode
+        value={qrModal.qrCode}  // <-- generate QR from ticket_code
+        size={180}
+        className="mx-auto mb-4"
+      />
+      <p className="text-sm text-gray-400 break-all">{qrModal.ticket_code}</p>
+      <button
+        onClick={() => setQrModal(null)}
+        className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
+      >
+        Close
+      </button>
     </div>
-  )
-}
+  </div>
+)}
 
