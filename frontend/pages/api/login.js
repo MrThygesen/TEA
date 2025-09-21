@@ -1,19 +1,14 @@
-// pages/api/login.js
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { pool } from '../../lib/postgres.js'
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed. Use POST.' })
-  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST' })
 
   try {
     const { email, username, password } = req.body
-    console.log('📩 API received:', { email, username, password })
-
     if ((!email && !username) || !password) {
-      return res.status(400).json({ error: 'Email/username and password are required.' })
+      return res.status(400).json({ error: 'Email or username and password are required' })
     }
 
     const identifier = email || username
@@ -27,19 +22,14 @@ export default async function handler(req, res) {
     )
 
     if (!result.rows.length) {
-      return res.status(400).json({ error: 'Invalid credentials.' })
+      return res.status(400).json({ error: 'Invalid credentials' })
     }
 
     const user = result.rows[0]
     const validPassword = await bcrypt.compare(password, user.password_hash)
+    if (!validPassword) return res.status(400).json({ error: 'Invalid credentials' })
 
-    if (!validPassword) {
-      return res.status(400).json({ error: 'Invalid credentials.' })
-    }
-
-    if (!user.email_verified) {
-      return res.status(403).json({ error: 'Email not verified.' })
-    }
+    if (!user.email_verified) return res.status(403).json({ error: 'Email not verified' })
 
     const token = jwt.sign(
       { id: user.id, email: user.email, username: user.username },
@@ -59,7 +49,7 @@ export default async function handler(req, res) {
       },
     })
   } catch (err) {
-    console.error('❌ Login error:', err)
+    console.error('Login error:', err)
     return res.status(500).json({ error: 'Internal server error' })
   }
 }

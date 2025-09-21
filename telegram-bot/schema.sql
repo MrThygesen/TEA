@@ -4,7 +4,7 @@
 -- =========================
 
 -- ----------------------------
--- WEB USER PROFILES
+-- TELEGRAM USER PROFILES
 -- ----------------------------
 CREATE TABLE IF NOT EXISTS telegram_user_profiles (
     id SERIAL PRIMARY KEY,
