@@ -238,50 +238,6 @@ export default function DynamicEventCard({ event, onPreview, authUser, setShowAc
         </div>
       )}
 
-      {/* Event Details Modal */}
-      {!onPreview && internalModalOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
-          onClick={() => setInternalModalOpen(false)}
-        >
-          <div
-            className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-xl font-bold mb-4">{event.name}</h2>
-            <img
-              src={event.image_url || '/default-event.jpg'}
-              alt={event.name}
-              className="w-full h-56 object-contain rounded mb-4"
-            />
-            <p className="mb-2 text-sm text-gray-400">
-              {new Date(event.datetime).toLocaleString()} @ {event.venue} ({event.venue_type || 'N/A'})
-            </p>
-            <p className="mb-4">{event.details}</p>
-
-            {event.basic_perk && (
-              <p className="text-sm text-gray-300">
-                <strong>Basic Perk:</strong> {event.basic_perk}
-              </p>
-            )}
-            {(event.paid_count || 0) >= 10 && event.advanced_perk && (
-              <p className="text-sm text-gray-300">
-                <strong>Advanced Perk:</strong> {event.advanced_perk}
-              </p>
-            )}
-
-            <button
-              onClick={() => setInternalModalOpen(false)}
-              className="mt-6 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
-    </>
-  )
-}
 
 
       {/* Event details modal */}
@@ -441,32 +397,32 @@ export default function Home() {
   }, [])
 
   // --- load user data on auth ---
-  useEffect(() => {
-    async function loadProfile() {
-      const token = localStorage.getItem('token')
-      if (!token) return
+useEffect(() => {
+  async function loadProfile() {
+    const token = localStorage.getItem('token')
+    if (!token) return
 
-      try {
-        const res = await fetch('/api/user/me', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        if (!res.ok) return
-        const data = await res.json()
-        setProfileName(data.username || '')
-        setProfileEmail(data.email || '')
-        setCoupons(data.paid_coupons || [])
-        setPrebookings(data.prebooked_events || [])
+    try {
+      const res = await fetch('/api/user/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      setProfileName(data.username || '')
+      setProfileEmail(data.email || '')
+      setCoupons(data.paid_coupons || [])
+      setPrebookings(data.prebooked_events || [])
 
-        const updatedUser = { ...authUser, ...data }
-        setAuthUser(updatedUser)
-        saveAuth(updatedUser)
-      } catch (err) {
-        console.error('Error fetching profile:', err)
-      }
+      const updatedUser = { ...authUser, ...data }
+      setAuthUser(updatedUser)
+      saveAuth(updatedUser)
+    } catch (err) {
+      console.error('Error fetching profile:', err)
     }
+  }
 
-    if (showAccountModal) loadProfile()
-  }, [showAccountModal])
+  if (authUser) loadProfile()
+}, [authUser])
 
   // --- auth handlers ---
   async function handleLogin(e) {
@@ -774,49 +730,4 @@ export default function Home() {
           </div>
         </div>
       )}
-
-      {/* Event Preview Modal */}
-      {!onPreview && internalModalOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
-          onClick={() => setInternalModalOpen(false)}
-        >
-          <div
-            className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-xl font-bold mb-4">{event.name}</h2>
-            <img
-              src={event.image_url || '/default-event.jpg'}
-              alt={event.name}
-              className="w-full h-56 object-contain rounded mb-4"
-            />
-            <p className="mb-2 text-sm text-gray-400">
-              {new Date(event.datetime).toLocaleString()} @ {event.venue} ({event.venue_type || 'N/A'})
-            </p>
-            <p className="mb-4">{event.details}</p>
-
-            {event.basic_perk && (
-              <p className="text-sm text-gray-300">
-                <strong>Basic Perk:</strong> {event.basic_perk}
-              </p>
-            )}
-            {(event.paid_count || 0) >= 10 && event.advanced_perk && (
-              <p className="text-sm text-gray-300">
-                <strong>Advanced Perk:</strong> {event.advanced_perk}
-              </p>
-            )}
-
-            <button
-              onClick={() => setInternalModalOpen(false)}
-              className="mt-6 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
-    </>
-  )
-}
 
