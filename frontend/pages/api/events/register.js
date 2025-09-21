@@ -24,16 +24,17 @@ export default async function handler(req, res) {
   if (!stage) return res.status(400).json({ error: 'Missing stage' })
 
   try {
+    // --- fetch event ---
     const { rows } = await pool.query('SELECT * FROM events WHERE id=$1', [eventId])
     const event = rows[0]
     if (!event) return res.status(404).json({ error: 'Event not found' })
 
-    // --- INSERT registration ---
+    // --- upsert registration ---
     await pool.query(
-      `INSERT INTO registrations (event_id, user_id, email)
-       VALUES ($1,$2,$3)
+      `INSERT INTO registrations (event_id, user_id, email, wallet_address)
+       VALUES ($1,$2,$3,$4)
        ON CONFLICT (event_id,user_id) DO NOTHING`,
-      [eventId, user.id, user.email]
+      [eventId, user.id, user.email, user.wallet_address]
     )
 
     // helper: get updated count
@@ -58,10 +59,16 @@ export default async function handler(req, res) {
            WHERE r.event_id=$1`,
           [eventId]
         )
-        await Promise.all(users.map(u => sendBookingReminderEmail(u.email, event)))
+
+        await Promise.all(
+          users.filter(u => u.email).map(u => sendBookingReminderEmail(u.email, event))
+        )
       }
 
-      return res.status(200).json({ message: 'Prebook confirmed', registeredCount })
+      return res.status(200).json({
+        message: 'You are on the guestlist ✅',
+        registeredCount,
+      })
     }
 
     // --- STAGE: BOOK ---
@@ -69,11 +76,18 @@ export default async function handler(req, res) {
       if (!event.price || Number(event.price) === 0) {
         // free event → send ticket
         await pool.query(
-          `UPDATE registrations SET ticket_sent=true WHERE event_id=$1 AND user_id=$2`,
+          `UPDATE registrations 
+           SET ticket_sent=true 
+           WHERE event_id=$1 AND user_id=$2`,
           [eventId, user.id]
         )
+
         if (user.email) await sendTicketEmail(user.email, event, user)
-        return res.status(200).json({ message: 'Ticket sent successfully', registeredCount })
+
+        return res.status(200).json({
+          message: 'Ticket sent successfully 🎟️',
+          registeredCount,
+        })
       }
 
       // paid event → Stripe checkout
@@ -86,15 +100,18 @@ export default async function handler(req, res) {
             product_data: { name: event.name },
             unit_amount: Math.round(Number(event.price) * 100),
           },
-          quantity: 1
+          quantity: 1,
         }],
         success_url: `${process.env.FRONTEND_URL}/success?event=${eventId}&user=${user.id}`,
         cancel_url: `${process.env.FRONTEND_URL}/cancel?event=${eventId}`,
         metadata: { eventId: String(eventId), userId: String(user.id) },
-        customer_email: user.email || undefined
+        customer_email: user.email || undefined,
       })
 
-      return res.status(200).json({ url: session.url, registeredCount })
+      return res.status(200).json({
+        url: session.url,
+        registeredCount,
+      })
     }
 
     return res.status(400).json({ error: 'Invalid stage', registeredCount })
