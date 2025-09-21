@@ -776,28 +776,47 @@ export default function Home() {
       )}
 
       {/* Event Preview Modal */}
-      {showEventModal && selectedEvent && (
+      {!onPreview && internalModalOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowEventModal(false)}
+          onClick={() => setInternalModalOpen(false)}
         >
           <div
             className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-xl font-bold mb-4">{selectedEvent.name}</h2>
-            <img src={selectedEvent.image_url || '/default-event.jpg'} alt={selectedEvent.name} className="w-full h-56 object-contain rounded mb-4" />
-            <p className="mb-2 text-sm text-gray-400">{new Date(selectedEvent.datetime).toLocaleString()} @ {selectedEvent.venue} ({selectedEvent.venue_type || 'N/A'})</p>
-            <p className="mb-4">{selectedEvent.details}</p>
+            <h2 className="text-xl font-bold mb-4">{event.name}</h2>
+            <img
+              src={event.image_url || '/default-event.jpg'}
+              alt={event.name}
+              className="w-full h-56 object-contain rounded mb-4"
+            />
+            <p className="mb-2 text-sm text-gray-400">
+              {new Date(event.datetime).toLocaleString()} @ {event.venue} ({event.venue_type || 'N/A'})
+            </p>
+            <p className="mb-4">{event.details}</p>
 
-            {selectedEvent.basic_perk && <p className="text-sm text-gray-300"><strong>Basic Perk:</strong> {selectedEvent.basic_perk}</p>}
-            {(selectedEvent.paid_count || 0) >= 10 && selectedEvent.advanced_perk && <p className="text-sm text-gray-300"><strong>Advanced Perk:</strong> {selectedEvent.advanced_perk}</p>}
+            {event.basic_perk && (
+              <p className="text-sm text-gray-300">
+                <strong>Basic Perk:</strong> {event.basic_perk}
+              </p>
+            )}
+            {(event.paid_count || 0) >= 10 && event.advanced_perk && (
+              <p className="text-sm text-gray-300">
+                <strong>Advanced Perk:</strong> {event.advanced_perk}
+              </p>
+            )}
 
-            <button onClick={() => setShowEventModal(false)} className="mt-6 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">Close</button>
+            <button
+              onClick={() => setInternalModalOpen(false)}
+              className="mt-6 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}
-    </main>
+    </>
   )
 }
 
