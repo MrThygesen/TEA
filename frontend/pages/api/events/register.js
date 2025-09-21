@@ -11,7 +11,6 @@ export default async function handler(req, res) {
   if (req.method !== 'POST')
     return res.status(405).json({ error: 'Method not allowed' })
 
-  // --- auth ---
   const token = auth.getTokenFromReq(req)
   if (!token) return res.status(401).json({ error: 'Not authenticated' })
 
@@ -27,7 +26,6 @@ export default async function handler(req, res) {
   if (!stage) return res.status(400).json({ error: 'Missing stage' })
 
   try {
-    // --- fetch event ---
     const { rows: eventRows } = await pool.query('SELECT * FROM events WHERE id=$1', [eventId])
     const event = eventRows[0]
     if (!event) return res.status(404).json({ error: 'Event not found' })
@@ -35,41 +33,52 @@ export default async function handler(req, res) {
     // --- generate unique ticket code ---
     let ticketCode
     let codeInserted = false
+
     while (!codeInserted) {
       ticketCode = crypto.randomBytes(8).toString('hex')
       try {
-        await pool.query(
-          `INSERT INTO registrations (event_id, user_id, email, wallet_address, ticket_code)
-           VALUES ($1,$2,$3,$4,$5)
-           ON CONFLICT (event_id,user_id) DO UPDATE 
-             SET email=EXCLUDED.email,
-                 wallet_address=EXCLUDED.wallet_address,
-                 ticket_code=EXCLUDED.ticket_code`,
-          [eventId, user.id, user.email, user.wallet_address || null, ticketCode]
-        )
+        if (user.id) {
+          await pool.query(
+            `INSERT INTO registrations (event_id, user_id, email, wallet_address, ticket_code)
+             VALUES ($1,$2,$3,$4,$5)
+             ON CONFLICT(event_id,user_id) DO UPDATE
+               SET email=EXCLUDED.email,
+                   wallet_address=EXCLUDED.wallet_address,
+                   ticket_code=EXCLUDED.ticket_code`,
+            [eventId, user.id, user.email, user.wallet_address || null, ticketCode]
+          )
+        } else if (user.telegram_user_id) {
+          await pool.query(
+            `INSERT INTO registrations (event_id, telegram_user_id, email, wallet_address, ticket_code)
+             VALUES ($1,$2,$3,$4,$5)
+             ON CONFLICT(event_id,telegram_user_id) DO UPDATE
+               SET email=EXCLUDED.email,
+                   wallet_address=EXCLUDED.wallet_address,
+                   ticket_code=EXCLUDED.ticket_code`,
+            [eventId, user.telegram_user_id, user.email, user.wallet_address || null, ticketCode]
+          )
+        } else {
+          return res.status(400).json({ error: 'No user ID found in token' })
+        }
+
         codeInserted = true
       } catch (err) {
-        if (err.code === '23505') {
-          // duplicate ticket_code → retry
-          continue
-        } else {
-          throw err
-        }
+        if (err.code === '23505') continue // duplicate ticket_code
+        else throw err
       }
     }
 
-    // --- get registered users count ---
+    // --- registered count ---
     const { rows: countRows } = await pool.query(
       'SELECT COUNT(*)::int AS count FROM registrations WHERE event_id=$1',
       [eventId]
     )
     const registeredCount = countRows[0]?.count || 0
 
-    // --- STAGE: PREBOOK ---
+    // --- prebook ---
     if (stage === 'prebook') {
       if (user.email) await sendPrebookEmail(user.email, event)
 
-      // auto-confirm if min_attendees reached
       if (registeredCount >= event.min_attendees && !event.is_confirmed) {
         await pool.query('UPDATE events SET is_confirmed=true WHERE id=$1', [eventId])
 
@@ -92,16 +101,21 @@ export default async function handler(req, res) {
       })
     }
 
-    // --- STAGE: BOOK ---
+    // --- book ---
     if (stage === 'book') {
       if (!event.price || Number(event.price) === 0) {
         // free event → send ticket immediately
-        await pool.query(
-          `UPDATE registrations 
-           SET ticket_sent=true 
-           WHERE event_id=$1 AND user_id=$2`,
-          [eventId, user.id]
-        )
+        if (user.id) {
+          await pool.query(
+            `UPDATE registrations SET ticket_sent=true WHERE event_id=$1 AND user_id=$2`,
+            [eventId, user.id]
+          )
+        } else if (user.telegram_user_id) {
+          await pool.query(
+            `UPDATE registrations SET ticket_sent=true WHERE event_id=$1 AND telegram_user_id=$2`,
+            [eventId, user.telegram_user_id]
+          )
+        }
 
         if (user.email)
           await sendTicketEmail(user.email, event, { ...user, ticket_code: ticketCode })

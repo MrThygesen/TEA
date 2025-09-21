@@ -15,25 +15,34 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { rows } = await pool.query(
-      `SELECT r.id,
-              r.has_paid,
-              r.ticket_sent,
-              r.ticket_code,
-              r.timestamp AS registered_at,
-              e.id AS event_id,
-              e.name AS event_name,
-              e.city,
-              e.datetime,
-              e.price,
-              e.is_confirmed
-       FROM registrations r
-       JOIN events e ON r.event_id = e.id
-       WHERE ($1 IS NOT NULL AND r.user_id = $1)
-          OR ($2 IS NOT NULL AND r.telegram_user_id = $2)
-       ORDER BY e.datetime DESC`,
-      [user.id || null, user.telegram_user_id || null]
-    )
+    let ticketsQuery = ''
+    let params = []
+
+    if (user.id) {
+      ticketsQuery = `
+        SELECT r.id, r.has_paid, r.ticket_sent, r.ticket_code, r.timestamp AS registered_at,
+               e.id AS event_id, e.name AS event_name, e.city, e.datetime, e.price, e.is_confirmed
+        FROM registrations r
+        JOIN events e ON r.event_id = e.id
+        WHERE r.user_id = $1
+        ORDER BY e.datetime DESC
+      `
+      params = [user.id]
+    } else if (user.telegram_user_id) {
+      ticketsQuery = `
+        SELECT r.id, r.has_paid, r.ticket_sent, r.ticket_code, r.timestamp AS registered_at,
+               e.id AS event_id, e.name AS event_name, e.city, e.datetime, e.price, e.is_confirmed
+        FROM registrations r
+        JOIN events e ON r.event_id = e.id
+        WHERE r.telegram_user_id = $1
+        ORDER BY e.datetime DESC
+      `
+      params = [user.telegram_user_id]
+    } else {
+      return res.status(400).json({ error: 'No user ID found in token' })
+    }
+
+    const { rows } = await pool.query(ticketsQuery, params)
 
     const tickets = await Promise.all(
       rows.map(async (t) => {
