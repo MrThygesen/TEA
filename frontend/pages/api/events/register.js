@@ -36,29 +36,50 @@ export default async function handler(req, res) {
 
     while (!codeInserted) {
       ticketCode = crypto.randomBytes(8).toString('hex')
+
       try {
-        if (user.id) {
+        // --- check if registration exists ---
+        const existing = await pool.query(
+          `SELECT id FROM registrations
+           WHERE event_id = $1 AND (
+             (user_id IS NOT NULL AND user_id = $2) OR
+             (telegram_user_id IS NOT NULL AND telegram_user_id = $3)
+           )`,
+          [eventId, user.id || null, user.telegram_user_id || null]
+        )
+
+        if (existing.rows.length > 0) {
+          // update existing registration
           await pool.query(
-            `INSERT INTO registrations (event_id, user_id, email, wallet_address, ticket_code)
-             VALUES ($1,$2,$3,$4,$5)
-             ON CONFLICT(event_id,user_id) DO UPDATE
-               SET email=EXCLUDED.email,
-                   wallet_address=EXCLUDED.wallet_address,
-                   ticket_code=EXCLUDED.ticket_code`,
-            [eventId, user.id, user.email, user.wallet_address || null, ticketCode]
-          )
-        } else if (user.telegram_user_id) {
-          await pool.query(
-            `INSERT INTO registrations (event_id, telegram_user_id, email, wallet_address, ticket_code)
-             VALUES ($1,$2,$3,$4,$5)
-             ON CONFLICT(event_id,telegram_user_id) DO UPDATE
-               SET email=EXCLUDED.email,
-                   wallet_address=EXCLUDED.wallet_address,
-                   ticket_code=EXCLUDED.ticket_code`,
-            [eventId, user.telegram_user_id, user.email, user.wallet_address || null, ticketCode]
+            `UPDATE registrations
+             SET email=$1,
+                 wallet_address=$2,
+                 ticket_code=$3,
+                 timestamp=CURRENT_TIMESTAMP
+             WHERE id=$4`,
+            [
+              user.email || null,
+              user.wallet_address || null,
+              ticketCode,
+              existing.rows[0].id
+            ]
           )
         } else {
-          return res.status(400).json({ error: 'No user ID found in token' })
+          // insert new registration
+          await pool.query(
+            `INSERT INTO registrations
+             (event_id, user_id, telegram_user_id, telegram_username, email, wallet_address, ticket_code, timestamp)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,CURRENT_TIMESTAMP)`,
+            [
+              eventId,
+              user.id || null,
+              user.telegram_user_id || null,
+              user.telegram_username || null,
+              user.email || null,
+              user.wallet_address || null,
+              ticketCode
+            ]
+          )
         }
 
         codeInserted = true
