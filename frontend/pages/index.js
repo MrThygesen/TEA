@@ -51,44 +51,27 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
 
     try {
       const token = localStorage.getItem('token')
-      const res = await fetch('/api/events/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token || ''}`,
-        },
-        body: JSON.stringify({ eventId: event.id, stage }),
-      })
-      const data = await res.json()
+const res = await fetch('/api/events/register', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${auth.token}`,
+  },
+  body: JSON.stringify({ eventId: event.id, stage }),
+})
+const data = await res.json()
+if (!res.ok) throw new Error(data.error || 'Failed to register')
 
-      if (data.url) {
-        // Paid event: redirect to Stripe Checkout
-        window.location.href = data.url
-        return
-      }
-
-      if (res.ok) {
-        if (stage === 'prebook') {
-          setStatusMsg('✅ Prebook confirmed! Check your email.')
-        } else if (stage === 'book') {
-          if (!event.price || Number(event.price) === 0) {
-            setStatusMsg('🎟 Ticket booked! Check your email for QR code.')
-          } else {
-            setStatusMsg('Redirecting to payment...')
-          }
-        }
-        if (typeof data.registeredCount === 'number') {
+// ✅ use backend-provided registeredCount
+if (typeof data.registeredCount === 'number') {
   setRegisteredUsers(data.registeredCount)
 }
 
-      } else {
-        setStatusMsg(data.error || 'Something went wrong.')
-      }
-    } catch (err) {
-      console.error(err)
-      setStatusMsg('❌ Network error')
-    } finally {
-      setLoading(false)
+if (stage === 'book') {
+  setHasTicket(true)
+}
+
+setLoading(false)
       setTimeout(() => setStatusMsg(''), 2500) // clear msg after 2.5s
     }
   }
