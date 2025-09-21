@@ -32,30 +32,38 @@ export default async function handler(req, res) {
     const event = eventRows[0]
     if (!event) return res.status(404).json({ error: 'Event not found' })
 
-    // --- generate ticket code ---
-    const ticketCode = crypto.randomBytes(8).toString('hex')
+    // --- generate unique ticket code ---
+    let ticketCode
+    let codeInserted = false
+    while (!codeInserted) {
+      ticketCode = crypto.randomBytes(8).toString('hex')
+      try {
+        await pool.query(
+          `INSERT INTO registrations (event_id, user_id, email, wallet_address, ticket_code)
+           VALUES ($1,$2,$3,$4,$5)
+           ON CONFLICT (event_id,user_id) DO UPDATE 
+             SET email=EXCLUDED.email,
+                 wallet_address=EXCLUDED.wallet_address,
+                 ticket_code=EXCLUDED.ticket_code`,
+          [eventId, user.id, user.email, user.wallet_address || null, ticketCode]
+        )
+        codeInserted = true
+      } catch (err) {
+        if (err.code === '23505') {
+          // duplicate ticket_code → retry
+          continue
+        } else {
+          throw err
+        }
+      }
+    }
 
-    // --- upsert registration ---
-    await pool.query(
-      `INSERT INTO registrations (event_id, user_id, email, wallet_address, ticket_code)
-       VALUES ($1,$2,$3,$4,$5)
-       ON CONFLICT (event_id,user_id) DO UPDATE 
-         SET email=EXCLUDED.email,
-             wallet_address=EXCLUDED.wallet_address,
-             ticket_code=EXCLUDED.ticket_code`,
-      [eventId, user.id, user.email, user.wallet_address || null, ticketCode]
-    )
-
-    // --- increment registered_users count ---
+    // --- get registered users count ---
     const { rows: countRows } = await pool.query(
       'SELECT COUNT(*)::int AS count FROM registrations WHERE event_id=$1',
       [eventId]
     )
     const registeredCount = countRows[0]?.count || 0
-    await pool.query('UPDATE events SET registered_users=$1 WHERE id=$2', [
-      registeredCount,
-      eventId,
-    ])
 
     // --- STAGE: PREBOOK ---
     if (stage === 'prebook') {
@@ -95,7 +103,8 @@ export default async function handler(req, res) {
           [eventId, user.id]
         )
 
-        if (user.email) await sendTicketEmail(user.email, event, { ...user, ticket_code: ticketCode })
+        if (user.email)
+          await sendTicketEmail(user.email, event, { ...user, ticket_code: ticketCode })
 
         return res.status(200).json({
           message: 'Ticket sent successfully 🎟️',
