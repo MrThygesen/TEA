@@ -1,6 +1,6 @@
 // pages/api/events/register.js
 import crypto from 'crypto'
-import { pool } from '../../../lib/postgres.js'
+import { pool } from '../../lib/postgres.js'
 
 
 export default async function handler(req, res) {
