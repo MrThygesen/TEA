@@ -1,6 +1,6 @@
 // pages/api/user/myTickets.js
-import { pool } from '../../../lib/postgres.js'
-import { auth } from '../../../lib/auth.js'
+import { pool } from '../../lib/postgres.js'
+import { auth } from '../../lib/auth.js'
 import QRCode from 'qrcode'
 
 export default async function handler(req, res) {
