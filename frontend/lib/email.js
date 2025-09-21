@@ -22,13 +22,13 @@ async function generateTicketQRCode(eventId, userId) {
 }
 
 /**
- * Send email verification to a new user
+ * Send email verification to a new web user
  */
-async function sendVerificationEmail(to, token, tgId) {
+async function sendVerificationEmail(to, token) {
+  if (!to) throw new Error('Missing recipient email')
+
   try {
-    const verifyUrl = `${BASE_URL}/verify-email?token=${encodeURIComponent(token)}${
-      tgId ? `&tgId=${encodeURIComponent(tgId)}` : ''
-    }`
+    const verifyUrl = `${BASE_URL}/verify-email?token=${encodeURIComponent(token)}`
 
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
     sendSmtpEmail.sender = { name: 'Edgy Events', email: MAIL_FROM }
@@ -44,6 +44,7 @@ async function sendVerificationEmail(to, token, tgId) {
       <p>If the button doesn’t work, copy and paste this URL into your browser:</p>
       <p>${verifyUrl}</p>
     `
+
     await apiInstance.sendTransacEmail(sendSmtpEmail)
     console.log('✅ Verification email sent to', to)
     return true
@@ -54,9 +55,10 @@ async function sendVerificationEmail(to, token, tgId) {
 }
 
 /**
- * Send email to prebooked user immediately
+ * Other email functions remain unchanged
  */
 async function sendPrebookEmail(to, event) {
+  if (!to) return
   try {
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
     sendSmtpEmail.sender = { name: 'Edgy Events', email: MAIL_FROM }
@@ -76,10 +78,8 @@ async function sendPrebookEmail(to, event) {
   }
 }
 
-/**
- * Send booking reminder when event is confirmed
- */
 async function sendBookingReminderEmail(to, event) {
+  if (!to) return
   try {
     const eventUrl = `${BASE_URL}/events/${event.id}`
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
@@ -99,21 +99,17 @@ async function sendBookingReminderEmail(to, event) {
   }
 }
 
-
-/**
- * Send ticket email with embedded QR code (as attachment with CID)
- */
 async function sendTicketEmail(to, event, user) {
+  if (!to) throw new Error('Missing recipient email')
   try {
     const qrData = `ticket:${event.id}:${user.id}`
-    const qrBuffer = await QRCode.toBuffer(qrData) // PNG buffer
+    const qrBuffer = await QRCode.toBuffer(qrData)
 
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
     sendSmtpEmail.sender = { name: 'Edgy Events', email: MAIL_FROM }
     sendSmtpEmail.to = [{ email: to }]
     sendSmtpEmail.subject = `Your Ticket: ${event.name}`
 
-    // build main body
     let htmlContent = `
       <h1>Your Ticket 🎟</h1>
       <p>Hello ${user.username || ''}, here is your ticket for:</p>
@@ -125,20 +121,11 @@ async function sendTicketEmail(to, event, user) {
       <p><small>QR Data: ${qrData}</small></p>
       <p>You can also save this into Google Wallet or Apple Wallet.</p>
     `
-
-    // append event.detailsBlock if present
-    if (event.detailsBlock) {
-      htmlContent += event.detailsBlock
-    }
+    if (event.detailsBlock) htmlContent += event.detailsBlock
 
     sendSmtpEmail.htmlContent = htmlContent
-
     sendSmtpEmail.attachment = [
-      {
-        content: qrBuffer.toString('base64'),
-        name: 'ticket.png',
-        contentId: 'qrCode',
-      }
+      { content: qrBuffer.toString('base64'), name: 'ticket.png', contentId: 'qrCode' }
     ]
 
     await apiInstance.sendTransacEmail(sendSmtpEmail)
