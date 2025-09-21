@@ -219,10 +219,10 @@ async function showAttendees(chatId, eventId, messageId = null) {
     { text: 'Arr', callback_data: 'noop_header_arr' },
     { text: 'Vouch', callback_data: 'noop_header_vouch' },
     { text: 'Basic', callback_data: 'noop_header_basic' },
-    { text: 'Advance', callback_data: 'noop_header_advance' },
+    { text: 'Advance', callback_data: 'noop_header_advance' }
+  ];
 
   const attendeeRows = regs.map(r => ([
-  ];
     { text: r.display_name, callback_data: `noop_${r.id}` },
     { text: r.has_arrived ? '✅' : '❌', callback_data: `toggle_${r.id}_has_arrived` },
     { text: r.voucher_applied ? '✅' : '❌', callback_data: `toggle_${r.id}_voucher_applied` },
