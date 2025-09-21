@@ -50,7 +50,7 @@ export default function DynamicEventCard({ event, onPreview, authUser, setShowAc
       setShowAccountModal(true)
       return
     }
-
+ 
     setLoading(true)
     setStatusMsg('Processing...')
 
