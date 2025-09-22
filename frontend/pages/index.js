@@ -116,7 +116,28 @@ function isMaxReached() {
 }
 
 function getWebButton() {
-  if (loading) { ...spinner... }
+  if (loading) {
+    return (
+      <span className="flex items-center justify-center gap-2">
+        <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          ></circle>
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+          ></path>
+        </svg>
+        {statusMsg || 'Processing...'}
+      </span>
+    )
+  }
 
   if (isMaxReached()) return 'Max reached'
   if (!eventConfirmed) return 'Guestlist'
@@ -125,86 +146,6 @@ function getWebButton() {
   return 'Book'
 }
 
-function openConfirmModal(stage) {
-  if (!authUser) {
-    setShowAccountModal(true)
-    return
-  }
-  if (isMaxReached()) return
-  setSelectedStage(stage)
-  setConfirmModalOpen(true)
-  setAgree(false)
-}
-
-
-  function getWebButton() {
-    if (loading) {
-      return (
-        <span className="flex items-center justify-center gap-2">
-          <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-          </svg>
-          {statusMsg || 'Processing...'}
-        </span>
-      )
-    }
-
-    if (!eventConfirmed) return 'Guestlist'
-    if (eventConfirmed && (!event.price || Number(event.price) === 0)) return 'Free Access'
-    if (eventConfirmed && Number(event.price) > 0) return 'Pay Access'
-    return 'Book'
-  }
-
-  function getStage() {
-    if (!eventConfirmed) return 'prebook'
-    return 'book'
-  }
-
-  function openConfirmModal(stage) {
-    if (!authUser) {
-      setShowAccountModal(true)
-      return
-    }
-    setSelectedStage(stage)
-    setConfirmModalOpen(true)
-    setAgree(false)
-  }
-
-  return (
-    <>
-      <div className="border border-zinc-700 rounded-lg p-4 text-left bg-zinc-800 shadow flex flex-col justify-between">
-        <img
-          src={event.image_url || '/default-event.jpg'}
-          alt={event.name}
-          className="w-full h-40 object-cover rounded mb-3"
-        />
-        <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
-        <p className="text-sm mb-2">
-          {event.description?.split(' ').slice(0, 30).join(' ')}...
-        </p>
-
-        <div className="flex flex-wrap gap-1 mb-2">
-          {[event.tag1, event.tag2, event.tag3].filter(Boolean).map((tag, i) => (
-            <span key={i} className="bg-blue-700 text-xs px-2 py-1 rounded">{tag}</span>
-          ))}
-        </div>
-
-        <div className="flex justify-between items-center mt-auto mb-2 gap-2">
-          <button
-            onClick={() => openConfirmModal(getStage())}
-            disabled={loading}
-            className={`flex-1 px-3 py-1 rounded ${
-              !eventConfirmed
-                ? 'bg-yellow-600 hover:bg-yellow-700'
-                : !event.price || Number(event.price) === 0
-                ? 'bg-green-600 hover:bg-green-700'
-                : 'bg-blue-600 hover:bg-blue-700'
-            } text-white text-sm`}
-          >
-            {getWebButton()}
-          </button>
-        </div>
 
         <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
           <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
