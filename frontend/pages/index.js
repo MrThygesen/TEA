@@ -25,25 +25,24 @@ function clearAuth() {
   try { localStorage.removeItem('edgy_auth_user') } catch (_) {}
 }
 
-// ---------------------------
-// Event Card Component
-// ---------------------------
 export function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
   const [internalModalOpen, setInternalModalOpen] = useState(false)
-  const [registeredUsers, setRegisteredUsers] = useState(event.registered_users || 0)
   const [confirmModalOpen, setConfirmModalOpen] = useState(false)
   const [agree, setAgree] = useState(false)
   const [selectedStage, setSelectedStage] = useState(null)
+  const [registeredUsers, setRegisteredUsers] = useState(event.registered_users || 0)
   const [hasTicket, setHasTicket] = useState(false)
 
   const eventConfirmed = event.is_confirmed === true
+  const isMaxReached = () => {
+    if (!authUser) return false
+    if (event.tag1 === 'group') return event.user_ticket_count >= 10
+    return event.user_ticket_count >= 1
+  }
 
-  // ---------------------------
-  // Helpers
-  // ---------------------------
-  async function handleWebAction(stage) {
+  const handleWebAction = async (stage) => {
     if (!authUser) {
       setShowAccountModal(true)
       return
@@ -51,7 +50,6 @@ export function DynamicEventCard({ event, onPreview, authUser, setShowAccountMod
 
     setLoading(true)
     setStatusMsg('Processing...')
-
     try {
       const token = authUser?.token || localStorage.getItem('token')
       const res = await fetch('/api/events/register', {
@@ -62,34 +60,25 @@ export function DynamicEventCard({ event, onPreview, authUser, setShowAccountMod
         },
         body: JSON.stringify({ eventId: event.id, stage }),
       })
-
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to register')
 
-      if (typeof data.registeredCount === 'number') {
-        setRegisteredUsers(data.registeredCount)
-      }
+      if (typeof data.registeredCount === 'number') setRegisteredUsers(data.registeredCount)
 
-      if (stage === 'book' && (!event.price || Number(event.price) === 0)) {
-        setHasTicket(true)
-        setStatusMsg(data.message || 'Ticket sent successfully!')
-        setTimeout(() => setStatusMsg(''), 2500)
-        return
-      }
-
-      if (stage === 'book' && Number(event.price) > 0 && data.url) {
-        setStatusMsg('Redirecting to payment...')
-        setTimeout(() => {
-          window.location.href = data.url
-        }, 500)
-        return
-      }
-
+      // --- Stage-specific handling ---
       if (stage === 'prebook') {
-        setStatusMsg(data.message || 'Prebook confirmed!')
-        setTimeout(() => setStatusMsg(''), 2500)
-        return
+        setStatusMsg(data.message || 'Guestlist confirmed!')
+      } else if (stage === 'book') {
+        if (!event.price || Number(event.price) === 0) {
+          setHasTicket(true)
+          setStatusMsg(data.message || 'Ticket sent!')
+        } else if (data.url) {
+          setStatusMsg('Redirecting to payment...')
+          setTimeout(() => { window.location.href = data.url }, 500)
+        }
       }
+
+      setTimeout(() => setStatusMsg(''), 2500)
     } catch (err) {
       console.error(err)
       setStatusMsg(err.message || 'Error occurred')
@@ -99,36 +88,8 @@ export function DynamicEventCard({ event, onPreview, authUser, setShowAccountMod
     }
   }
 
-  function isMaxReached() {
-    if (!authUser) return false
-    if (event.tag1 === 'group') return event.user_ticket_count >= 10
-    return event.user_ticket_count >= 1
-  }
-
-  function getWebButtonLabel() {
-    if (loading) {
-      return (
-        <span className="flex items-center justify-center gap-2">
-          <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            ></circle>
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-            ></path>
-          </svg>
-          {statusMsg || 'Processing...'}
-        </span>
-      )
-    }
-
+  const getWebButtonLabel = () => {
+    if (loading) return <span className="flex items-center justify-center gap-2">Processing...</span>
     if (isMaxReached()) return 'Max reached'
     if (!eventConfirmed) return 'Guestlist'
     if (eventConfirmed && (!event.price || Number(event.price) === 0)) return 'Free Access'
@@ -136,16 +97,19 @@ export function DynamicEventCard({ event, onPreview, authUser, setShowAccountMod
     return 'Book'
   }
 
-  // ---------------------------
-  // Render
-  // ---------------------------
+  const handleConfirmClick = () => {
+    if (isMaxReached()) return
+    // Choose stage dynamically based on event confirmation & price
+    const stage = !eventConfirmed ? 'prebook' : 'book'
+    setSelectedStage(stage)
+    setConfirmModalOpen(true)
+  }
+
   return (
     <>
       <div className="bg-zinc-900 rounded-2xl shadow p-4 flex flex-col">
         <h3 className="text-lg font-semibold mb-2">{event.name}</h3>
-        <p className="text-sm text-gray-400 mb-2">
-          {new Date(event.datetime).toLocaleString()} @ {event.venue}
-        </p>
+        <p className="text-sm text-gray-400 mb-2">{new Date(event.datetime).toLocaleString()} @ {event.venue}</p>
 
         <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
           <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
@@ -154,12 +118,7 @@ export function DynamicEventCard({ event, onPreview, authUser, setShowAccountMod
 
         {!onPreview && (
           <button
-            onClick={() => {
-              if (isMaxReached()) return
-                const stage = event.is_confirmed ? 'book' : 'prebook';
-                await handleWebAction(stage);
-              setConfirmModalOpen(true)
-            }}
+            onClick={handleConfirmClick}
             disabled={isMaxReached() || loading}
             className={`mt-2 w-full px-3 py-1 rounded text-sm ${
               isMaxReached()
@@ -179,73 +138,61 @@ export function DynamicEventCard({ event, onPreview, authUser, setShowAccountMod
             Preview
           </button>
         )}
-      </div>
 
-      {/* Confirmation Modal */}
-      {confirmModalOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
-          onClick={() => setConfirmModalOpen(false)}
-        >
+        {/* Confirmation Modal */}
+        {confirmModalOpen && selectedStage && (
           <div
-            className="bg-zinc-900 rounded-2xl shadow-xl max-w-md w-full p-6 text-white relative"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
+            onClick={() => setConfirmModalOpen(false)}
           >
-            <h2 className="text-xl font-semibold mb-4 text-center">{event.name}</h2>
-            <p className="mb-6 text-sm text-gray-300 text-center leading-relaxed">
-              By confirming, you declare a genuine interest in participating in this event for
-              social or professional purposes. Participation includes receiving event-related
-              emails and following the event guidelines.
-            </p>
+            <div
+              className="bg-zinc-900 rounded-2xl shadow-xl max-w-md w-full p-6 text-white relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-xl font-semibold mb-4 text-center">{event.name}</h2>
+              <p className="mb-6 text-sm text-gray-300 text-center leading-relaxed">
+                Confirm participation by agreeing to the event guidelines.
+              </p>
 
-            <div className="flex items-center justify-between gap-3">
-              <label className="flex items-center gap-2 text-xs text-gray-300">
-                <input
-                  type="checkbox"
-                  checked={agree}
-                  onChange={(e) => setAgree(e.target.checked)}
-                />
-                I agree to guidelines and receival of emails for the event.
-              </label>
+              <div className="flex items-center justify-between gap-3">
+                <label className="flex items-center gap-2 text-xs text-gray-300">
+                  <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+                  I agree to guidelines and event emails.
+                </label>
 
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setConfirmModalOpen(false)}
-                  className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-sm"
-                >
-                  Cancel
-                </button>
-                <button
-                  disabled={!agree || loading}
-                  onClick={async () => {
-                    setConfirmModalOpen(false)
-                    await handleWebAction(selectedStage)
-                  }}
-                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm disabled:opacity-50"
-                >
-                  {selectedStage === 'prebook'
-                    ? 'Join Guestlist'
-                    : !event.price || Number(event.price) === 0
-                    ? 'Book Free'
-                    : 'Pay Now'}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setConfirmModalOpen(false)}
+                    className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    disabled={!agree || loading}
+                    onClick={async () => {
+                      setConfirmModalOpen(false)
+                      await handleWebAction(selectedStage)
+                    }}
+                    className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm disabled:opacity-50"
+                  >
+                    {selectedStage === 'prebook' ? 'Join Guestlist' : !event.price || Number(event.price) === 0 ? 'Book Free' : 'Pay Now'}
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <p className="mt-6 text-xs text-gray-500 text-center">
-              By proceeding, you agree to our{' '}
-              <a
-                href="/policies"
-                className="text-blue-400 underline hover:text-blue-300"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                policies
-              </a>.
-            </p>
+              <p className="mt-6 text-xs text-gray-500 text-center">
+                By proceeding, you agree to our{' '}
+                <a href="/policies" className="text-blue-400 underline hover:text-blue-300" target="_blank" rel="noopener noreferrer">
+                  policies
+                </a>.
+              </p>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
+    </>
+  )
+}
 
       {/* Event details modal */}
       {!onPreview && internalModalOpen && (
