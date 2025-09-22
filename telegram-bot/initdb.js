@@ -17,7 +17,9 @@ export default async function handler(req, res) {
   try {
     console.log('🔹 Initializing database...')
 
-    // -- TELEGRAM USER PROFILES
+    // ----------------------------
+    // TELEGRAM USER PROFILES
+    // ----------------------------
     await pool.query(`
       CREATE TABLE IF NOT EXISTS telegram_user_profiles (
         id SERIAL PRIMARY KEY,
@@ -30,27 +32,12 @@ export default async function handler(req, res) {
       );
     `)
 
-    // -- WEB EMAIL VERIFICATION TOKENS
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS web_email_verification_tokens (
-        token TEXT PRIMARY KEY,
-        user_id INTEGER REFERENCES telegram_user_profiles(id) ON DELETE CASCADE,
-        email TEXT NOT NULL,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        expires_at TIMESTAMPTZ NOT NULL
-      );
-    `)
-    await pool.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_web_email_verif_userid
-      ON web_email_verification_tokens(user_id);
-    `)
-
-    // -- USER PROFILES
+    // ----------------------------
+    // WEB USER PROFILES
+    // ----------------------------
     await pool.query(`
       CREATE TABLE IF NOT EXISTS user_profiles (
         id SERIAL PRIMARY KEY,
-        telegram_user_id TEXT UNIQUE,
-        telegram_username TEXT UNIQUE,
         username TEXT UNIQUE,
         tier INTEGER DEFAULT 1 CHECK (tier IN (1,2)),
         email TEXT UNIQUE,
@@ -65,43 +52,26 @@ export default async function handler(req, res) {
       );
     `)
 
-    // -- EMAIL VERIFICATION TOKENS
- await pool.query(`
-  CREATE TABLE IF NOT EXISTS email_verification_tokens (
-    token TEXT PRIMARY KEY,
-    user_id INTEGER REFERENCES user_profiles(id) ON DELETE CASCADE,
-    email TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMPTZ NOT NULL
-  );
-`)
+    // ----------------------------
+    // WEB EMAIL VERIFICATION TOKENS
+    // ----------------------------
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS email_verification_tokens (
+        token TEXT PRIMARY KEY,
+        user_id INTEGER REFERENCES user_profiles(id) ON DELETE CASCADE,
+        email TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMPTZ NOT NULL
+      );
+    `)
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_userid
+      ON email_verification_tokens(user_id);
+    `)
 
-// Ensure telegram_user_id column exists
-await pool.query(`
-  DO $$
-  BEGIN
-    IF NOT EXISTS (
-      SELECT 1 FROM information_schema.columns
-      WHERE table_name='email_verification_tokens' AND column_name='telegram_user_id'
-    ) THEN
-      ALTER TABLE email_verification_tokens
-      ADD COLUMN telegram_user_id INTEGER REFERENCES telegram_user_profiles(id) ON DELETE CASCADE;
-    END IF;
-  END
-  $$;
-`)
-
-await pool.query(`
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_userid
-  ON email_verification_tokens(user_id);
-`)
-await pool.query(`
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_tgid
-  ON email_verification_tokens(telegram_user_id);
-`)
-
-
-    // -- EVENTS
+    // ----------------------------
+    // EVENTS
+    // ----------------------------
     await pool.query(`
       CREATE TABLE IF NOT EXISTS events (
         id SERIAL PRIMARY KEY,
@@ -129,7 +99,9 @@ await pool.query(`
     `)
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_events_city ON events(LOWER(city));`)
 
-    // -- REGISTRATIONS
+    // ----------------------------
+    // REGISTRATIONS
+    // ----------------------------
     await pool.query(`
       CREATE TABLE IF NOT EXISTS registrations (
         id SERIAL PRIMARY KEY,
@@ -151,27 +123,12 @@ await pool.query(`
         has_paid BOOLEAN DEFAULT FALSE,
         paid_at TIMESTAMPTZ,
         ticket_sent BOOLEAN DEFAULT FALSE,
+        stage TEXT CHECK (stage IN ('prebook','book')) DEFAULT 'prebook',
         CONSTRAINT registrations_user_check CHECK (
           user_id IS NOT NULL OR telegram_user_id IS NOT NULL
         )
       );
     `)
-
-    // --- Ensure stage column exists ---
-    await pool.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_name='registrations' AND column_name='stage'
-        ) THEN
-          ALTER TABLE registrations
-          ADD COLUMN stage TEXT CHECK (stage IN ('prebook','book')) DEFAULT 'prebook';
-        END IF;
-      END
-      $$;
-    `)
-
     await pool.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_registrations_event_user
       ON registrations(event_id, user_id)
@@ -183,7 +140,9 @@ await pool.query(`
       WHERE telegram_user_id IS NOT NULL;
     `)
 
-    // -- INVITATIONS
+    // ----------------------------
+    // INVITATIONS
+    // ----------------------------
     await pool.query(`
       CREATE TABLE IF NOT EXISTS invitations (
         id SERIAL PRIMARY KEY,
@@ -197,7 +156,9 @@ await pool.query(`
       );
     `)
 
-    // -- USER EMAILS
+    // ----------------------------
+    // USER EMAILS
+    // ----------------------------
     await pool.query(`
       CREATE TABLE IF NOT EXISTS user_emails (
         user_id INTEGER PRIMARY KEY REFERENCES user_profiles(id) ON DELETE CASCADE,
@@ -206,7 +167,9 @@ await pool.query(`
       );
     `)
 
-    // -- FAVORITES
+    // ----------------------------
+    // FAVORITES
+    // ----------------------------
     await pool.query(`
       CREATE TABLE IF NOT EXISTS favorites (
         id SERIAL PRIMARY KEY,
@@ -223,7 +186,9 @@ await pool.query(`
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_favorites_web ON favorites(user_id);`)
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_favorites_tg ON favorites(telegram_user_id);`)
 
-    // -- updated_at trigger
+    // ----------------------------
+    // updated_at trigger for all tables with updated_at
+    // ----------------------------
     await pool.query(`
       CREATE OR REPLACE FUNCTION update_updated_at_column()
       RETURNS TRIGGER AS $$
@@ -236,7 +201,6 @@ await pool.query(`
     await pool.query(`DROP TRIGGER IF EXISTS trg_update_user_profiles_updated_at ON user_profiles;`)
     await pool.query(`DROP TRIGGER IF EXISTS trg_update_telegram_user_profiles_updated_at ON telegram_user_profiles;`)
     await pool.query(`DROP TRIGGER IF EXISTS trg_update_events_updated_at ON events;`)
-
     await pool.query(`
       CREATE TRIGGER trg_update_user_profiles_updated_at
       BEFORE UPDATE ON user_profiles
