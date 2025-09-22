@@ -2,13 +2,13 @@
 import { pool } from '../../../lib/postgres.js'
 import { auth } from '../../../lib/auth.js'
 import Stripe from 'stripe'
+import crypto from 'crypto'
+import { sendTicketEmail, sendBookingReminderEmail } from '../../../lib/email.js'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   try {
     // --------------------------
@@ -24,12 +24,9 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Invalid token' })
     }
 
-    // Determine userId (web or telegram)
     const userId = user.id || null
     const telegramUserId = user.telegram_user_id || null
-    if (!userId && !telegramUserId) {
-      return res.status(400).json({ error: 'No valid user in token' })
-    }
+    if (!userId && !telegramUserId) return res.status(400).json({ error: 'No valid user in token' })
 
     // --------------------------
     // Input
@@ -37,64 +34,70 @@ export default async function handler(req, res) {
     const { eventId } = req.body
     if (!eventId) return res.status(400).json({ error: 'Missing eventId' })
 
-    // Fetch event details
+    // Fetch event
     const { rows: events } = await pool.query(
-      `SELECT id, name, price, min_attendees, max_attendees
-       FROM events 
-       WHERE id = $1`,
+      `SELECT * FROM events WHERE id=$1`,
       [eventId]
     )
-    if (events.length === 0) return res.status(404).json({ error: 'Event not found' })
+    if (!events.length) return res.status(404).json({ error: 'Event not found' })
     const event = events[0]
 
-    // Count current registrations
+    // Count current bookings (stage='book')
     const { rows: regRows } = await pool.query(
-      `SELECT COUNT(*)::int AS count FROM registrations WHERE event_id = $1`,
+      `SELECT COUNT(*)::int AS count FROM registrations WHERE event_id=$1 AND stage='book'`,
       [eventId]
     )
-    const currentCount = regRows[0].count
+    const bookedCount = regRows[0]?.count || 0
 
-    // Decide stage automatically
-const stage = currentCount < event.min_attendees ? 'guestlist' : 'book'
+    // Decide stage
+    const stage = bookedCount < event.min_attendees ? 'prebook' : 'book'
 
-
-    // Prevent duplicate registration
+    // Prevent duplicate
     const { rows: existing } = await pool.query(
-      `SELECT id FROM registrations WHERE event_id = $1 AND (user_id = $2 OR telegram_user_id = $3)`,
+      `SELECT * FROM registrations WHERE event_id=$1 AND (user_id=$2 OR telegram_user_id=$3)`,
       [eventId, userId, telegramUserId]
     )
-    if (existing.length > 0) {
-      return res.status(400).json({ error: 'Already registered' })
-    }
+    if (existing.length > 0) return res.status(400).json({ error: 'Already registered' })
 
     let registration
     let clientSecret = null
+    let ticketCode = crypto.randomBytes(8).toString('hex')
 
     // --------------------------
-    // Handle Free / Prebook / Paid
+    // Free or Prebook
     // --------------------------
     if (event.price === 0 || stage === 'prebook') {
-      // Free OR Prebook → insert immediately
       const { rows } = await pool.query(
-        `INSERT INTO registrations (event_id, user_id, telegram_user_id, stage, status)
-         VALUES ($1, $2, $3, $4, 'confirmed')
+        `INSERT INTO registrations
+         (event_id, user_id, telegram_user_id, stage, ticket_code, ticket_sent)
+         VALUES ($1,$2,$3,$4,$5,$6)
          RETURNING *`,
-        [eventId, userId, telegramUserId, stage]
+        [eventId, userId, telegramUserId, stage, ticketCode, event.price === 0]
       )
       registration = rows[0]
+
+      // Send ticket email immediately if free
+      if (event.price === 0 && user.email) {
+        await sendTicketEmail(user.email, event, { ...user, ticket_code: ticketCode })
+      }
+
     } else {
-      // Paid booking (stage=book, price > 0) → Stripe
+      // --------------------------
+      // Paid booking → Stripe
+      // --------------------------
       const paymentIntent = await stripe.paymentIntents.create({
-        amount: event.price,
+        amount: Math.round(Number(event.price) * 100),
         currency: 'usd',
         metadata: { eventId, userId: userId ?? telegramUserId },
+        receipt_email: user.email || undefined,
       })
 
       const { rows } = await pool.query(
-        `INSERT INTO registrations (event_id, user_id, telegram_user_id, stage, status, stripe_payment_intent_id)
-         VALUES ($1, $2, $3, 'book', 'pending', $4)
+        `INSERT INTO registrations
+         (event_id, user_id, telegram_user_id, stage, ticket_code, stripe_payment_intent_id)
+         VALUES ($1,$2,$3,'book',$4,$5)
          RETURNING *`,
-        [eventId, userId, telegramUserId, paymentIntent.id]
+        [eventId, userId, telegramUserId, ticketCode, paymentIntent.id]
       )
       registration = rows[0]
       clientSecret = paymentIntent.client_secret
@@ -106,9 +109,10 @@ const stage = currentCount < event.min_attendees ? 'guestlist' : 'book'
       registration,
       clientSecret,
     })
+
   } catch (err) {
     console.error('Error in /api/events/register:', err)
-    res.status(500).json({ error: 'Server error' })
+    return res.status(500).json({ error: 'Server error', details: err.message })
   }
 }
 
