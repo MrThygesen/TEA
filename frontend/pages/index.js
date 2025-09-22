@@ -43,7 +43,7 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
  const stage = event.stage || 'prebook'
  const eventConfirmed = stage === 'book'
 
-  const eventConfirmed = registeredUsers >= (event.min_attendees || 0)
+//  const eventConfirmed = registeredUsers >= (event.min_attendees || 0)
   const telegramLink = eventConfirmed
     ? `https://t.me/TeaIsHereBot?start=buy_${event.id}`
     : `https://t.me/TeaIsHereBot?start=${event.id}`
