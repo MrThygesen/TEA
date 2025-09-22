@@ -502,10 +502,28 @@ useEffect(() => {
     }
   }
 
-  function handleLogout() {
+ /* function handleLogout() {
     clearAuth()
     setAuthUser(null)
-  }
+  } */
+
+
+function handleLogout() {
+  // Clear localStorage
+  clearAuth()
+  localStorage.removeItem('token')
+
+  // Reset all auth-related state
+  setAuthUser(null)
+  setProfileName('')
+  setProfileEmail('')
+  setProfilePasswordInput('')
+  setAuthError('')
+
+  // Optionally, force the page to re-render inputs cleared
+  // window.location.reload()  // uncomment only if necessary
+}
+
 
   async function saveProfile(e) {
     e.preventDefault()
