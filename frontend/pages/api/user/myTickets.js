@@ -47,7 +47,14 @@ export default async function handler(req, res) {
     const tickets = await Promise.all(
       rows.map(async (t) => {
         const isBookStage = !!t.is_confirmed
-        const stage = t.ticket_sent || t.has_paid ? 'book' : 'guestlist'
+let stage
+if (t.ticket_sent || t.has_paid) {
+  stage = 'book'
+} else {
+  stage = 'guestlist'
+}
+
+
         const isFree = !t.price || Number(t.price) === 0
 
         let qrData = null

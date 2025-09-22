@@ -15,22 +15,21 @@ export default async function handler(req, res) {
     // Auth
     // --------------------------
     const token = auth.getTokenFromReq(req)
-    if (!token) return res.status(401).json({ error: 'Unauthorized' })
+    if (!token) return res.status(401).json({ error: 'Not authenticated' })
 
-    const decoded = auth.verifyToken(token) // <-- depends on your auth.js
-    if (!decoded?.userId) {
+    let user
+    try {
+      user = auth.verifyToken(token)
+    } catch {
       return res.status(401).json({ error: 'Invalid token' })
     }
 
-    // Fetch user from DB
-    const { rows: users } = await pool.query(
-      `SELECT id, email FROM user_profiles WHERE id = $1`,
-      [decoded.userId]
-    )
-    if (users.length === 0) {
-      return res.status(401).json({ error: 'User not found' })
+    // Determine userId (web or telegram)
+    const userId = user.id || null
+    const telegramUserId = user.telegram_user_id || null
+    if (!userId && !telegramUserId) {
+      return res.status(400).json({ error: 'No valid user in token' })
     }
-    const user = users[0]
 
     // --------------------------
     // Input
@@ -40,13 +39,12 @@ export default async function handler(req, res) {
 
     // Fetch event details
     const { rows: events } = await pool.query(
-      `SELECT id, title, price, min_attendees, max_attendees
+      `SELECT id, name, price, min_attendees, max_attendees
        FROM events 
        WHERE id = $1`,
       [eventId]
     )
     if (events.length === 0) return res.status(404).json({ error: 'Event not found' })
-
     const event = events[0]
 
     // Count current registrations
@@ -57,12 +55,13 @@ export default async function handler(req, res) {
     const currentCount = regRows[0].count
 
     // Decide stage automatically
-    const stage = currentCount < event.min_attendees ? 'prebook' : 'book'
+const stage = currentCount < event.min_attendees ? 'guestlist' : 'book'
+
 
     // Prevent duplicate registration
     const { rows: existing } = await pool.query(
-      `SELECT id FROM registrations WHERE event_id = $1 AND user_id = $2`,
-      [eventId, user.id]
+      `SELECT id FROM registrations WHERE event_id = $1 AND (user_id = $2 OR telegram_user_id = $3)`,
+      [eventId, userId, telegramUserId]
     )
     if (existing.length > 0) {
       return res.status(400).json({ error: 'Already registered' })
@@ -77,10 +76,10 @@ export default async function handler(req, res) {
     if (event.price === 0 || stage === 'prebook') {
       // Free OR Prebook → insert immediately
       const { rows } = await pool.query(
-        `INSERT INTO registrations (event_id, user_id, stage, status)
-         VALUES ($1, $2, $3, 'confirmed')
+        `INSERT INTO registrations (event_id, user_id, telegram_user_id, stage, status)
+         VALUES ($1, $2, $3, $4, 'confirmed')
          RETURNING *`,
-        [eventId, user.id, stage]
+        [eventId, userId, telegramUserId, stage]
       )
       registration = rows[0]
     } else {
@@ -88,14 +87,14 @@ export default async function handler(req, res) {
       const paymentIntent = await stripe.paymentIntents.create({
         amount: event.price,
         currency: 'usd',
-        metadata: { eventId, userId: user.id },
+        metadata: { eventId, userId: userId ?? telegramUserId },
       })
 
       const { rows } = await pool.query(
-        `INSERT INTO registrations (event_id, user_id, stage, status, stripe_payment_intent_id)
-         VALUES ($1, $2, 'book', 'pending', $3)
+        `INSERT INTO registrations (event_id, user_id, telegram_user_id, stage, status, stripe_payment_intent_id)
+         VALUES ($1, $2, $3, 'book', 'pending', $4)
          RETURNING *`,
-        [eventId, user.id, paymentIntent.id]
+        [eventId, userId, telegramUserId, paymentIntent.id]
       )
       registration = rows[0]
       clientSecret = paymentIntent.client_secret
