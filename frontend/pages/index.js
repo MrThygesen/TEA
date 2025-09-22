@@ -54,7 +54,7 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
     setStatusMsg('Booking...')
     try {
       const token = localStorage.getItem('token')
-      const stage = registeredUsers >= (event.min_attendees || 0) ? 'pay' : 'guestlist'
+      const stage = registeredUsers >= (event.min_attendees || 0) ? 'book' : 'prebook'
 
       const res = await fetch('/api/events/register', {
         method: 'POST',
