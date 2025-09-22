@@ -156,7 +156,8 @@ export function DynamicEventCard({ event, onPreview, authUser, setShowAccountMod
           <button
             onClick={() => {
               if (isMaxReached()) return
-              setSelectedStage(eventConfirmed ? 'book' : 'prebook')
+                const stage = event.is_confirmed ? 'book' : 'prebook';
+                await handleWebAction(stage);
               setConfirmModalOpen(true)
             }}
             disabled={isMaxReached() || loading}

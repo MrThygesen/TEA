@@ -1,5 +1,13 @@
+// pages/api/user/me.js
 import { pool } from '../../../lib/postgres.js'
 import { auth } from '../../../lib/auth.js'
+
+res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+res.setHeader('Pragma', 'no-cache')
+res.setHeader('Expires', '0')
+res.setHeader('Surrogate-Control', 'no-store')
+
+
 
 export default async function handler(req, res) {
   const token = auth.getTokenFromReq(req)
@@ -13,9 +21,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Fetch user info
+    // Fetch user info (including password hash check)
     const { rows } = await pool.query(
-      `SELECT id, username, email, role, wallet_address, city, tier
+      `SELECT id, username, email, role, wallet_address, city, tier,
+              (password_hash IS NOT NULL) AS has_password
        FROM user_profiles
        WHERE id=$1`,
       [user.id]
@@ -46,6 +55,7 @@ export default async function handler(req, res) {
       wallet_address: u.wallet_address,
       city: u.city,
       tier: u.tier,
+      hasPassword: u.has_password,   // ✅ add this flag
       prebooked_events: prebookRows,
     })
   } catch (err) {

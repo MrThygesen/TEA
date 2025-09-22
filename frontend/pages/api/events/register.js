@@ -11,6 +11,12 @@ export default async function handler(req, res) {
   if (req.method !== 'POST')
     return res.status(405).json({ error: 'Method not allowed' })
 
+  // Prevent 304 caching
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  res.setHeader('Pragma', 'no-cache')
+  res.setHeader('Expires', '0')
+  res.setHeader('Surrogate-Control', 'no-store')
+
   const token = auth.getTokenFromReq(req)
   if (!token) return res.status(401).json({ error: 'Not authenticated' })
 
@@ -26,11 +32,12 @@ export default async function handler(req, res) {
   if (!stage) return res.status(400).json({ error: 'Missing stage' })
 
   try {
+    // --- Fetch event ---
     const { rows: eventRows } = await pool.query('SELECT * FROM events WHERE id=$1', [eventId])
     const event = eventRows[0]
     if (!event) return res.status(404).json({ error: 'Event not found' })
 
-    // --- enforce ticket limits ---
+    // --- Enforce ticket limits ---
     const { rows: userTickets } = await pool.query(
       `SELECT COUNT(*)::int AS count 
        FROM registrations
@@ -42,13 +49,8 @@ export default async function handler(req, res) {
          )`,
       [eventId, user.id || null, user.telegram_user_id || null]
     )
-
     const currentCount = userTickets[0]?.count || 0
-
-    let maxTickets = 1
-    if (event.tag1 === 'group') {
-      maxTickets = 10
-    }
+    const maxTickets = event.tag1 === 'group' ? 10 : 1
 
     if (stage === 'book' && currentCount >= maxTickets) {
       return res.status(400).json({
@@ -56,7 +58,7 @@ export default async function handler(req, res) {
       })
     }
 
-    // --- check existing registration ---
+    // --- Check existing registration ---
     const { rows: existingRows } = await pool.query(
       `SELECT * FROM registrations
        WHERE event_id=$1 AND (
@@ -69,46 +71,29 @@ export default async function handler(req, res) {
     let ticketCode = null
 
     if (existingRows.length > 0) {
-      // update existing registration
+      // Existing registration
       const existing = existingRows[0]
 
-      if (stage === 'book') {
-        // assign ticket code if not already set
-        ticketCode = existing.ticket_code
-        if (!ticketCode) {
-          let codeInserted = false
-          while (!codeInserted) {
-            ticketCode = crypto.randomBytes(8).toString('hex')
-            try {
-              await pool.query(
-                `UPDATE registrations
-                 SET stage='book',
-                     email=$1,
-                     wallet_address=$2,
-                     ticket_code=$3,
-                     timestamp=CURRENT_TIMESTAMP
-                 WHERE id=$4`,
-                [user.email || null, user.wallet_address || null, ticketCode, existing.id]
-              )
-              codeInserted = true
-            } catch (err) {
-              if (err.code === '23505') continue // duplicate ticket_code, retry
-              else throw err
-            }
-          }
-        } else {
-          await pool.query(
-            `UPDATE registrations
-             SET stage='book',
-                 email=$1,
-                 wallet_address=$2,
-                 timestamp=CURRENT_TIMESTAMP
-             WHERE id=$3`,
-            [user.email || null, user.wallet_address || null, existing.id]
-          )
-        }
+      // Auto-upgrade prebook -> book if event is confirmed
+      let newStage = stage
+      if (existing.stage === 'prebook' && event.is_confirmed && stage === 'prebook') {
+        newStage = 'book'
+      }
+
+      if (newStage === 'book') {
+        // Assign ticket code if missing
+        ticketCode = existing.ticket_code || crypto.randomBytes(8).toString('hex')
+        await pool.query(
+          `UPDATE registrations
+           SET stage='book',
+               email=$1,
+               wallet_address=$2,
+               ticket_code=$3,
+               timestamp=CURRENT_TIMESTAMP
+           WHERE id=$4`,
+          [user.email || null, user.wallet_address || null, ticketCode, existing.id]
+        )
       } else {
-        // prebook just updates email/wallet
         await pool.query(
           `UPDATE registrations
            SET stage='prebook',
@@ -120,32 +105,23 @@ export default async function handler(req, res) {
         )
       }
     } else {
-      // create new registration
-      if (stage === 'book') {
-        let codeInserted = false
-        while (!codeInserted) {
-          ticketCode = crypto.randomBytes(8).toString('hex')
-          try {
-            await pool.query(
-              `INSERT INTO registrations
-               (event_id, user_id, telegram_user_id, telegram_username, email, wallet_address, ticket_code, stage, timestamp)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,'book',CURRENT_TIMESTAMP)`,
-              [
-                eventId,
-                user.id || null,
-                user.telegram_user_id || null,
-                user.telegram_username || null,
-                user.email || null,
-                user.wallet_address || null,
-                ticketCode
-              ]
-            )
-            codeInserted = true
-          } catch (err) {
-            if (err.code === '23505') continue
-            else throw err
-          }
-        }
+      // New registration
+      if (stage === 'book' || event.is_confirmed) {
+        ticketCode = crypto.randomBytes(8).toString('hex')
+        await pool.query(
+          `INSERT INTO registrations
+           (event_id, user_id, telegram_user_id, telegram_username, email, wallet_address, ticket_code, stage, timestamp)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,'book',CURRENT_TIMESTAMP)`,
+          [
+            eventId,
+            user.id || null,
+            user.telegram_user_id || null,
+            user.telegram_username || null,
+            user.email || null,
+            user.wallet_address || null,
+            ticketCode
+          ]
+        )
       } else {
         await pool.query(
           `INSERT INTO registrations
@@ -163,7 +139,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // --- registered count ---
+    // --- Registered count ---
     const { rows: countRows } = await pool.query(
       `SELECT COUNT(*)::int AS count 
        FROM registrations 
@@ -172,10 +148,11 @@ export default async function handler(req, res) {
     )
     const registeredCount = countRows[0]?.count || 0
 
-    // --- prebook ---
-    if (stage === 'prebook') {
+    // --- Handle prebook ---
+    if (stage === 'prebook' && !event.is_confirmed) {
       if (user.email) await sendPrebookEmail(user.email, event)
 
+      // Confirm event if min_attendees reached
       if (registeredCount >= event.min_attendees && !event.is_confirmed) {
         await pool.query('UPDATE events SET is_confirmed=true WHERE id=$1', [eventId])
 
@@ -198,10 +175,10 @@ export default async function handler(req, res) {
       })
     }
 
-    // --- book ---
-    if (stage === 'book') {
+    // --- Handle book ---
+    if (stage === 'book' || event.is_confirmed) {
+      // Free event → send ticket immediately
       if (!event.price || Number(event.price) === 0) {
-        // free event → send ticket immediately
         if (user.id) {
           await pool.query(
             `UPDATE registrations SET ticket_sent=true WHERE event_id=$1 AND user_id=$2`,
@@ -223,7 +200,7 @@ export default async function handler(req, res) {
         })
       }
 
-      // paid event → Stripe checkout
+      // Paid event → Stripe checkout
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         mode: 'payment',
