@@ -34,7 +34,11 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
   const [statusMsg, setStatusMsg] = useState('')
   const [internalModalOpen, setInternalModalOpen] = useState(false)
   const [registeredUsers, setRegisteredUsers] = useState(event.registered_users || 0)
-
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false)
+  const [agree, setAgree] = useState(false)
+  const [selectedStage, setSelectedStage] = useState('prebook')
+  const stage = registeredUsers >= (event.min_attendees || 0) ? 'book' : 'prebook'
+  
   const eventConfirmed = registeredUsers >= (event.min_attendees || 0)
   const telegramLink = eventConfirmed
     ? `https://t.me/TeaIsHereBot?start=buy_${event.id}`
@@ -182,20 +186,20 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
                 >
                   Cancel
                 </button>
-                <button
-                  disabled={!agree || loading}
-                  onClick={async () => {
-                    setConfirmModalOpen(false)
-                    await handleWebAction(selectedStage)
-                  }}
-                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm disabled:opacity-50"
-                >
-                  {selectedStage === 'prebook'
-                    ? 'Join Guestlist'
-                    : !event.price || Number(event.price) === 0
-                    ? 'Book Free'
-                    : 'Pay Now'}
-                </button>
+<button
+  disabled={!agree || loading}
+  onClick={async () => {
+    setConfirmModalOpen(false)
+    await handleWebAction(selectedStage)
+  }}
+  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm disabled:opacity-50"
+>
+  {selectedStage === 'prebook'
+    ? 'Join Guestlist'
+    : !event.price || Number(event.price) === 0
+    ? 'Book Free'
+    : 'Pay Now'}
+</button>
               </div>
             </div>
 
