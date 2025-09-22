@@ -1,4 +1,3 @@
-//YourAccountModal.js
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -8,7 +7,7 @@ export default function YourAccountModal({ profile, onClose }) {
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [qrModal, setQrModal] = useState(null) 
+  const [qrModal, setQrModal] = useState(null)
 
   useEffect(() => {
     const fetchTickets = async () => {
@@ -41,14 +40,12 @@ export default function YourAccountModal({ profile, onClose }) {
 
   // Group tickets
   const confirmed = visibleTickets.filter(
-    (t) => t.stage === 'book' && (t.is_free || t.has_paid) && t.ticket_sent
+    (t) => t.stage === 'book' && (t.price === 0 || t.has_paid) && t.ticket_sent
   )
   const showedInterest = visibleTickets.filter(
-    (t) => t.stage === 'guestlist' && t.is_book_stage && !t.has_paid && !t.ticket_sent
+    (t) => t.stage === 'prebook' && !t.has_paid && !t.ticket_sent
   )
-  const guestlist = visibleTickets.filter(
-    (t) => t.stage === 'guestlist' && !t.is_book_stage
-  )
+  const guestlist = visibleTickets.filter((t) => t.stage === 'prebook' && !t.has_paid)
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -91,16 +88,11 @@ export default function YourAccountModal({ profile, onClose }) {
                     <span>{t.event_name}</span>
                     <span className="text-green-400">✅ Confirmed</span>
                     <button
-                onClick={() =>
-                setQrModal({
-                ...t,
-                qrCode: t.ticket_code, // pass ticket_code for QR
-                })
-                  }
-                  className="text-blue-400 hover:underline"
-                >
-                  Open QR
-                </button>
+                      onClick={() => setQrModal(t)}
+                      className="text-blue-400 hover:underline"
+                    >
+                      Open QR
+                    </button>
                   </div>
                 ))}
               </div>
@@ -127,7 +119,7 @@ export default function YourAccountModal({ profile, onClose }) {
               </div>
             )}
 
-            {/* Guestlist (Not confirmed) */}
+            {/* Guestlist */}
             <h3 className="text-lg font-semibold text-gray-400 mt-6 mb-2">Guestlist</h3>
             {guestlist.length === 0 ? (
               <p className="text-gray-400 text-sm">No guestlist entries.</p>
@@ -162,10 +154,10 @@ export default function YourAccountModal({ profile, onClose }) {
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-semibold mb-4">{qrModal.event_name}</h3>
-            <img
-              src={qrModal.qrImage}
-              alt="QR Ticket"
-              className="rounded-lg border border-zinc-700 mx-auto mb-4"
+            <QRCode
+              value={qrModal.ticket_code || 'NO-CODE'}
+              size={200}
+              className="mx-auto mb-4"
             />
             <button
               onClick={() => setQrModal(null)}
