@@ -52,12 +52,50 @@ export default async function handler(req, res) {
     // Decide stage
     const stage = bookedCount < event.min_attendees ? 'prebook' : 'book'
 
-    // Prevent duplicate registration
-    const { rows: existing } = await pool.query(
-      `SELECT * FROM registrations WHERE event_id=$1 AND (user_id=$2 OR telegram_user_id=$3)`,
-      [eventId, userId, telegramUserId]
+// Check existing registration
+const { rows: existing } = await pool.query(
+  `SELECT * FROM registrations WHERE event_id=$1 AND (user_id=$2 OR telegram_user_id=$3)`,
+  [eventId, userId, telegramUserId]
+)
+
+if (existing.length > 0) {
+  const existingReg = existing[0]
+
+  if (existingReg.stage === 'book') {
+    // Already fully booked/paid
+    return res.status(400).json({ error: 'Already booked' })
+  }
+
+  if (stage === 'book' && existingReg.stage === 'prebook') {
+    // Upgrade prebook → book
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(Number(event.price) * 100),
+      currency: 'usd',
+      metadata: { eventId, userId },
+      receipt_email: user.email || undefined,
+    })
+
+    const { rows } = await pool.query(
+      `UPDATE registrations
+       SET stage='book',
+           stripe_payment_intent_id=$1
+       WHERE id=$2
+       RETURNING *`,
+      [paymentIntent.id, existingReg.id]
     )
-    if (existing.length > 0) return res.status(400).json({ error: 'Already registered' })
+
+    const registration = rows[0]
+    return res.status(200).json({
+      success: true,
+      stage: 'book',
+      registration,
+      clientSecret: paymentIntent.client_secret,
+    })
+  }
+
+  // Otherwise keep blocking
+  return res.status(400).json({ error: 'Already registered' })
+}
 
     // --------------------------
     // Generate ticket code
