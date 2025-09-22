@@ -3,7 +3,7 @@ import { pool } from '../../../lib/postgres.js'
 import { auth } from '../../../lib/auth.js'
 import Stripe from 'stripe'
 import crypto from 'crypto'
-import { sendTicketEmail, sendBookingReminderEmail } from '../../../lib/email.js'
+import { sendTicketEmail, sendPrebookEmail } from '../../../lib/email.js'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
     if (!events.length) return res.status(404).json({ error: 'Event not found' })
     const event = events[0]
 
-    // Count current bookings (stage='book')
+    // Count current booked registrations
     const { rows: regRows } = await pool.query(
       `SELECT COUNT(*)::int AS count FROM registrations WHERE event_id=$1 AND stage='book'`,
       [eventId]
@@ -52,16 +52,21 @@ export default async function handler(req, res) {
     // Decide stage
     const stage = bookedCount < event.min_attendees ? 'prebook' : 'book'
 
-    // Prevent duplicate
+    // Prevent duplicate registration
     const { rows: existing } = await pool.query(
       `SELECT * FROM registrations WHERE event_id=$1 AND (user_id=$2 OR telegram_user_id=$3)`,
       [eventId, userId, telegramUserId]
     )
     if (existing.length > 0) return res.status(400).json({ error: 'Already registered' })
 
+    // --------------------------
+    // Generate ticket code
+    // --------------------------
+    const ticketCode = crypto.randomBytes(8).toString('hex')
     let registration
     let clientSecret = null
-    let ticketCode = crypto.randomBytes(8).toString('hex')
+
+    console.log('Registering:', { eventId, userId, telegramUserId, stage, ticketCode, price: event.price })
 
     // --------------------------
     // Free or Prebook
@@ -76,9 +81,11 @@ export default async function handler(req, res) {
       )
       registration = rows[0]
 
-      // Send ticket email immediately if free
+      // Send email
       if (event.price === 0 && user.email) {
-        await sendTicketEmail(user.email, event, { ...user, ticket_code: ticketCode })
+        await sendTicketEmail(user.email, event, { ...user, id: userId, ticket_code: ticketCode })
+      } else if (stage === 'prebook' && user.email) {
+        await sendPrebookEmail(user.email, event)
       }
 
     } else {
@@ -88,16 +95,16 @@ export default async function handler(req, res) {
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(Number(event.price) * 100),
         currency: 'usd',
-        metadata: { eventId, userId: userId ?? telegramUserId },
+        metadata: { eventId, userId },
         receipt_email: user.email || undefined,
       })
 
       const { rows } = await pool.query(
         `INSERT INTO registrations
          (event_id, user_id, telegram_user_id, stage, ticket_code, stripe_payment_intent_id)
-         VALUES ($1,$2,$3,'book',$4,$5)
+         VALUES ($1,$2,$3,$4,$5,$6)
          RETURNING *`,
-        [eventId, userId, telegramUserId, ticketCode, paymentIntent.id]
+        [eventId, userId, telegramUserId, 'book', ticketCode, paymentIntent.id]
       )
       registration = rows[0]
       clientSecret = paymentIntent.client_secret

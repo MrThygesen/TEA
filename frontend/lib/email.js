@@ -12,24 +12,23 @@ apiInstance.setApiKey(
 const MAIL_FROM = process.env.MAIL_FROM || 'no-reply@teanet.xyz'
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 
-/**
- * Generate QR data + base64 QR code for a ticket
- */
+// --------------------------
+// Generate QR Code for ticket
+// --------------------------
 async function generateTicketQRCode(eventId, userId) {
+  if (!eventId || !userId) throw new Error('Missing eventId or userId for QR code')
   const qrData = `ticket:${eventId}:${userId}`
   const qrImage = await QRCode.toDataURL(qrData) // base64 image
   return { qrData, qrImage }
 }
 
-/**
- * Send email verification to a new web user
- */
+// --------------------------
+// Send verification email
+// --------------------------
 async function sendVerificationEmail(to, token) {
   if (!to) throw new Error('Missing recipient email')
-
   try {
     const verifyUrl = `${BASE_URL}/verify-email?token=${encodeURIComponent(token)}`
-
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
     sendSmtpEmail.sender = { name: 'Edgy Events', email: MAIL_FROM }
     sendSmtpEmail.to = [{ email: to }]
@@ -44,31 +43,29 @@ async function sendVerificationEmail(to, token) {
       <p>If the button doesn’t work, copy and paste this URL into your browser:</p>
       <p>${verifyUrl}</p>
     `
-
     await apiInstance.sendTransacEmail(sendSmtpEmail)
     console.log('✅ Verification email sent to', to)
-    return true
   } catch (err) {
     console.error('❌ Failed to send verification email:', err?.response?.body || err)
     throw new Error('Failed to send verification email')
   }
 }
 
-/**
- * Other email functions remain unchanged
- */
+// --------------------------
+// Prebook email
+// --------------------------
 async function sendPrebookEmail(to, event) {
-  if (!to) return
+  if (!to || !event) return
   try {
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
     sendSmtpEmail.sender = { name: 'Edgy Events', email: MAIL_FROM }
     sendSmtpEmail.to = [{ email: to }]
-    sendSmtpEmail.subject = `Prebooked: ${event.name}`
+    sendSmtpEmail.subject = `Prebook Confirmed: ${event.name}`
     sendSmtpEmail.htmlContent = `
       <h1>Prebook Confirmed ✅</h1>
-      <p>You have successfully prebooked a spot for:</p>
-      <p><strong>${event.name}</strong> (${event.city})</p>
-      <p>Date/Time: ${new Date(event.datetime).toLocaleString()}</p>
+      <p>You are first in line to get info on the event confirmation:</p>
+      <p><strong>${event.name}</strong> (${event.city || 'TBA'})</p>
+      <p>Date/Time: ${event.datetime ? new Date(event.datetime).toLocaleString() : 'TBA'}</p>
       <p>We’ll notify you once the event is confirmed.</p>
     `
     await apiInstance.sendTransacEmail(sendSmtpEmail)
@@ -78,29 +75,15 @@ async function sendPrebookEmail(to, event) {
   }
 }
 
-async function sendBookingReminderEmail(to, event) {
-  if (!to) return
-  try {
-    const eventUrl = `${BASE_URL}/events/${event.id}`
-    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
-    sendSmtpEmail.sender = { name: 'Edgy Events', email: MAIL_FROM }
-    sendSmtpEmail.to = [{ email: to }]
-    sendSmtpEmail.subject = `Event confirmed: ${event.name}!`
-    sendSmtpEmail.htmlContent = `
-      <h1>Event Confirmed 🎉</h1>
-      <p>The event <strong>${event.name}</strong> now has enough prebookings and is open for booking.</p>
-      <p><strong>Date/Time:</strong> ${new Date(event.datetime).toLocaleString()}</p>
-      <p><a href="${eventUrl}" style="background-color:#4CAF50;color:white;padding:12px 24px;text-decoration:none;border-radius:5px;display:inline-block;">Book my spot</a></p>
-    `
-    await apiInstance.sendTransacEmail(sendSmtpEmail)
-    console.log('✅ Booking reminder email sent to', to)
-  } catch (err) {
-    console.error('❌ Failed to send booking reminder email:', err?.response?.body || err)
-  }
-}
-
+// --------------------------
+// Ticket email
+// --------------------------
 async function sendTicketEmail(to, event, user) {
-  if (!to) throw new Error('Missing recipient email')
+  if (!to || !event || !user || !user.id) {
+    console.warn('Skipping ticket email: missing data', { to, eventId: event?.id, userId: user?.id })
+    return
+  }
+
   try {
     const qrData = `ticket:${event.id}:${user.id}`
     const qrBuffer = await QRCode.toBuffer(qrData)
@@ -113,8 +96,8 @@ async function sendTicketEmail(to, event, user) {
     let htmlContent = `
       <h1>Your Ticket 🎟</h1>
       <p>Hello ${user.username || ''}, here is your ticket for:</p>
-      <p><strong>${event.name}</strong> (${event.city})</p>
-      <p>Date/Time: ${new Date(event.datetime).toLocaleString()}</p>
+      <p><strong>${event.name}</strong> (${event.city || 'TBA'})</p>
+      <p>Date/Time: ${event.datetime ? new Date(event.datetime).toLocaleString() : 'TBA'}</p>
       <p>Venue: ${event.venue || 'TBA'}</p>
       <p>Please show this QR code at the entrance:</p>
       <p><img src="cid:qrCode" alt="QR Ticket" style="max-width:250px;"/></p>
@@ -130,10 +113,8 @@ async function sendTicketEmail(to, event, user) {
 
     await apiInstance.sendTransacEmail(sendSmtpEmail)
     console.log('✅ Ticket email sent to', to)
-    return true
   } catch (err) {
     console.error('❌ Failed to send ticket email:', err?.response?.body || err)
-    throw new Error('Failed to send ticket email')
   }
 }
 
@@ -141,7 +122,6 @@ module.exports = {
   generateTicketQRCode,
   sendVerificationEmail,
   sendPrebookEmail,
-  sendBookingReminderEmail,
   sendTicketEmail,
 }
 
