@@ -139,6 +139,7 @@ export default async function handler(req, res) {
         ticket_validated BOOLEAN DEFAULT FALSE,
         validated_by TEXT,
         validated_at TIMESTAMPTZ,
+        stage TEXT CHECK (stage IN ('prebook','book')) DEFAULT 'prebook',
         has_paid BOOLEAN DEFAULT FALSE,
         paid_at TIMESTAMPTZ,
         ticket_sent BOOLEAN DEFAULT FALSE,

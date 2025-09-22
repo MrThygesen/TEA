@@ -119,6 +119,7 @@ CREATE TABLE IF NOT EXISTS registrations (
     validated_at TIMESTAMPTZ,
     has_paid BOOLEAN DEFAULT FALSE,
     paid_at TIMESTAMPTZ,
+    stage TEXT CHECK (stage IN ('prebook','book')) DEFAULT 'prebook', 
     ticket_sent BOOLEAN DEFAULT FALSE,
     CONSTRAINT registrations_user_check CHECK (
         user_id IS NOT NULL OR telegram_user_id IS NOT NULL

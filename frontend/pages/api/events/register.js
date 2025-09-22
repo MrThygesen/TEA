@@ -21,7 +21,6 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Invalid token' })
   }
 
-
   const { eventId, stage } = req.body
   if (!eventId) return res.status(400).json({ error: 'Missing eventId' })
   if (!stage) return res.status(400).json({ error: 'Missing stage' })
@@ -31,95 +30,144 @@ export default async function handler(req, res) {
     const event = eventRows[0]
     if (!event) return res.status(404).json({ error: 'Event not found' })
 
-// --- enforce ticket limits ---
-const { rows: userTickets } = await pool.query(
-  `SELECT COUNT(*)::int AS count FROM registrations
-   WHERE event_id=$1 AND (
-     (user_id IS NOT NULL AND user_id=$2) OR
-     (telegram_user_id IS NOT NULL AND telegram_user_id=$3)
-   )`,
-  [eventId, user.id || null, user.telegram_user_id || null]
-)
+    // --- enforce ticket limits ---
+    const { rows: userTickets } = await pool.query(
+      `SELECT COUNT(*)::int AS count 
+       FROM registrations
+       WHERE event_id=$1 
+         AND stage='book'
+         AND (
+           (user_id IS NOT NULL AND user_id=$2) OR
+           (telegram_user_id IS NOT NULL AND telegram_user_id=$3)
+         )`,
+      [eventId, user.id || null, user.telegram_user_id || null]
+    )
 
-const currentCount = userTickets[0]?.count || 0
+    const currentCount = userTickets[0]?.count || 0
 
-let maxTickets = 1
-if (event.tag1 === 'group') {
-  maxTickets = 10
-}
+    let maxTickets = 1
+    if (event.tag1 === 'group') {
+      maxTickets = 10
+    }
 
-// prevent overbooking
-if (currentCount >= maxTickets) {
-  return res.status(400).json({
-    error: `You already reached the max ticket limit (${maxTickets}) for this event.`,
-    registeredCount,
-  })
-}
+    if (stage === 'book' && currentCount >= maxTickets) {
+      return res.status(400).json({
+        error: `You already reached the max ticket limit (${maxTickets}) for this event.`,
+      })
+    }
 
+    // --- check existing registration ---
+    const { rows: existingRows } = await pool.query(
+      `SELECT * FROM registrations
+       WHERE event_id=$1 AND (
+         (user_id IS NOT NULL AND user_id=$2) OR
+         (telegram_user_id IS NOT NULL AND telegram_user_id=$3)
+       )`,
+      [eventId, user.id || null, user.telegram_user_id || null]
+    )
 
+    let ticketCode = null
 
-    // --- generate unique ticket code ---
-    let ticketCode
-    let codeInserted = false
+    if (existingRows.length > 0) {
+      // update existing registration
+      const existing = existingRows[0]
 
-    while (!codeInserted) {
-      ticketCode = crypto.randomBytes(8).toString('hex')
-
-      try {
-        // --- check if registration exists ---
-        const existing = await pool.query(
-          `SELECT id FROM registrations
-           WHERE event_id = $1 AND (
-             (user_id IS NOT NULL AND user_id = $2) OR
-             (telegram_user_id IS NOT NULL AND telegram_user_id = $3)
-           )`,
-          [eventId, user.id || null, user.telegram_user_id || null]
-        )
-
-        if (existing.rows.length > 0) {
-          // update existing registration
+      if (stage === 'book') {
+        // assign ticket code if not already set
+        ticketCode = existing.ticket_code
+        if (!ticketCode) {
+          let codeInserted = false
+          while (!codeInserted) {
+            ticketCode = crypto.randomBytes(8).toString('hex')
+            try {
+              await pool.query(
+                `UPDATE registrations
+                 SET stage='book',
+                     email=$1,
+                     wallet_address=$2,
+                     ticket_code=$3,
+                     timestamp=CURRENT_TIMESTAMP
+                 WHERE id=$4`,
+                [user.email || null, user.wallet_address || null, ticketCode, existing.id]
+              )
+              codeInserted = true
+            } catch (err) {
+              if (err.code === '23505') continue // duplicate ticket_code, retry
+              else throw err
+            }
+          }
+        } else {
           await pool.query(
             `UPDATE registrations
-             SET email=$1,
+             SET stage='book',
+                 email=$1,
                  wallet_address=$2,
-                 ticket_code=$3,
                  timestamp=CURRENT_TIMESTAMP
-             WHERE id=$4`,
-            [
-              user.email || null,
-              user.wallet_address || null,
-              ticketCode,
-              existing.rows[0].id
-            ]
-          )
-        } else {
-          // insert new registration
-          await pool.query(
-            `INSERT INTO registrations
-             (event_id, user_id, telegram_user_id, telegram_username, email, wallet_address, ticket_code, timestamp)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,CURRENT_TIMESTAMP)`,
-            [
-              eventId,
-              user.id || null,
-              user.telegram_user_id || null,
-              user.telegram_username || null,
-              user.email || null,
-              user.wallet_address || null,
-              ticketCode
-            ]
+             WHERE id=$3`,
+            [user.email || null, user.wallet_address || null, existing.id]
           )
         }
-
-        codeInserted = true
-      } catch (err) {
-        if (err.code === '23505') continue // duplicate ticket_code
-        else throw err
+      } else {
+        // prebook just updates email/wallet
+        await pool.query(
+          `UPDATE registrations
+           SET stage='prebook',
+               email=$1,
+               wallet_address=$2,
+               timestamp=CURRENT_TIMESTAMP
+           WHERE id=$3`,
+          [user.email || null, user.wallet_address || null, existing.id]
+        )
+      }
+    } else {
+      // create new registration
+      if (stage === 'book') {
+        let codeInserted = false
+        while (!codeInserted) {
+          ticketCode = crypto.randomBytes(8).toString('hex')
+          try {
+            await pool.query(
+              `INSERT INTO registrations
+               (event_id, user_id, telegram_user_id, telegram_username, email, wallet_address, ticket_code, stage, timestamp)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,'book',CURRENT_TIMESTAMP)`,
+              [
+                eventId,
+                user.id || null,
+                user.telegram_user_id || null,
+                user.telegram_username || null,
+                user.email || null,
+                user.wallet_address || null,
+                ticketCode
+              ]
+            )
+            codeInserted = true
+          } catch (err) {
+            if (err.code === '23505') continue
+            else throw err
+          }
+        }
+      } else {
+        await pool.query(
+          `INSERT INTO registrations
+           (event_id, user_id, telegram_user_id, telegram_username, email, wallet_address, stage, timestamp)
+           VALUES ($1,$2,$3,$4,$5,$6,'prebook',CURRENT_TIMESTAMP)`,
+          [
+            eventId,
+            user.id || null,
+            user.telegram_user_id || null,
+            user.telegram_username || null,
+            user.email || null,
+            user.wallet_address || null,
+          ]
+        )
       }
     }
 
     // --- registered count ---
     const { rows: countRows } = await pool.query(
-      'SELECT COUNT(*)::int AS count FROM registrations WHERE event_id=$1',
+      `SELECT COUNT(*)::int AS count 
+       FROM registrations 
+       WHERE event_id=$1 AND stage='book'`,
       [eventId]
     )
     const registeredCount = countRows[0]?.count || 0
@@ -135,7 +183,7 @@ if (currentCount >= maxTickets) {
           `SELECT u.email
            FROM registrations r
            JOIN user_profiles u ON r.user_id=u.id
-           WHERE r.event_id=$1`,
+           WHERE r.event_id=$1 AND r.stage='prebook'`,
           [eventId]
         )
 
