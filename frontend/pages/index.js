@@ -28,148 +28,115 @@ function clearAuth() {
 // ---------------------------
 // Event Card Component
 // ---------------------------
-export function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
+
+function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
   const [internalModalOpen, setInternalModalOpen] = useState(false)
   const [registeredUsers, setRegisteredUsers] = useState(event.registered_users || 0)
-  const [confirmModalOpen, setConfirmModalOpen] = useState(false)
-  const [agree, setAgree] = useState(false)
-  const [selectedStage, setSelectedStage] = useState(null)
-  const [hasTicket, setHasTicket] = useState(false)
 
-  const eventConfirmed = event.is_confirmed === true
+  const eventConfirmed = registeredUsers >= (event.min_attendees || 0)
+  const telegramLink = eventConfirmed
+    ? `https://t.me/TeaIsHereBot?start=buy_${event.id}`
+    : `https://t.me/TeaIsHereBot?start=${event.id}`
 
-  // ---------------------------
-  // Helpers
-  // ---------------------------
-  async function handleWebAction(stage) {
+  async function handleWebAction() {
     if (!authUser) {
       setShowAccountModal(true)
       return
     }
 
     setLoading(true)
-    setStatusMsg('Processing...')
-
+    setStatusMsg('Booking...')
     try {
-      const token = authUser?.token || localStorage.getItem('token')
+      const token = localStorage.getItem('token')
+      const stage = registeredUsers >= (event.min_attendees || 0) ? 'pay' : 'guestlist'
+
       const res = await fetch('/api/events/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${token || ''}`,
         },
         body: JSON.stringify({ eventId: event.id, stage }),
       })
-
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to register')
 
-      if (typeof data.registeredCount === 'number') {
-        setRegisteredUsers(data.registeredCount)
-      }
-
-      if (stage === 'book' && (!event.price || Number(event.price) === 0)) {
-        setHasTicket(true)
-        setStatusMsg(data.message || 'Ticket sent successfully!')
-        setTimeout(() => setStatusMsg(''), 2500)
+      if (data.url) {
+        // Paid event: redirect to Stripe Checkout
+        window.location.href = data.url
         return
       }
 
-      if (stage === 'book' && Number(event.price) > 0 && data.url) {
-        setStatusMsg('Redirecting to payment...')
-        setTimeout(() => {
-          window.location.href = data.url
-        }, 500)
-        return
+      if (data.message?.includes('Free ticket')) {
+        // Free event: ticket email already sent
+        setRegisteredUsers(prev => prev + 1)
+        setStatusMsg('Ticket sent!')
+      } else if (data.registered) {
+        setRegisteredUsers(prev => stage === 'guestlist' ? prev : prev + 1)
+        setStatusMsg('Registered!')
+      } else {
+        setStatusMsg(data.message || 'Something went wrong')
       }
-
-      if (stage === 'prebook') {
-        setStatusMsg(data.message || 'Prebook confirmed!')
-        setTimeout(() => setStatusMsg(''), 2500)
-        return
-      }
-    } catch (err) {
-      console.error(err)
-      setStatusMsg(err.message || 'Error occurred')
-      setTimeout(() => setStatusMsg(''), 2500)
+    } catch {
+      setStatusMsg('Network error')
     } finally {
       setLoading(false)
+      setTimeout(() => setStatusMsg(''), 2000) // clear message after 2s
     }
-  }
-
-  function isMaxReached() {
-    if (!authUser) return false
-    if (event.tag1 === 'group') return event.user_ticket_count >= 10
-    return event.user_ticket_count >= 1
   }
 
   function getWebButtonLabel() {
-    if (loading) {
-      return (
-        <span className="flex items-center justify-center gap-2">
-          <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            ></circle>
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-            ></path>
-          </svg>
-          {statusMsg || 'Processing...'}
-        </span>
-      )
-    }
-
-    if (isMaxReached()) return 'Max reached'
-    if (!eventConfirmed) return 'Guestlist'
-    if (eventConfirmed && (!event.price || Number(event.price) === 0)) return 'Free Access'
-    if (eventConfirmed && Number(event.price) > 0) return 'Pay Access'
-    return 'Book'
+    if (loading) return (
+      <span className="flex items-center justify-center gap-2">
+        <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10"
+            stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor"
+            d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+        </svg>
+        {statusMsg || 'Booking...'}
+      </span>
+    )
+    if (statusMsg) return statusMsg
+    return registeredUsers >= (event.min_attendees || 0) ? 'Pay Access' : 'Guestlist'
   }
 
-  // ---------------------------
-  // Render
-  // ---------------------------
   return (
     <>
-      <div className="bg-zinc-900 rounded-2xl shadow p-4 flex flex-col">
-        <h3 className="text-lg font-semibold mb-2">{event.name}</h3>
-        <p className="text-sm text-gray-400 mb-2">
-          {new Date(event.datetime).toLocaleString()} @ {event.venue}
-        </p>
+      <div className="border border-zinc-700 rounded-lg p-4 text-left bg-zinc-800 shadow flex flex-col justify-between">
+        <img
+          src={event.image_url || '/default-event.jpg'}
+          alt={event.name}
+          className="w-full h-40 object-cover rounded mb-3"
+        />
+        <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
+        <p className="text-sm mb-2">{event.description?.split(' ').slice(0, 30).join(' ')}...</p>
+
+        <div className="flex flex-wrap gap-1 mb-2">
+          {[event.tag1, event.tag2, event.tag3].filter(Boolean).map((tag, i) => (
+            <span key={i} className="bg-blue-700 text-xs px-2 py-1 rounded">
+              {tag}
+            </span>
+          ))}
+        </div>
+
+        <div className="flex justify-between items-center mt-auto mb-2 gap-2">
+          <button
+            onClick={handleWebAction}
+            disabled={loading}
+            className={`flex-1 px-3 py-1 rounded ${
+              eventConfirmed ? 'bg-blue-600 hover:bg-blue-700' : 'bg-yellow-600 hover:bg-yellow-700'
+            } text-white text-sm`}
+          >
+            {getWebButtonLabel()}
+          </button>
+        </div>
 
         <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
           <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
           <span>👥 {registeredUsers} Users</span>
         </div>
-
-        {!onPreview && (
-          <button
-            onClick={() => {
-              if (isMaxReached()) return
-                const stage = event.is_confirmed ? 'book' : 'prebook';
-                await handleWebAction(stage);
-              setConfirmModalOpen(true)
-            }}
-            disabled={isMaxReached() || loading}
-            className={`mt-2 w-full px-3 py-1 rounded text-sm ${
-              isMaxReached()
-                ? 'bg-zinc-600 text-gray-400 cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-700 text-white'
-            }`}
-          >
-            {getWebButtonLabel()}
-          </button>
-        )}
 
         {!onPreview && (
           <button
@@ -181,73 +148,6 @@ export function DynamicEventCard({ event, onPreview, authUser, setShowAccountMod
         )}
       </div>
 
-      {/* Confirmation Modal */}
-      {confirmModalOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
-          onClick={() => setConfirmModalOpen(false)}
-        >
-          <div
-            className="bg-zinc-900 rounded-2xl shadow-xl max-w-md w-full p-6 text-white relative"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-xl font-semibold mb-4 text-center">{event.name}</h2>
-            <p className="mb-6 text-sm text-gray-300 text-center leading-relaxed">
-              By confirming, you declare a genuine interest in participating in this event for
-              social or professional purposes. Participation includes receiving event-related
-              emails and following the event guidelines.
-            </p>
-
-            <div className="flex items-center justify-between gap-3">
-              <label className="flex items-center gap-2 text-xs text-gray-300">
-                <input
-                  type="checkbox"
-                  checked={agree}
-                  onChange={(e) => setAgree(e.target.checked)}
-                />
-                I agree to guidelines and receival of emails for the event.
-              </label>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setConfirmModalOpen(false)}
-                  className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-sm"
-                >
-                  Cancel
-                </button>
-                <button
-                  disabled={!agree || loading}
-                  onClick={async () => {
-                    setConfirmModalOpen(false)
-                    await handleWebAction(selectedStage)
-                  }}
-                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm disabled:opacity-50"
-                >
-                  {selectedStage === 'prebook'
-                    ? 'Join Guestlist'
-                    : !event.price || Number(event.price) === 0
-                    ? 'Book Free'
-                    : 'Pay Now'}
-                </button>
-              </div>
-            </div>
-
-            <p className="mt-6 text-xs text-gray-500 text-center">
-              By proceeding, you agree to our{' '}
-              <a
-                href="/policies"
-                className="text-blue-400 underline hover:text-blue-300"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                policies
-              </a>.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Event details modal */}
       {!onPreview && internalModalOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
@@ -264,8 +164,7 @@ export function DynamicEventCard({ event, onPreview, authUser, setShowAccountMod
               className="w-full h-56 object-contain rounded mb-4"
             />
             <p className="mb-2 text-sm text-gray-400">
-              {new Date(event.datetime).toLocaleString()} @ {event.venue} (
-              {event.venue_type || 'N/A'})
+              {new Date(event.datetime).toLocaleString()} @ {event.venue} ({event.venue_type || 'N/A'})
             </p>
             <p className="mb-4">{event.details}</p>
 
@@ -293,60 +192,6 @@ export function DynamicEventCard({ event, onPreview, authUser, setShowAccountMod
   )
 }
 
-function VideoHero() {
-  const [open, setOpen] = useState(false)
-
-  return (
-    <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg mt-10 text-center">
-      <h2 className="text-2xl font-semibold mb-6 text-blue-400">Watch How It Works</h2>
-
-      <div
-        className="relative mx-auto w-full max-w-4xl cursor-pointer rounded-lg overflow-hidden"
-        onClick={() => setOpen(true)}
-        aria-label="Play video"
-        role="button"
-      >
-        <img
-          src="/images/video-poster.jpg"
-          alt="Video poster describing how it works"
-          className="w-full h-64 object-cover"
-        />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span
-            className="bg-black bg-opacity-60 text-white rounded-full p-3"
-            style={{ boxShadow: '0 4px 14px rgba(0,0,0,.6)' }}
-          >
-            ▶
-          </span>
-        </div>
-      </div>
-
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" role="dialog" aria-label="Video modal">
-          <div className="relative w-full max-w-4xl aspect-video bg-black">
-            <iframe
-              className="w-full h-full rounded-lg"
-              src="https://www.youtube.com/embed/FN_sOmPuuec?si=pNEvmL1ELtpqMRKD"
-              title="Event Platform Video"
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-            <button
-              onClick={() => setOpen(false)}
-              className="absolute top-2 right-2 text-white bg-black/60 rounded-full p-2"
-              aria-label="Close video"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
-    </section>
-  )
-}
-
-
 // ---------------------------
 // Event List Row
 // ---------------------------
@@ -361,9 +206,6 @@ function EventListRow({ event, onPreview }) {
     </div>
   )
 }
-
-
-
 
 // ---------------------------
 // Main Home Component
@@ -404,32 +246,32 @@ export default function Home() {
   }, [])
 
   // --- load user data on auth ---
-useEffect(() => {
-  async function loadProfile() {
-    const token = localStorage.getItem('token')
-    if (!token) return
+  useEffect(() => {
+    async function loadProfile() {
+      const token = localStorage.getItem('token')
+      if (!token) return
 
-    try {
-      const res = await fetch('/api/user/me', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      if (!res.ok) return
-      const data = await res.json()
-      setProfileName(data.username || '')
-      setProfileEmail(data.email || '')
-      setCoupons(data.paid_coupons || [])
-      setPrebookings(data.prebooked_events || [])
+      try {
+        const res = await fetch('/api/user/me', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        setProfileName(data.username || '')
+        setProfileEmail(data.email || '')
+        setCoupons(data.paid_coupons || [])
+        setPrebookings(data.prebooked_events || [])
 
-      const updatedUser = { ...authUser, ...data }
-      setAuthUser(updatedUser)
-      saveAuth(updatedUser)
-    } catch (err) {
-      console.error('Error fetching profile:', err)
+        const updatedUser = { ...authUser, ...data }
+        setAuthUser(updatedUser)
+        saveAuth(updatedUser)
+      } catch (err) {
+        console.error('Error fetching profile:', err)
+      }
     }
-  }
 
-  if (authUser) loadProfile()
-}, [authUser])
+    if (showAccountModal) loadProfile()
+  }, [showAccountModal])
 
   // --- auth handlers ---
   async function handleLogin(e) {
@@ -493,28 +335,10 @@ useEffect(() => {
     }
   }
 
- /* function handleLogout() {
+  function handleLogout() {
     clearAuth()
     setAuthUser(null)
-  } */
-
-
-function handleLogout() {
-  // Clear localStorage
-  clearAuth()
-  localStorage.removeItem('token')
-
-  // Reset all auth-related state
-  setAuthUser(null)
-  setProfileName('')
-  setProfileEmail('')
-  setProfilePasswordInput('')
-  setAuthError('')
-
-  // Optionally, force the page to re-render inputs cleared
-  // window.location.reload()  // uncomment only if necessary
-}
-
+  }
 
   async function saveProfile(e) {
     e.preventDefault()
@@ -586,33 +410,6 @@ function handleLogout() {
             )}
           </div>
         </header>
- 
-{/* Video Section */}
-<VideoHero />
-
-
-{/* Three Images Section */}
-<section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg mt-10">
-  <h2 className="text-2xl font-semibold mb-6 text-center text-blue-400">Our Network Highlights</h2>
-  <div className="grid md:grid-cols-3 gap-6">
-    <div className="flex flex-col items-center">
-      <img src="/images/image1.jpg" alt="Perks" className="w-full h-48 object-cover rounded-lg mb-2" />
-      <h3 className="text-lg font-semibold">Perks & Benefits</h3>
-      <p className="text-gray-300 text-sm text-center">Enjoy curated perks at every event you join.</p>
-    </div>
-    <div className="flex flex-col items-center">
-      <img src="/images/image2.jpg" alt="Venues" className="w-full h-48 object-cover rounded-lg mb-2" />
-      <h3 className="text-lg font-semibold">Venue Partners</h3>
-      <p className="text-gray-300 text-sm text-center">We collaborate with the best cafés, pubs, and event spaces.</p>
-    </div>
-    <div className="flex flex-col items-center">
-      <img src="/images/image3.jpg" alt="Organizers" className="w-full h-48 object-cover rounded-lg mb-2" />
-      <h3 className="text-lg font-semibold">Event Organizers</h3>
-      <p className="text-gray-300 text-sm text-center">Connect with organizers who craft unique experiences.</p>
-    </div>
-  </div>
-</section>
-
 
         {/* Admin SBT Manager */}
         {isAdmin && <AdminSBTManager darkMode={true} />}
@@ -756,7 +553,28 @@ function handleLogout() {
         </div>
       )}
 
+      {/* Event Preview Modal */}
+      {showEventModal && selectedEvent && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowEventModal(false)}
+        >
+          <div
+            className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold mb-4">{selectedEvent.name}</h2>
+            <img src={selectedEvent.image_url || '/default-event.jpg'} alt={selectedEvent.name} className="w-full h-56 object-contain rounded mb-4" />
+            <p className="mb-2 text-sm text-gray-400">{new Date(selectedEvent.datetime).toLocaleString()} @ {selectedEvent.venue} ({selectedEvent.venue_type || 'N/A'})</p>
+            <p className="mb-4">{selectedEvent.details}</p>
 
+            {selectedEvent.basic_perk && <p className="text-sm text-gray-300"><strong>Basic Perk:</strong> {selectedEvent.basic_perk}</p>}
+            {(selectedEvent.paid_count || 0) >= 10 && selectedEvent.advanced_perk && <p className="text-sm text-gray-300"><strong>Advanced Perk:</strong> {selectedEvent.advanced_perk}</p>}
+
+            <button onClick={() => setShowEventModal(false)} className="mt-6 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">Close</button>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
