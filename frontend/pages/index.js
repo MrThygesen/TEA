@@ -29,9 +29,7 @@ function clearAuth() {
 // Event Card Component
 // ---------------------------
 
-import { useState } from 'react'
-
-export default function DynamicEventCard({ event, authUser, setShowAccountModal }) {
+export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
   const [internalModalOpen, setInternalModalOpen] = useState(false)
@@ -41,7 +39,6 @@ export default function DynamicEventCard({ event, authUser, setShowAccountModal 
 
   const stage = event.stage || 'prebook'
   const eventConfirmed = stage === 'book'
-
   const requiresConfirmation = stage === 'prebook' || stage === 'book'
 
   async function handleWebAction(stageParam) {
@@ -66,7 +63,7 @@ export default function DynamicEventCard({ event, authUser, setShowAccountModal 
       const data = await res.json()
 
       if (data.url) {
-        window.location.href = data.url // Paid event: redirect to Stripe
+        window.location.href = data.url
         return
       }
 
@@ -193,51 +190,6 @@ export default function DynamicEventCard({ event, authUser, setShowAccountModal 
                 policies
               </a>.
             </p>
-          </div>
-        </div>
-      )}
-    </>
-  )
-}
-
-
-      {!onPreview && internalModalOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
-          onClick={() => setInternalModalOpen(false)}
-        >
-          <div
-            className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-xl font-bold mb-4">{event.name}</h2>
-            <img
-              src={event.image_url || '/default-event.jpg'}
-              alt={event.name}
-              className="w-full h-56 object-contain rounded mb-4"
-            />
-            <p className="mb-2 text-sm text-gray-400">
-              {new Date(event.datetime).toLocaleString()} @ {event.venue} ({event.venue_type || 'N/A'})
-            </p>
-            <p className="mb-4">{event.details}</p>
-
-            {event.basic_perk && (
-              <p className="text-sm text-gray-300">
-                <strong>Basic Perk:</strong> {event.basic_perk}
-              </p>
-            )}
-            {(event.paid_count || 0) >= 10 && event.advanced_perk && (
-              <p className="text-sm text-gray-300">
-                <strong>Advanced Perk:</strong> {event.advanced_perk}
-              </p>
-            )}
-
-            <button
-              onClick={() => setInternalModalOpen(false)}
-              className="mt-6 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              Close
-            </button>
           </div>
         </div>
       )}
@@ -509,20 +461,20 @@ export default function Home() {
             Our event platform and network is the spot where people, venues, and opportunities meet. Our guests receive curated experiences that blend business with social connections. We are happy to help you expanding your network and meet new connections in real life.
           </p>
 
-          <div className="mt-6 flex gap-3 justify-center">
-            {!authUser ? (
-              <>
-                <button onClick={() => setShowSignupModal(true)} className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700">Create account</button>
-                <button onClick={() => setShowLoginModal(true)} className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600">Log in</button>
-              </>
-            )  (
-              <>
-                <span>Welcome, <span className="font-semibold text-white">{authUser.username}</span></span>
-                <button onClick={() => setShowAccountModal(true)} className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700">Your Account</button>
-                <button onClick={handleLogout} className="px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600">Log out</button>
-              </>
-            )}
-          </div>
+ <div className="mt-6 flex gap-3 justify-center">
+  {!authUser ? (
+    <>
+      <button onClick={() => setShowSignupModal(true)} className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700">Create account</button>
+      <button onClick={() => setShowLoginModal(true)} className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600">Log in</button>
+    </>
+  ) : (
+    <>
+      <span>Welcome, <span className="font-semibold text-white">{authUser.username}</span></span>
+      <button onClick={() => setShowAccountModal(true)} className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700">Your Account</button>
+      <button onClick={handleLogout} className="px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600">Log out</button>
+    </>
+  )}
+</div>
         </header>
 
 {/* Video Section */} <VideoHero /> 
