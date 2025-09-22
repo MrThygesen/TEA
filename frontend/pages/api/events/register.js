@@ -21,6 +21,7 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Invalid token' })
   }
 
+
   const { eventId, stage } = req.body
   if (!eventId) return res.status(400).json({ error: 'Missing eventId' })
   if (!stage) return res.status(400).json({ error: 'Missing stage' })
@@ -29,6 +30,33 @@ export default async function handler(req, res) {
     const { rows: eventRows } = await pool.query('SELECT * FROM events WHERE id=$1', [eventId])
     const event = eventRows[0]
     if (!event) return res.status(404).json({ error: 'Event not found' })
+
+// --- enforce ticket limits ---
+const { rows: userTickets } = await pool.query(
+  `SELECT COUNT(*)::int AS count FROM registrations
+   WHERE event_id=$1 AND (
+     (user_id IS NOT NULL AND user_id=$2) OR
+     (telegram_user_id IS NOT NULL AND telegram_user_id=$3)
+   )`,
+  [eventId, user.id || null, user.telegram_user_id || null]
+)
+
+const currentCount = userTickets[0]?.count || 0
+
+let maxTickets = 1
+if (event.tag1 === 'group') {
+  maxTickets = 10
+}
+
+// prevent overbooking
+if (currentCount >= maxTickets) {
+  return res.status(400).json({
+    error: `You already reached the max ticket limit (${maxTickets}) for this event.`,
+    registeredCount,
+  })
+}
+
+
 
     // --- generate unique ticket code ---
     let ticketCode

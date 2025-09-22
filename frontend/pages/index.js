@@ -105,6 +105,38 @@ async function handleWebAction(stage) {
 }
 
   // --- determine button label and stage ---
+
+
+function isMaxReached() {
+  if (!authUser) return false
+  if (event.tag1 === 'group') {
+    return event.user_ticket_count >= 10
+  }
+  return event.user_ticket_count >= 1
+}
+
+function getWebButton() {
+  if (loading) { ...spinner... }
+
+  if (isMaxReached()) return 'Max reached'
+  if (!eventConfirmed) return 'Guestlist'
+  if (eventConfirmed && (!event.price || Number(event.price) === 0)) return 'Free Access'
+  if (eventConfirmed && Number(event.price) > 0) return 'Pay Access'
+  return 'Book'
+}
+
+function openConfirmModal(stage) {
+  if (!authUser) {
+    setShowAccountModal(true)
+    return
+  }
+  if (isMaxReached()) return
+  setSelectedStage(stage)
+  setConfirmModalOpen(true)
+  setAgree(false)
+}
+
+
   function getWebButton() {
     if (loading) {
       return (
