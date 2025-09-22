@@ -193,7 +193,64 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
 }
 
 
-function VideoHero() { const [open, setOpen] = useState(false) return ( <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg mt-10 text-center"> <h2 className="text-2xl font-semibold mb-6 text-blue-400">Watch How It Works</h2> <div className="relative mx-auto w-full max-w-4xl cursor-pointer rounded-lg overflow-hidden" onClick={() => setOpen(true)} aria-label="Play video" role="button" > <img src="/images/video-poster.jpg" alt="Video poster describing how it works" className="w-full h-64 object-cover" /> <div className="absolute inset-0 flex items-center justify-center"> <span className="bg-black bg-opacity-60 text-white rounded-full p-3" style={{ boxShadow: '0 4px 14px rgba(0,0,0,.6)' }} > ▶ </span> </div> </div> {open && ( <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" role="dialog" aria-label="Video modal"> <div className="relative w-full max-w-4xl aspect-video bg-black"> <iframe className="w-full h-full rounded-lg" src="https://www.youtube.com/embed/FN_sOmPuuec?si=pNEvmL1ELtpqMRKD" title="Event Platform Video" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /> <button onClick={() => setOpen(false)} className="absolute top-2 right-2 text-white bg-black/60 rounded-full p-2" aria-label="Close video" > ✕ </button> </div> </div> )} </section> ) }
+function VideoHero() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg mt-10 text-center">
+      <h2 className="text-2xl font-semibold mb-6 text-blue-400">
+        Watch How It Works
+      </h2>
+      <div
+        className="relative mx-auto w-full max-w-4xl cursor-pointer rounded-lg overflow-hidden"
+        onClick={() => setOpen(true)}
+        aria-label="Play video"
+        role="button"
+      >
+        <img
+          src="/images/video-poster.jpg"
+          alt="Video poster describing how it works"
+          className="w-full h-64 object-cover"
+        />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span
+            className="bg-black bg-opacity-60 text-white rounded-full p-3"
+            style={{ boxShadow: '0 4px 14px rgba(0,0,0,.6)' }}
+          >
+            ▶
+          </span>
+        </div>
+      </div>
+
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+          role="dialog"
+          aria-label="Video modal"
+        >
+          <div className="relative w-full max-w-4xl aspect-video bg-black">
+            <iframe
+              className="w-full h-full rounded-lg"
+              src="https://www.youtube.com/embed/FN_sOmPuuec?si=pNEvmL1ELtpqMRKD"
+              title="Event Platform Video"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+            <button
+              onClick={() => setOpen(false)}
+              className="absolute top-2 right-2 text-white bg-black/60 rounded-full p-2"
+              aria-label="Close video"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 
 
 // ---------------------------
