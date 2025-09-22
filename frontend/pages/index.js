@@ -148,7 +148,6 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
         )}
       </div>
 
-
       {/* Confirmation Modal */}
       {confirmModalOpen && (
         <div
