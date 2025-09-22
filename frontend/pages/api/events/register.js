@@ -31,7 +31,7 @@ export default async function handler(req, res) {
     if (!userId && !telegramUserId) {
       return res.status(400).json({ error: 'No valid user in token' })
     }
- 
+
     // --------------------------
     // Input
     // --------------------------
@@ -46,7 +46,9 @@ export default async function handler(req, res) {
     if (!events.length) return res.status(404).json({ error: 'Event not found' })
     const event = events[0]
 
-    // Count all registrations (both prebook + book)
+    const price = Number(event.price) || 0
+
+    // Count all registrations
     const { rows: regRows } = await pool.query(
       `SELECT COUNT(*)::int AS count FROM registrations WHERE event_id=$1`,
       [eventId]
@@ -73,10 +75,10 @@ export default async function handler(req, res) {
 
       if (stage === 'book' && existingReg.stage === 'prebook') {
         // Upgrade prebook → book
-        if (Number(event.price) > 0) {
+        if (price > 0) {
           // Paid upgrade → Stripe
           const paymentIntent = await stripe.paymentIntents.create({
-            amount: Math.round(Number(event.price) * 100),
+            amount: Math.round(price * 100),
             currency: 'usd',
             metadata: { eventId, userId },
             receipt_email: user.email || undefined,
@@ -91,11 +93,10 @@ export default async function handler(req, res) {
             [paymentIntent.id, existingReg.id]
           )
 
-          const registration = rows[0]
           return res.status(200).json({
             success: true,
             stage: 'book',
-            registration,
+            registration: rows[0],
             clientSecret: paymentIntent.client_secret,
           })
         } else {
@@ -107,11 +108,10 @@ export default async function handler(req, res) {
              RETURNING *`,
             [existingReg.id]
           )
-          const registration = rows[0]
           return res.status(200).json({
             success: true,
             stage: 'book',
-            registration,
+            registration: rows[0],
             clientSecret: null,
           })
         }
@@ -133,22 +133,22 @@ export default async function handler(req, res) {
       telegramUserId,
       stage,
       ticketCode,
-      price: event.price,
+      price,
     })
 
-    if (event.price === 0 || stage === 'prebook') {
-      // Free or prebook
+    if (price === 0 || stage === 'prebook') {
+      // Free registration or prebook → just DB insert
       const { rows } = await pool.query(
         `INSERT INTO registrations
          (event_id, user_id, telegram_user_id, stage, ticket_code, ticket_sent)
          VALUES ($1,$2,$3,$4,$5,$6)
          RETURNING *`,
-        [eventId, userId, telegramUserId, stage, ticketCode, event.price === 0]
+        [eventId, userId, telegramUserId, stage, ticketCode, price === 0]
       )
       registration = rows[0]
 
-      // Send email
-      if (event.price === 0 && user.email) {
+      // Send emails
+      if (price === 0 && user.email) {
         await sendTicketEmail(user.email, event, {
           ...user,
           id: userId,
@@ -160,7 +160,7 @@ export default async function handler(req, res) {
     } else {
       // Paid booking → Stripe
       const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(Number(event.price) * 100),
+        amount: Math.round(price * 100),
         currency: 'usd',
         metadata: { eventId, userId },
         receipt_email: user.email || undefined,
@@ -185,9 +185,7 @@ export default async function handler(req, res) {
     })
   } catch (err) {
     console.error('Error in /api/events/register:', err)
-    return res
-      .status(500)
-      .json({ error: 'Server error', details: err.message })
+    return res.status(500).json({ error: 'Server error', details: err.message })
   }
 }
 
