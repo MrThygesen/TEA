@@ -17,10 +17,6 @@ export default async function handler(req, res) {
   try {
     console.log('🔹 Initializing database...')
 
-    // simply call the same SQL as in migrations.js
-    // for brevity, you can also import migrations.js and run runMigrations()
-    // but here we duplicate all queries for safety in POST context
-
     // -- TELEGRAM USER PROFILES
     await pool.query(`
       CREATE TABLE IF NOT EXISTS telegram_user_profiles (
@@ -139,7 +135,6 @@ export default async function handler(req, res) {
         ticket_validated BOOLEAN DEFAULT FALSE,
         validated_by TEXT,
         validated_at TIMESTAMPTZ,
-        stage TEXT CHECK (stage IN ('prebook','book')) DEFAULT 'prebook',
         has_paid BOOLEAN DEFAULT FALSE,
         paid_at TIMESTAMPTZ,
         ticket_sent BOOLEAN DEFAULT FALSE,
@@ -148,6 +143,22 @@ export default async function handler(req, res) {
         )
       );
     `)
+
+    // --- Ensure stage column exists ---
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='registrations' AND column_name='stage'
+        ) THEN
+          ALTER TABLE registrations
+          ADD COLUMN stage TEXT CHECK (stage IN ('prebook','book')) DEFAULT 'prebook';
+        END IF;
+      END
+      $$;
+    `)
+
     await pool.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_registrations_event_user
       ON registrations(event_id, user_id)
