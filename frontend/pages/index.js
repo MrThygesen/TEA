@@ -192,6 +192,10 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
   )
 }
 
+
+function VideoHero() { const [open, setOpen] = useState(false) return ( <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg mt-10 text-center"> <h2 className="text-2xl font-semibold mb-6 text-blue-400">Watch How It Works</h2> <div className="relative mx-auto w-full max-w-4xl cursor-pointer rounded-lg overflow-hidden" onClick={() => setOpen(true)} aria-label="Play video" role="button" > <img src="/images/video-poster.jpg" alt="Video poster describing how it works" className="w-full h-64 object-cover" /> <div className="absolute inset-0 flex items-center justify-center"> <span className="bg-black bg-opacity-60 text-white rounded-full p-3" style={{ boxShadow: '0 4px 14px rgba(0,0,0,.6)' }} > ▶ </span> </div> </div> {open && ( <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" role="dialog" aria-label="Video modal"> <div className="relative w-full max-w-4xl aspect-video bg-black"> <iframe className="w-full h-full rounded-lg" src="https://www.youtube.com/embed/FN_sOmPuuec?si=pNEvmL1ELtpqMRKD" title="Event Platform Video" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /> <button onClick={() => setOpen(false)} className="absolute top-2 right-2 text-white bg-black/60 rounded-full p-2" aria-label="Close video" > ✕ </button> </div> </div> )} </section> ) }
+
+
 // ---------------------------
 // Event List Row
 // ---------------------------
@@ -410,6 +414,12 @@ export default function Home() {
             )}
           </div>
         </header>
+
+{/* Video Section */} <VideoHero /> 
+
+
+{/* Three Images Section */} <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg mt-10"> <h2 className="text-2xl font-semibold mb-6 text-center text-blue-400">Our Network Highlights</h2> <div className="grid md:grid-cols-3 gap-6"> <div className="flex flex-col items-center"> <img src="/images/image1.jpg" alt="Perks" className="w-full h-48 object-cover rounded-lg mb-2" /> <h3 className="text-lg font-semibold">Perks & Benefits</h3> <p className="text-gray-300 text-sm text-center">Enjoy curated perks at every event you join.</p> </div> <div className="flex flex-col items-center"> <img src="/images/image2.jpg" alt="Venues" className="w-full h-48 object-cover rounded-lg mb-2" /> <h3 className="text-lg font-semibold">Venue Partners</h3> <p className="text-gray-300 text-sm text-center">We collaborate with the best cafés, pubs, and event spaces.</p> </div> <div className="flex flex-col items-center"> <img src="/images/image3.jpg" alt="Organizers" className="w-full h-48 object-cover rounded-lg mb-2" /> <h3 className="text-lg font-semibold">Event Organizers</h3> <p className="text-gray-300 text-sm text-center">Connect with organizers who craft unique experiences.</p> </div> </div> </section>
+
 
         {/* Admin SBT Manager */}
         {isAdmin && <AdminSBTManager darkMode={true} />}
