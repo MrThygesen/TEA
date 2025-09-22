@@ -148,6 +148,74 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
         )}
       </div>
 
+
+      {/* Confirmation Modal */}
+      {confirmModalOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
+          onClick={() => setConfirmModalOpen(false)}
+        >
+          <div
+            className="bg-zinc-900 rounded-2xl shadow-xl max-w-md w-full p-6 text-white relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-semibold mb-4 text-center">{event.name}</h2>
+            <p className="mb-6 text-sm text-gray-300 text-center leading-relaxed">
+              By confirming, you declare a genuine interest in participating in this event for
+              social or professional purposes. Participation includes receiving event-related
+              emails and following the event guidelines.
+            </p>
+
+            <div className="flex items-center justify-between gap-3">
+              <label className="flex items-center gap-2 text-xs text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={agree}
+                  onChange={(e) => setAgree(e.target.checked)}
+                />
+                I agree to guidelines and receival of emails for the event.
+              </label>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setConfirmModalOpen(false)}
+                  className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  disabled={!agree || loading}
+                  onClick={async () => {
+                    setConfirmModalOpen(false)
+                    await handleWebAction(selectedStage)
+                  }}
+                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm disabled:opacity-50"
+                >
+                  {selectedStage === 'prebook'
+                    ? 'Join Guestlist'
+                    : !event.price || Number(event.price) === 0
+                    ? 'Book Free'
+                    : 'Pay Now'}
+                </button>
+              </div>
+            </div>
+
+            <p className="mt-6 text-xs text-gray-500 text-center">
+              By proceeding, you agree to our{' '}
+              <a
+                href="/policies"
+                className="text-blue-400 underline hover:text-blue-300"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                policies
+              </a>.
+            </p>
+          </div>
+        </div>
+      )}
+
+
       {!onPreview && internalModalOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
