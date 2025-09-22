@@ -515,7 +515,7 @@ export default function Home() {
                 <button onClick={() => setShowSignupModal(true)} className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700">Create account</button>
                 <button onClick={() => setShowLoginModal(true)} className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600">Log in</button>
               </>
-            ) : (
+            )  (
               <>
                 <span>Welcome, <span className="font-semibold text-white">{authUser.username}</span></span>
                 <button onClick={() => setShowAccountModal(true)} className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700">Your Account</button>
