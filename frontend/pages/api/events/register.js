@@ -31,7 +31,7 @@ export default async function handler(req, res) {
     if (!userId && !telegramUserId) {
       return res.status(400).json({ error: 'No valid user in token' })
     }
-
+ 
     // --------------------------
     // Input
     // --------------------------
