@@ -1,21 +1,23 @@
-// migrations.js
+// pages/api/migrations.js
 import pkg from 'pg'
 import dotenv from 'dotenv'
 dotenv.config()
 const { Pool } = pkg
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-})
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed. Use POST.' })
+  }
 
-async function runMigrations() {
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+  })
+
   try {
-    console.log('🔹 Running migrations...')
+    console.log('🚀 Running migrations...')
 
-    // ----------------------------
-    // TELEGRAM USER PROFILES
-    // ----------------------------
+    // -- TELEGRAM USER PROFILES
     await pool.query(`
       CREATE TABLE IF NOT EXISTS telegram_user_profiles (
         id SERIAL PRIMARY KEY,
@@ -28,9 +30,7 @@ async function runMigrations() {
       );
     `)
 
-    // ----------------------------
-    // WEB EMAIL VERIFICATION TOKENS
-    // ----------------------------
+    // -- WEB EMAIL VERIFICATION TOKENS
     await pool.query(`
       CREATE TABLE IF NOT EXISTS web_email_verification_tokens (
         token TEXT PRIMARY KEY,
@@ -45,9 +45,7 @@ async function runMigrations() {
       ON web_email_verification_tokens(user_id);
     `)
 
-    // ----------------------------
-    // USER PROFILES
-    // ----------------------------
+    // -- USER PROFILES
     await pool.query(`
       CREATE TABLE IF NOT EXISTS user_profiles (
         id SERIAL PRIMARY KEY,
@@ -67,22 +65,32 @@ async function runMigrations() {
       );
     `)
 
-    // ----------------------------
-    // EMAIL VERIFICATION TOKENS
-    // ----------------------------
+    // -- EMAIL VERIFICATION TOKENS
     await pool.query(`
       CREATE TABLE IF NOT EXISTS email_verification_tokens (
         token TEXT PRIMARY KEY,
         user_id INTEGER REFERENCES user_profiles(id) ON DELETE CASCADE,
-        telegram_user_id INTEGER REFERENCES telegram_user_profiles(id) ON DELETE CASCADE,
         email TEXT NOT NULL,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        expires_at TIMESTAMPTZ NOT NULL,
-        CONSTRAINT email_verif_user_or_telegram CHECK (
-          user_id IS NOT NULL OR telegram_user_id IS NOT NULL
-        )
+        expires_at TIMESTAMPTZ NOT NULL
       );
     `)
+
+    // Ensure telegram_user_id column exists
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='email_verification_tokens' AND column_name='telegram_user_id'
+        ) THEN
+          ALTER TABLE email_verification_tokens
+          ADD COLUMN telegram_user_id INTEGER REFERENCES telegram_user_profiles(id) ON DELETE CASCADE;
+        END IF;
+      END
+      $$;
+    `)
+
     await pool.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_userid
       ON email_verification_tokens(user_id);
@@ -92,9 +100,7 @@ async function runMigrations() {
       ON email_verification_tokens(telegram_user_id);
     `)
 
-    // ----------------------------
-    // EVENTS
-    // ----------------------------
+    // -- EVENTS
     await pool.query(`
       CREATE TABLE IF NOT EXISTS events (
         id SERIAL PRIMARY KEY,
@@ -122,9 +128,7 @@ async function runMigrations() {
     `)
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_events_city ON events(LOWER(city));`)
 
-    // ----------------------------
-    // REGISTRATIONS
-    // ----------------------------
+    // -- REGISTRATIONS
     await pool.query(`
       CREATE TABLE IF NOT EXISTS registrations (
         id SERIAL PRIMARY KEY,
@@ -141,8 +145,7 @@ async function runMigrations() {
         advanced_perk_applied BOOLEAN DEFAULT FALSE,
         ticket_code TEXT UNIQUE,
         ticket_validated BOOLEAN DEFAULT FALSE,
-        validated_by TEXT, 
-        stage TEXT CHECK (stage IN ('prebook','book')) DEFAULT 'prebook',
+        validated_by TEXT,
         validated_at TIMESTAMPTZ,
         has_paid BOOLEAN DEFAULT FALSE,
         paid_at TIMESTAMPTZ,
@@ -152,7 +155,22 @@ async function runMigrations() {
         )
       );
     `)
-    // partial unique indexes
+
+    // Ensure stage column exists
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='registrations' AND column_name='stage'
+        ) THEN
+          ALTER TABLE registrations
+          ADD COLUMN stage TEXT CHECK (stage IN ('prebook','book')) DEFAULT 'prebook';
+        END IF;
+      END
+      $$;
+    `)
+
     await pool.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_registrations_event_user
       ON registrations(event_id, user_id)
@@ -164,9 +182,7 @@ async function runMigrations() {
       WHERE telegram_user_id IS NOT NULL;
     `)
 
-    // ----------------------------
-    // INVITATIONS
-    // ----------------------------
+    // -- INVITATIONS
     await pool.query(`
       CREATE TABLE IF NOT EXISTS invitations (
         id SERIAL PRIMARY KEY,
@@ -180,9 +196,7 @@ async function runMigrations() {
       );
     `)
 
-    // ----------------------------
-    // USER EMAILS
-    // ----------------------------
+    // -- USER EMAILS
     await pool.query(`
       CREATE TABLE IF NOT EXISTS user_emails (
         user_id INTEGER PRIMARY KEY REFERENCES user_profiles(id) ON DELETE CASCADE,
@@ -191,9 +205,7 @@ async function runMigrations() {
       );
     `)
 
-    // ----------------------------
-    // FAVORITES
-    // ----------------------------
+    // -- FAVORITES
     await pool.query(`
       CREATE TABLE IF NOT EXISTS favorites (
         id SERIAL PRIMARY KEY,
@@ -210,9 +222,7 @@ async function runMigrations() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_favorites_web ON favorites(user_id);`)
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_favorites_tg ON favorites(telegram_user_id);`)
 
-    // ----------------------------
-    // updated_at trigger function
-    // ----------------------------
+    // -- updated_at trigger
     await pool.query(`
       CREATE OR REPLACE FUNCTION update_updated_at_column()
       RETURNS TRIGGER AS $$
@@ -223,7 +233,6 @@ async function runMigrations() {
       $$ LANGUAGE 'plpgsql';
     `)
 
-    // attach triggers
     await pool.query(`DROP TRIGGER IF EXISTS trg_update_user_profiles_updated_at ON user_profiles;`)
     await pool.query(`DROP TRIGGER IF EXISTS trg_update_telegram_user_profiles_updated_at ON telegram_user_profiles;`)
     await pool.query(`DROP TRIGGER IF EXISTS trg_update_events_updated_at ON events;`)
@@ -247,15 +256,13 @@ async function runMigrations() {
       EXECUTE FUNCTION update_updated_at_column();
     `)
 
-    console.log('✅ Migrations applied successfully')
-    process.exit(0)
+    console.log('✅ Migrations completed.')
+    res.status(200).json({ success: true, message: 'Migrations completed' })
   } catch (err) {
-    console.error('❌ Migration failed', err)
-    process.exit(1)
+    console.error('❌ Migration error:', err)
+    res.status(500).json({ error: 'Server error', details: err.message })
   } finally {
     await pool.end()
   }
 }
-
-runMigrations()
 

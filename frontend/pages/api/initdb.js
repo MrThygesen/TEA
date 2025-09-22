@@ -66,27 +66,40 @@ export default async function handler(req, res) {
     `)
 
     // -- EMAIL VERIFICATION TOKENS
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS email_verification_tokens (
-        token TEXT PRIMARY KEY,
-        user_id INTEGER REFERENCES user_profiles(id) ON DELETE CASCADE,
-        telegram_user_id INTEGER REFERENCES telegram_user_profiles(id) ON DELETE CASCADE,
-        email TEXT NOT NULL,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        expires_at TIMESTAMPTZ NOT NULL,
-        CONSTRAINT email_verif_user_or_telegram CHECK (
-          user_id IS NOT NULL OR telegram_user_id IS NOT NULL
-        )
-      );
-    `)
-    await pool.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_userid
-      ON email_verification_tokens(user_id);
-    `)
-    await pool.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_tgid
-      ON email_verification_tokens(telegram_user_id);
-    `)
+ await pool.query(`
+  CREATE TABLE IF NOT EXISTS email_verification_tokens (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER REFERENCES user_profiles(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMPTZ NOT NULL
+  );
+`)
+
+// Ensure telegram_user_id column exists
+await pool.query(`
+  DO $$
+  BEGIN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name='email_verification_tokens' AND column_name='telegram_user_id'
+    ) THEN
+      ALTER TABLE email_verification_tokens
+      ADD COLUMN telegram_user_id INTEGER REFERENCES telegram_user_profiles(id) ON DELETE CASCADE;
+    END IF;
+  END
+  $$;
+`)
+
+await pool.query(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_userid
+  ON email_verification_tokens(user_id);
+`)
+await pool.query(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_tgid
+  ON email_verification_tokens(telegram_user_id);
+`)
+
 
     // -- EVENTS
     await pool.query(`
