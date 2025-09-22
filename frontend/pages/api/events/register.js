@@ -53,7 +53,7 @@ export default async function handler(req, res) {
     )
     const totalRegistered = regRows[0]?.count || 0
 
-    // Decide stage based on attendees
+    // Decide stage
     const stage = totalRegistered >= event.min_attendees ? 'book' : 'prebook'
 
     // --------------------------
@@ -73,29 +73,48 @@ export default async function handler(req, res) {
 
       if (stage === 'book' && existingReg.stage === 'prebook') {
         // Upgrade prebook → book
-        const paymentIntent = await stripe.paymentIntents.create({
-          amount: Math.round(Number(event.price) * 100),
-          currency: 'usd',
-          metadata: { eventId, userId },
-          receipt_email: user.email || undefined,
-        })
+        if (Number(event.price) > 0) {
+          // Paid upgrade → Stripe
+          const paymentIntent = await stripe.paymentIntents.create({
+            amount: Math.round(Number(event.price) * 100),
+            currency: 'usd',
+            metadata: { eventId, userId },
+            receipt_email: user.email || undefined,
+          })
 
-        const { rows } = await pool.query(
-          `UPDATE registrations
-           SET stage='book',
-               stripe_payment_intent_id=$1
-           WHERE id=$2
-           RETURNING *`,
-          [paymentIntent.id, existingReg.id]
-        )
+          const { rows } = await pool.query(
+            `UPDATE registrations
+             SET stage='book',
+                 stripe_payment_intent_id=$1
+             WHERE id=$2
+             RETURNING *`,
+            [paymentIntent.id, existingReg.id]
+          )
 
-        const registration = rows[0]
-        return res.status(200).json({
-          success: true,
-          stage: 'book',
-          registration,
-          clientSecret: paymentIntent.client_secret,
-        })
+          const registration = rows[0]
+          return res.status(200).json({
+            success: true,
+            stage: 'book',
+            registration,
+            clientSecret: paymentIntent.client_secret,
+          })
+        } else {
+          // Free upgrade → just update DB
+          const { rows } = await pool.query(
+            `UPDATE registrations
+             SET stage='book'
+             WHERE id=$1
+             RETURNING *`,
+            [existingReg.id]
+          )
+          const registration = rows[0]
+          return res.status(200).json({
+            success: true,
+            stage: 'book',
+            registration,
+            clientSecret: null,
+          })
+        }
       }
 
       return res.status(400).json({ error: 'Already registered' })
@@ -118,7 +137,7 @@ export default async function handler(req, res) {
     })
 
     if (event.price === 0 || stage === 'prebook') {
-      // Free or prebook registration
+      // Free or prebook
       const { rows } = await pool.query(
         `INSERT INTO registrations
          (event_id, user_id, telegram_user_id, stage, ticket_code, ticket_sent)
