@@ -37,8 +37,12 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
   const [confirmModalOpen, setConfirmModalOpen] = useState(false)
   const [agree, setAgree] = useState(false)
   const [selectedStage, setSelectedStage] = useState('prebook')
-  const stage = registeredUsers >= (event.min_attendees || 0) ? 'book' : 'prebook'
+
+//  const stage = registeredUsers >= (event.min_attendees || 0) ? 'book' : 'prebook'
   
+ const stage = event.stage || 'prebook'
+ const eventConfirmed = stage === 'book'
+
   const eventConfirmed = registeredUsers >= (event.min_attendees || 0)
   const telegramLink = eventConfirmed
     ? `https://t.me/TeaIsHereBot?start=buy_${event.id}`
@@ -54,7 +58,8 @@ function DynamicEventCard({ event, onPreview, authUser, setShowAccountModal }) {
     setStatusMsg('Booking...')
     try {
       const token = localStorage.getItem('token')
-      const stage = registeredUsers >= (event.min_attendees || 0) ? 'book' : 'prebook'
+ //     const stage = registeredUsers >= (event.min_attendees || 0) ? 'book' : 'prebook'
+
 
       const res = await fetch('/api/events/register', {
         method: 'POST',

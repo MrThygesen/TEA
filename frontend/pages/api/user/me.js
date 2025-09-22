@@ -34,6 +34,7 @@ export default async function handler(req, res) {
               e.id AS event_id,
               e.name AS event_name,
               e.datetime AS event_datetime,
+              e.stage,
               e.is_confirmed AS is_confirmed,
               r.has_arrived,
               r.ticket_validated
@@ -42,6 +43,7 @@ export default async function handler(req, res) {
        WHERE r.user_id = $1`,
       [user.id]
     )
+
 
     return res.status(200).json({
       id: u.id,
