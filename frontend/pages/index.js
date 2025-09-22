@@ -25,7 +25,6 @@ function clearAuth() {
   try { localStorage.removeItem('edgy_auth_user') } catch (_) {}
 }
 
-
 // ---------------------------
 // Event Card Component
 // ---------------------------
@@ -41,116 +40,135 @@ export function DynamicEventCard({ event, onPreview, authUser, setShowAccountMod
 
   const eventConfirmed = event.is_confirmed === true
 
-  // --- handle registration / booking ---
-async function handleWebAction(stage) {
-  if (!authUser) {
-    setShowAccountModal(true)
-    return
-  }
-
-  setLoading(true)
-  setStatusMsg('Processing...')
-
-  try {
-    const token = authUser?.token || localStorage.getItem('token')
-    const res = await fetch('/api/events/register', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ eventId: event.id, stage }),
-    })
-
-    const data = await res.json()
-
-    if (!res.ok) throw new Error(data.error || 'Failed to register')
-
-    // Update registered users count
-    if (typeof data.registeredCount === 'number') {
-      setRegisteredUsers(data.registeredCount)
+  // ---------------------------
+  // Helpers
+  // ---------------------------
+  async function handleWebAction(stage) {
+    if (!authUser) {
+      setShowAccountModal(true)
+      return
     }
 
-    // Handle free events → ticket sent
-    if (stage === 'book' && (!event.price || Number(event.price) === 0)) {
-      setHasTicket(true)
-      setStatusMsg(data.message || 'Ticket sent successfully!')
+    setLoading(true)
+    setStatusMsg('Processing...')
+
+    try {
+      const token = authUser?.token || localStorage.getItem('token')
+      const res = await fetch('/api/events/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ eventId: event.id, stage }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to register')
+
+      if (typeof data.registeredCount === 'number') {
+        setRegisteredUsers(data.registeredCount)
+      }
+
+      if (stage === 'book' && (!event.price || Number(event.price) === 0)) {
+        setHasTicket(true)
+        setStatusMsg(data.message || 'Ticket sent successfully!')
+        setTimeout(() => setStatusMsg(''), 2500)
+        return
+      }
+
+      if (stage === 'book' && Number(event.price) > 0 && data.url) {
+        setStatusMsg('Redirecting to payment...')
+        setTimeout(() => {
+          window.location.href = data.url
+        }, 500)
+        return
+      }
+
+      if (stage === 'prebook') {
+        setStatusMsg(data.message || 'Prebook confirmed!')
+        setTimeout(() => setStatusMsg(''), 2500)
+        return
+      }
+    } catch (err) {
+      console.error(err)
+      setStatusMsg(err.message || 'Error occurred')
       setTimeout(() => setStatusMsg(''), 2500)
-      return
+    } finally {
+      setLoading(false)
     }
-
-    // Handle paid events → redirect to Stripe checkout
-    if (stage === 'book' && Number(event.price) > 0 && data.url) {
-      setStatusMsg('Redirecting to payment...')
-      setTimeout(() => {
-        window.location.href = data.url
-      }, 500)
-      return
-    }
-
-    // Handle prebook / guestlist
-    if (stage === 'prebook') {
-      setStatusMsg(data.message || 'Prebook confirmed!')
-      setTimeout(() => setStatusMsg(''), 2500)
-      return
-    }
-
-  } catch (err) {
-    console.error(err)
-    setStatusMsg(err.message || 'Error occurred')
-    setTimeout(() => setStatusMsg(''), 2500)
-  } finally {
-    setLoading(false)
-  }
-}
-
-  // --- determine button label and stage ---
-
-
-function isMaxReached() {
-  if (!authUser) return false
-  if (event.tag1 === 'group') {
-    return event.user_ticket_count >= 10
-  }
-  return event.user_ticket_count >= 1
-}
-
-function getWebButton() {
-  if (loading) {
-    return (
-      <span className="flex items-center justify-center gap-2">
-        <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
-          <circle
-            className="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="4"
-          ></circle>
-          <path
-            className="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-          ></path>
-        </svg>
-        {statusMsg || 'Processing...'}
-      </span>
-    )
   }
 
-  if (isMaxReached()) return 'Max reached'
-  if (!eventConfirmed) return 'Guestlist'
-  if (eventConfirmed && (!event.price || Number(event.price) === 0)) return 'Free Access'
-  if (eventConfirmed && Number(event.price) > 0) return 'Pay Access'
-  return 'Book'
-}
+  function isMaxReached() {
+    if (!authUser) return false
+    if (event.tag1 === 'group') return event.user_ticket_count >= 10
+    return event.user_ticket_count >= 1
+  }
 
+  function getWebButtonLabel() {
+    if (loading) {
+      return (
+        <span className="flex items-center justify-center gap-2">
+          <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            ></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+            ></path>
+          </svg>
+          {statusMsg || 'Processing...'}
+        </span>
+      )
+    }
+
+    if (isMaxReached()) return 'Max reached'
+    if (!eventConfirmed) return 'Guestlist'
+    if (eventConfirmed && (!event.price || Number(event.price) === 0)) return 'Free Access'
+    if (eventConfirmed && Number(event.price) > 0) return 'Pay Access'
+    return 'Book'
+  }
+
+  // ---------------------------
+  // Render
+  // ---------------------------
+  return (
+    <>
+      <div className="bg-zinc-900 rounded-2xl shadow p-4 flex flex-col">
+        <h3 className="text-lg font-semibold mb-2">{event.name}</h3>
+        <p className="text-sm text-gray-400 mb-2">
+          {new Date(event.datetime).toLocaleString()} @ {event.venue}
+        </p>
 
         <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
           <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
           <span>👥 {registeredUsers} Users</span>
         </div>
+
+        {!onPreview && (
+          <button
+            onClick={() => {
+              if (isMaxReached()) return
+              setSelectedStage(eventConfirmed ? 'book' : 'prebook')
+              setConfirmModalOpen(true)
+            }}
+            disabled={isMaxReached() || loading}
+            className={`mt-2 w-full px-3 py-1 rounded text-sm ${
+              isMaxReached()
+                ? 'bg-zinc-600 text-gray-400 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700 text-white'
+            }`}
+          >
+            {getWebButtonLabel()}
+          </button>
+        )}
 
         {!onPreview && (
           <button
@@ -174,8 +192,9 @@ function getWebButton() {
           >
             <h2 className="text-xl font-semibold mb-4 text-center">{event.name}</h2>
             <p className="mb-6 text-sm text-gray-300 text-center leading-relaxed">
-              By confirming, you declare a genuine interest in participating in this
-              event for social or professional purposes. Participation includes receiving event-related emails and following the event guidelines.
+              By confirming, you declare a genuine interest in participating in this event for
+              social or professional purposes. Participation includes receiving event-related
+              emails and following the event guidelines.
             </p>
 
             <div className="flex items-center justify-between gap-3">
@@ -226,8 +245,6 @@ function getWebButton() {
           </div>
         </div>
       )}
-
-
 
       {/* Event details modal */}
       {!onPreview && internalModalOpen && (
