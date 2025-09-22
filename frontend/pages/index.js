@@ -105,142 +105,74 @@ export function DynamicEventCard({ event, onPreview, authUser, setShowAccountMod
     setConfirmModalOpen(true)
   }
 
-  return (
-    <>
-      <div className="bg-zinc-900 rounded-2xl shadow p-4 flex flex-col">
-        <h3 className="text-lg font-semibold mb-2">{event.name}</h3>
-        <p className="text-sm text-gray-400 mb-2">{new Date(event.datetime).toLocaleString()} @ {event.venue}</p>
+ return (
+  <>
+    <div className="bg-zinc-900 rounded-2xl shadow p-4 flex flex-col">
+      {/* Card content */}
+      <h3 className="text-lg font-semibold mb-2">{event.name}</h3>
+      <p className="text-sm text-gray-400 mb-2">{new Date(event.datetime).toLocaleString()} @ {event.venue}</p>
 
-        <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
-          <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
-          <span>👥 {registeredUsers} Users</span>
-        </div>
-
-        {!onPreview && (
-          <button
-            onClick={handleConfirmClick}
-            disabled={isMaxReached() || loading}
-            className={`mt-2 w-full px-3 py-1 rounded text-sm ${
-              isMaxReached()
-                ? 'bg-zinc-600 text-gray-400 cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-700 text-white'
-            }`}
-          >
-            {getWebButtonLabel()}
-          </button>
-        )}
-
-        {!onPreview && (
-          <button
-            onClick={() => setInternalModalOpen(true)}
-            className="mt-2 w-full px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-sm"
-          >
-            Preview
-          </button>
-        )}
-
-        {/* Confirmation Modal */}
-        {confirmModalOpen && selectedStage && (
-          <div
-            className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
-            onClick={() => setConfirmModalOpen(false)}
-          >
-            <div
-              className="bg-zinc-900 rounded-2xl shadow-xl max-w-md w-full p-6 text-white relative"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h2 className="text-xl font-semibold mb-4 text-center">{event.name}</h2>
-              <p className="mb-6 text-sm text-gray-300 text-center leading-relaxed">
-                Confirm participation by agreeing to the event guidelines.
-              </p>
-
-              <div className="flex items-center justify-between gap-3">
-                <label className="flex items-center gap-2 text-xs text-gray-300">
-                  <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
-                  I agree to guidelines and event emails.
-                </label>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setConfirmModalOpen(false)}
-                    className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-sm"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    disabled={!agree || loading}
-                    onClick={async () => {
-                      setConfirmModalOpen(false)
-                      await handleWebAction(selectedStage)
-                    }}
-                    className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm disabled:opacity-50"
-                  >
-                    {selectedStage === 'prebook' ? 'Join Guestlist' : !event.price || Number(event.price) === 0 ? 'Book Free' : 'Pay Now'}
-                  </button>
-                </div>
-              </div>
-
-              <p className="mt-6 text-xs text-gray-500 text-center">
-                By proceeding, you agree to our{' '}
-                <a href="/policies" className="text-blue-400 underline hover:text-blue-300" target="_blank" rel="noopener noreferrer">
-                  policies
-                </a>.
-              </p>
-            </div>
-          </div>
-        )}
+      <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
+        <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
+        <span>👥 {registeredUsers} Users</span>
       </div>
-    </>
-  )
-}
 
-      {/* Event details modal */}
-      {!onPreview && internalModalOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
-          onClick={() => setInternalModalOpen(false)}
+      {!onPreview && (
+        <button
+          onClick={handleConfirmClick}
+          disabled={isMaxReached() || loading}
+          className={`mt-2 w-full px-3 py-1 rounded text-sm ${
+            isMaxReached()
+              ? 'bg-zinc-600 text-gray-400 cursor-not-allowed'
+              : 'bg-blue-600 hover:bg-blue-700 text-white'
+          }`}
         >
-          <div
-            className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-xl font-bold mb-4">{event.name}</h2>
-            <img
-              src={event.image_url || '/default-event.jpg'}
-              alt={event.name}
-              className="w-full h-56 object-contain rounded mb-4"
-            />
-            <p className="mb-2 text-sm text-gray-400">
-              {new Date(event.datetime).toLocaleString()} @ {event.venue} (
-              {event.venue_type || 'N/A'})
-            </p>
-            <p className="mb-4">{event.details}</p>
-
-            {event.basic_perk && (
-              <p className="text-sm text-gray-300">
-                <strong>Basic Perk:</strong> {event.basic_perk}
-              </p>
-            )}
-            {(event.paid_count || 0) >= 10 && event.advanced_perk && (
-              <p className="text-sm text-gray-300">
-                <strong>Advanced Perk:</strong> {event.advanced_perk}
-              </p>
-            )}
-
-            <button
-              onClick={() => setInternalModalOpen(false)}
-              className="mt-6 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              Close
-            </button>
-          </div>
-        </div>
+          {getWebButtonLabel()}
+        </button>
       )}
-    </>
-  )
-}
 
-function VideoHero() {
+      {!onPreview && (
+        <button
+          onClick={() => setInternalModalOpen(true)}
+          className="mt-2 w-full px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-sm"
+        >
+          Preview
+        </button>
+      )}
+    </div>
+
+    {/* Confirmation Modal */}
+    {confirmModalOpen && selectedStage && (
+      <div
+        className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
+        onClick={() => setConfirmModalOpen(false)}
+      >
+        <div
+          className="bg-zinc-900 rounded-2xl shadow-xl max-w-md w-full p-6 text-white relative"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* modal content */}
+        </div>
+      </div>
+    )}
+
+    {/* Event details modal */}
+    {internalModalOpen && (
+      <div
+        className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+        onClick={() => setInternalModalOpen(false)}
+      >
+        <div
+          className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* modal content */}
+        </div>
+      </div>
+    )}
+  </>
+)
+unction VideoHero() {
   const [open, setOpen] = useState(false)
 
   return (
