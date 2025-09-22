@@ -11,19 +11,36 @@ export default async function handler(req, res) {
   }
 
   try {
+    // --------------------------
+    // Auth
+    // --------------------------
     const token = auth.getTokenFromReq(req)
     if (!token) return res.status(401).json({ error: 'Unauthorized' })
 
-    const { eventId, stage } = req.body
-    if (!eventId) return res.status(400).json({ error: 'Missing eventId' })
+    const decoded = auth.verifyToken(token) // <-- depends on your auth.js
+    if (!decoded?.userId) {
+      return res.status(401).json({ error: 'Invalid token' })
+    }
 
-    // Fetch user
-    const user = await auth.getUserFromToken(token)
-    if (!user) return res.status(401).json({ error: 'Invalid user' })
+    // Fetch user from DB
+    const { rows: users } = await pool.query(
+      `SELECT id, email FROM user_profiles WHERE id = $1`,
+      [decoded.userId]
+    )
+    if (users.length === 0) {
+      return res.status(401).json({ error: 'User not found' })
+    }
+    const user = users[0]
+
+    // --------------------------
+    // Input
+    // --------------------------
+    const { eventId } = req.body
+    if (!eventId) return res.status(400).json({ error: 'Missing eventId' })
 
     // Fetch event details
     const { rows: events } = await pool.query(
-      `SELECT id, title, price, min_attendees, max_attendees 
+      `SELECT id, title, price, min_attendees, max_attendees
        FROM events 
        WHERE id = $1`,
       [eventId]
@@ -40,7 +57,7 @@ export default async function handler(req, res) {
     const currentCount = regRows[0].count
 
     // Decide stage automatically
-    const computedStage = currentCount < event.min_attendees ? 'prebook' : 'book'
+    const stage = currentCount < event.min_attendees ? 'prebook' : 'book'
 
     // Prevent duplicate registration
     const { rows: existing } = await pool.query(
@@ -54,17 +71,20 @@ export default async function handler(req, res) {
     let registration
     let clientSecret = null
 
-    if (event.price === 0 || computedStage === 'prebook') {
-      // Free event OR prebook stage → insert registration immediately
+    // --------------------------
+    // Handle Free / Prebook / Paid
+    // --------------------------
+    if (event.price === 0 || stage === 'prebook') {
+      // Free OR Prebook → insert immediately
       const { rows } = await pool.query(
         `INSERT INTO registrations (event_id, user_id, stage, status)
          VALUES ($1, $2, $3, 'confirmed')
          RETURNING *`,
-        [eventId, user.id, computedStage]
+        [eventId, user.id, stage]
       )
       registration = rows[0]
     } else {
-      // Paid booking (stage = book, price > 0) → use Stripe
+      // Paid booking (stage=book, price > 0) → Stripe
       const paymentIntent = await stripe.paymentIntents.create({
         amount: event.price,
         currency: 'usd',
@@ -83,7 +103,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       success: true,
-      stage: computedStage,
+      stage,
       registration,
       clientSecret,
     })
