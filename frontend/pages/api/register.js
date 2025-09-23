@@ -51,9 +51,10 @@ export default async function handler(req, res) {
     )
 
     // ✅ send verification email
-    const verifyUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/api/confirm-email?token=${token}`
+  //  const verifyUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/api/confirm-email?token=${token}`
     try {
-      await sendVerificationEmail(email, verifyUrl)
+    //  await sendVerificationEmail(email, verifyUrl)
+await sendVerificationEmail(email, token) // pass the raw token
     } catch (emailErr) {
       console.warn(
         '⚠️ Failed to send verification email, but user was created:',
