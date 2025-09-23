@@ -12,6 +12,8 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
       setLoading(true)
       const token = localStorage.getItem('token')
       if (!token) {
+        setProfile(null)
+        setTickets([])
         setLoading(false)
         return
       }
@@ -23,7 +25,9 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         })
         if (profileRes.ok) {
           const data = await profileRes.json()
-          setProfile(data)
+          setProfile(data || null)
+        } else {
+          setProfile(null)
         }
 
         // fetch tickets
@@ -38,6 +42,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         }
       } catch (err) {
         console.error('Failed to load account info', err)
+        setProfile(null)
         setTickets([])
       } finally {
         setLoading(false)
@@ -67,14 +72,12 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
 
         {loading ? (
           <p className="text-gray-400">Loading...</p>
-        ) : (
+        ) : profile ? (
           <>
-            {profile && (
-              <div className="mb-4">
-                <p><strong>Username:</strong> {profile.username}</p>
-                <p><strong>Email:</strong> {profile.email}</p>
-              </div>
-            )}
+            <div className="mb-4">
+              <p><strong>Username:</strong> {profile.username || '—'}</p>
+              <p><strong>Email:</strong> {profile.email || '—'}</p>
+            </div>
 
             <h3 className="text-lg font-semibold mb-2">Your Tickets</h3>
             {tickets.length === 0 ? (
@@ -83,7 +86,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
               <ul className="space-y-2">
                 {tickets.map((ticket) => (
                   <li
-                    key={ticket.id}
+                    key={ticket.id || Math.random()}
                     className="p-2 bg-zinc-800 rounded flex justify-between items-center"
                   >
                     <span>
@@ -99,6 +102,8 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
               </ul>
             )}
           </>
+        ) : (
+          <p className="text-gray-400">Not logged in.</p>
         )}
       </div>
     </div>

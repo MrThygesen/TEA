@@ -606,11 +606,11 @@ export default function Home() {
 {/* Account/Login/Signup Modals */}
 {showAccountModal && (
   <YourAccountModal
-    profile={profile}
     onClose={() => setShowAccountModal(false)}
-    refreshTrigger={ticketRefreshTrigger}
+    refreshTrigger={0} // or some dummy number if required
   />
 )}
+
 
 
 
