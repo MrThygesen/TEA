@@ -37,10 +37,9 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   const [agree, setAgree] = useState(false)
 
   // Counters for each stage
-  const [registeredCounters, setRegisteredCounters] = useState({
-    prebook_count: event.prebook_count || 0,
-    book_count: event.book_count || 0,
-  })
+const [registeredUsers, setRegisteredUsers] = useState({
+  prebook: event.prebook_count || 0,
+  book: event.book_count || 0
 
   const [stage, setStage] = useState(event.stage || 'prebook')
   const eventConfirmed = stage === 'book'
@@ -49,79 +48,75 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   // --------------------------
   // Handle registration / guestlist / booking
   // --------------------------
-  async function handleWebAction() {
-    const token = localStorage.getItem('token')
-    if (!authUser || !token) {
-      setShowAccountModal(true)
+  async function handleWebAction(stageParam) {
+  const token = localStorage.getItem('token')
+  if (!authUser || !token) {
+    setShowAccountModal(true)
+    return
+  }
+
+  setLoading(true)
+  setStatusMsg(stageParam === 'prebook' ? 'Joining...' : 'Booking...')
+
+  try {
+    const res = await fetch('/api/events/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ eventId: event.id })
+    })
+    const data = await res.json()
+
+    if (data.clientSecret) {
+      // Paid booking flow
+      // Redirect to Stripe checkout or show payment flow
+      setStatusMsg('Redirecting to payment...')
       return
     }
 
-    setLoading(true)
-    setStatusMsg(stage === 'prebook' ? 'Joining Guestlist...' : 'Booking...')
-
-    try {
-      const res = await fetch('/api/events/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ eventId: event.id }),
-      })
-
-      const data = await res.json()
-      if (!res.ok) {
-        setStatusMsg(data.error || 'Something went wrong')
-        return
-      }
-
-      // Update stage and counters from backend response
-      setStage(data.stage)
-      if (data.counters) {
-        setRegisteredCounters(data.counters)
-      } else {
-        // fallback if backend doesn't return counters
-        if (data.stage === 'prebook') setRegisteredCounters(prev => ({ ...prev, prebook_count: prev.prebook_count + 1 }))
-        if (data.stage === 'book') setRegisteredCounters(prev => ({ ...prev, book_count: prev.book_count + 1 }))
-      }
-
-      setStatusMsg(data.stage === 'prebook' ? '✅ Added to Guestlist' : '✅ Booking confirmed!')
-
-      // If Stripe checkout or external URL is returned
-      if (data.url) window.location.href = data.url
-
-    } catch (err) {
-      console.error(err)
-      setStatusMsg('⚠️ Server error')
-    } finally {
-      setLoading(false)
-      setTimeout(() => setStatusMsg(''), 2000)
+    if (data.counters) {
+      setRegisteredUsers(data.counters)
     }
+
+    if (data.stage === 'prebook') {
+      setStatusMsg('Added to Guestlist!')
+    } else if (data.stage === 'book') {
+      setStatusMsg('Booking confirmed!')
+    } else {
+      setStatusMsg(data.message || 'Registered!')
+    }
+  } catch (err) {
+    console.error(err)
+    setStatusMsg('Error registering')
+  } finally {
+    setLoading(false)
+    setTimeout(() => setStatusMsg(''), 2000)
   }
+}
+
 
   // --------------------------
   // Button label logic
   // --------------------------
-  function getWebButtonLabel() {
-    if (loading) {
-      return (
-        <span className="flex items-center justify-center gap-2">
-          <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-          </svg>
-          {statusMsg || (stage === 'prebook' ? 'Joining...' : 'Booking...')}
-        </span>
-      )
-    }
-
-    if (statusMsg) return statusMsg
-    if (stage === 'prebook') return 'Guestlist'
-    if (stage === 'book') return !event.price || Number(event.price) === 0 ? 'Book Free' : 'Pay Now'
-    return 'Registration Closed'
+function getWebButtonLabel() {
+  if (loading) {
+    return (
+      <span className="flex items-center justify-center gap-2">
+        <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+        </svg>
+        {statusMsg || (stage === 'prebook' ? 'Guestlist...' : 'Pay Now...')}
+      </span>
+    )
   }
-
-  const isDisabled = loading || (!requiresConfirmation && stage !== 'prebook' && stage !== 'book')
+  if (statusMsg) return statusMsg
+  if (stage === 'prebook') return 'Guestlist'
+  if (stage === 'book') return !event.price || Number(event.price) === 0 ? 'Book Free' : 'Pay Now'
+  return 'Registration Closed'
+}
 
   // --------------------------
   // Render component
@@ -150,12 +145,20 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
           </button>
         </div>
 
-        <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
+     
+<div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
+  <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
+  <span>👥 Guestlist: {registeredUsers.prebook} | Booked: {registeredUsers.book}</span>
+</div>
+
+
+/*
+   <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
           <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
           <span>
             👥 Guestlist: {registeredCounters.prebook_count} / {event.min_attendees} | Booked: {registeredCounters.book_count}
           </span>
-        </div>
+        </div> */
 
         <button onClick={() => setInternalModalOpen(true)} className="mt-2 w-full px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-sm">
           Preview
