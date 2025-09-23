@@ -11,59 +11,63 @@ export default async function handler(req, res) {
 
   const { email, password, username } = req.body
   if (!email || !password || !username) {
-    return res.status(400).json({ error: 'Username, email and password are required.' })
+    return res
+      .status(400)
+      .json({ error: 'Username, email and password are required.' })
   }
 
   try {
-    console.log('🔹 Registration started for:', email)
+    console.log('🔹 User signup started for:', email)
 
+    // ✅ hash password
     const hashedPassword = await bcrypt.hash(password, 10)
 
+    // ✅ insert into user_profiles
     const result = await pool.query(
       `INSERT INTO user_profiles (email, password_hash, username, email_verified)
        VALUES ($1, $2, $3, FALSE)
        ON CONFLICT (email) DO NOTHING
-       RETURNING id, email, username`,
+       RETURNING id, email, username, role, tier`,
       [email, hashedPassword, username]
     )
 
     if (result.rows.length === 0) {
+      console.warn('⚠️ Email already registered:', email)
       return res.status(400).json({ error: 'Email already registered' })
     }
 
     const user = result.rows[0]
 
-    // ✅ Generate token
+    // ✅ generate verification token
     const token = crypto.randomBytes(32).toString('hex')
-
-    // ✅ Use ISO string for Postgres TIMESTAMPTZ
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-
-    // Insert token
     await pool.query(
       `INSERT INTO email_verification_tokens (user_id, token, expires_at, email)
-       VALUES ($1, $2, $3, $4)
+       VALUES ($1, $2, NOW() + interval '1 day', $3)
        ON CONFLICT (user_id) 
        DO UPDATE SET token = EXCLUDED.token,
                      expires_at = EXCLUDED.expires_at,
                      email = EXCLUDED.email`,
-      [user.id, token, expiresAt, email]
+      [user.id, token, email]
     )
 
-    // Send verification email
+    // ✅ send verification email
+    const verifyUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/api/confirm-email?token=${token}`
     try {
-      await sendVerificationEmail(email, token)
+      await sendVerificationEmail(email, verifyUrl)
     } catch (emailErr) {
-      console.warn('⚠️ Failed to send verification email:', emailErr)
+      console.warn(
+        '⚠️ Failed to send verification email, but user was created:',
+        emailErr
+      )
     }
 
     return res.status(201).json({
-      message: '✅ Registration successful. Please check your email to verify your account.',
-      debug: { token, expiresAt }, // optional for debugging
+      user,
+      message:
+        '✅ Registration successful. Please check your email to verify your account.',
     })
-
   } catch (err) {
-    console.error('❌ Registration error:', err)
+    console.error('❌ User signup error:', err)
     return res.status(500).json({ error: 'Internal server error', details: err.message })
   }
 }
