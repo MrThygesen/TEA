@@ -28,7 +28,7 @@ function clearAuth() {
 // ---------------------------
 // Event Card Component
 // ---------------------------
-export default function DynamicEventCard({ event, authUser, setShowAccountModal }) {
+export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
   const [internalModalOpen, setInternalModalOpen] = useState(false)
@@ -661,4 +661,3 @@ export default function Home() {
     </main>
   )
 }
-
