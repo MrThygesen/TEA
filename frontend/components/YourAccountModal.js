@@ -8,9 +8,9 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
 
-  // --- load profile + tickets whenever modal opens or refreshTrigger changes
   useEffect(() => {
     async function loadAccount() {
+      setLoading(true)
       const token = localStorage.getItem('token')
       if (!token) {
         setLoading(false)
@@ -18,12 +18,20 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
       }
 
       try {
-        const res = await fetch('/api/user/myTickets', {
+        // fetch profile
+        const profileRes = await fetch('/api/user/me', {
           headers: { Authorization: `Bearer ${token}` }
         })
-        if (res.ok) {
-          const data = await res.json()
-          setProfile(data.profile || null)
+        const ticketsRes = await fetch('/api/user/myTickets', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+
+        if (profileRes.ok) {
+          const data = await profileRes.json()
+          setProfile(data)
+        }
+        if (ticketsRes.ok) {
+          const data = await ticketsRes.json()
           setTickets(data.tickets || [])
         }
       } catch (err) {
@@ -75,10 +83,10 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                     key={ticket.id}
                     className="p-2 bg-zinc-800 rounded flex justify-between items-center"
                   >
-                    <span>{ticket.event_name}</span>
-                    {ticket.qr && (
+                    <span>{ticket.event_name} — {ticket.stage}</span>
+                    {ticket.qrImage && (
                       <img
-                        src={ticket.qr}
+                        src={ticket.qrImage}
                         alt="QR Code"
                         className="w-12 h-12 object-contain"
                       />
