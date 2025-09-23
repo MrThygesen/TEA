@@ -1,4 +1,4 @@
-'use client'
+'use client' 
 
 import { useState, useEffect } from 'react'
 import { useAccount } from 'wagmi'
@@ -28,7 +28,7 @@ function clearAuth() {
 // ---------------------------
 // Event Card Component
 // ---------------------------
-
+			
 export function DynamicEventCard({ event, authUser, setShowAccountModal, setTicketRefreshTrigger }) {
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
