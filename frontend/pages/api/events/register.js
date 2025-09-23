@@ -14,21 +14,37 @@ export default async function handler(req, res) {
 
   try {
     // --------------------------
-    // Auth
+    // Auth & User lookup
     // --------------------------
     const token = auth.getTokenFromReq(req)
     if (!token) return res.status(401).json({ error: 'Not authenticated' })
 
-    let user
+    let decoded
     try {
-      user = auth.verifyToken(token)
+      decoded = auth.verifyToken(token)
     } catch {
       return res.status(401).json({ error: 'Invalid token' })
     }
 
-    const userId = user.id || null
-    const telegramUserId = user.telegram_user_id || null
-    if (!userId && !telegramUserId) {
+    let user = null
+    let userId = decoded.id || null
+    let telegramUserId = decoded.telegram_user_id || null
+
+    if (userId) {
+      const { rows } = await pool.query(
+        `SELECT id, email, username FROM user_profiles WHERE id=$1`,
+        [userId]
+      )
+      if (!rows.length) return res.status(404).json({ error: 'User not found' })
+      user = rows[0]
+    } else if (telegramUserId) {
+      const { rows } = await pool.query(
+        `SELECT telegram_user_id FROM telegram_user_profiles WHERE telegram_user_id=$1`,
+        [telegramUserId]
+      )
+      if (!rows.length) return res.status(404).json({ error: 'Telegram user not found' })
+      user = rows[0]
+    } else {
       return res.status(400).json({ error: 'No valid user in token' })
     }
 
@@ -76,12 +92,11 @@ export default async function handler(req, res) {
       if (stage === 'book' && existingReg.stage === 'prebook') {
         // Upgrade prebook → book
         if (price > 0) {
-          // Paid upgrade → Stripe
           const paymentIntent = await stripe.paymentIntents.create({
             amount: Math.round(price * 100),
             currency: 'usd',
             metadata: { eventId, userId },
-            receipt_email: user.email || undefined,
+            receipt_email: user?.email || undefined,
           })
 
           const { rows } = await pool.query(
@@ -100,7 +115,6 @@ export default async function handler(req, res) {
             clientSecret: paymentIntent.client_secret,
           })
         } else {
-          // Free upgrade → just update DB
           const { rows } = await pool.query(
             `UPDATE registrations
              SET stage='book'
@@ -127,17 +141,8 @@ export default async function handler(req, res) {
     let registration
     let clientSecret = null
 
-    console.log('Registering:', {
-      eventId,
-      userId,
-      telegramUserId,
-      stage,
-      ticketCode,
-      price,
-    })
-
     if (price === 0 || stage === 'prebook') {
-      // Free registration or prebook → just DB insert
+      // Free registration or prebook
       const { rows } = await pool.query(
         `INSERT INTO registrations
          (event_id, user_id, telegram_user_id, stage, ticket_code, ticket_sent)
@@ -147,23 +152,22 @@ export default async function handler(req, res) {
       )
       registration = rows[0]
 
-      // Send emails
-      if (price === 0 && user.email) {
+      if (price === 0 && user?.email) {
         await sendTicketEmail(user.email, event, {
           ...user,
           id: userId,
           ticket_code: ticketCode,
         })
-      } else if (stage === 'prebook' && user.email) {
+      } else if (stage === 'prebook' && user?.email) {
         await sendPrebookEmail(user.email, event)
       }
     } else {
-      // Paid booking → Stripe
+      // Paid booking
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(price * 100),
         currency: 'usd',
         metadata: { eventId, userId },
-        receipt_email: user.email || undefined,
+        receipt_email: user?.email || undefined,
       })
 
       const { rows } = await pool.query(
