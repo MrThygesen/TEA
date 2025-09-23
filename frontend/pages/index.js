@@ -1,4 +1,4 @@
-'use client'     
+'use client'      
 
 import { useState, useEffect } from 'react'
 import { useAccount } from 'wagmi'
@@ -7,7 +7,7 @@ import AdminSBTManager from '../components/AdminSBTManager'
 import YourAccountModal from '../components/YourAccountModal'
 
 // ---------------------------
-// Helpers: Auth persistence
+// Helpers: Auth persistence Test
 // ---------------------------
 function loadAuth() {
   if (typeof window === 'undefined') return null
