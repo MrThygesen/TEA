@@ -1,5 +1,5 @@
+//YourAccountModal.js
 'use client'
- 
 import { useState, useEffect } from 'react'
 
 export default function YourAccountModal({ onClose, refreshTrigger }) {
