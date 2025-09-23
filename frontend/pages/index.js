@@ -34,16 +34,16 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   const [internalModalOpen, setInternalModalOpen] = useState(false)
   const [confirmModalOpen, setConfirmModalOpen] = useState(false)
   const [agree, setAgree] = useState(false)
-
+  const [ticketRefreshTrigger, setTicketRefreshTrigger] = useState(0)
   const [registeredUsers, setRegisteredUsers] = useState({
     prebook: event.prebook_count || 0,
     book: event.book_count || 0
   })
   const [stage, setStage] = useState(event.stage || 'prebook')
-
   const eventConfirmed = stage === 'book'
   const requiresConfirmation = stage === 'prebook' || stage === 'book'
   const isDisabled = loading || !authUser
+
 
   // --------------------------
   // Handle Registration
@@ -73,6 +73,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
       if (data.counters) setRegisteredUsers(data.counters)
       // Sync stage
       if (data.stage) setStage(data.stage)
+setTicketRefreshTrigger(prev => prev + 1)
 
       if (data.clientSecret) {
         setStatusMsg('Redirecting to payment...')
@@ -95,7 +96,8 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   // --------------------------
   // Dynamic button label
   // --------------------------
-  function getWebButtonLabel() {
+
+   function getWebButtonLabel() {
     if (loading) {
       return (
         <span className="flex items-center justify-center gap-2">
@@ -598,12 +600,14 @@ export default function Home() {
       </footer>
 
 {/* Account/Login/Signup Modals */}
-{showAccountModal && authUser && (
+{showAccountModal && (
   <YourAccountModal
-    profile={authUser}
+    profile={profile}
     onClose={() => setShowAccountModal(false)}
+    refreshTrigger={ticketRefreshTrigger}
   />
 )}
+
 
 
 
