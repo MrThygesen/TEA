@@ -1,4 +1,4 @@
-// pages/api/events/register.js
+// pages/api/events/register.js 
 import { pool } from '../../../lib/postgres.js'
 import { auth } from '../../../lib/auth.js'
 import Stripe from 'stripe'
