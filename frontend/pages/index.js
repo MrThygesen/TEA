@@ -35,52 +35,73 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   const [internalModalOpen, setInternalModalOpen] = useState(false)
   const [confirmModalOpen, setConfirmModalOpen] = useState(false)
   const [agree, setAgree] = useState(false)
-  const [registeredUsers, setRegisteredUsers] = useState(event.registered_users || 0)
 
-  const stage = event.stage || 'prebook'
+  // Counters for each stage
+  const [registeredCounters, setRegisteredCounters] = useState({
+    prebook_count: event.prebook_count || 0,
+    book_count: event.book_count || 0,
+  })
+
+  const [stage, setStage] = useState(event.stage || 'prebook')
   const eventConfirmed = stage === 'book'
   const requiresConfirmation = stage === 'prebook' || stage === 'book'
 
-  async function handleWebAction(stageParam) {
-    if (!authUser) {
+  // --------------------------
+  // Handle registration / guestlist / booking
+  // --------------------------
+  async function handleWebAction() {
+    const token = localStorage.getItem('token')
+    if (!authUser || !token) {
       setShowAccountModal(true)
       return
     }
 
     setLoading(true)
-    setStatusMsg(stageParam === 'prebook' ? 'Prebooking...' : 'Booking...')
+    setStatusMsg(stage === 'prebook' ? 'Joining Guestlist...' : 'Booking...')
 
     try {
-      const token = localStorage.getItem('token')
       const res = await fetch('/api/events/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token || ''}`,
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ eventId: event.id, stage: stageParam }),
+        body: JSON.stringify({ eventId: event.id }),
       })
-      const data = await res.json()
 
-      if (data.url) {
-        window.location.href = data.url
+      const data = await res.json()
+      if (!res.ok) {
+        setStatusMsg(data.error || 'Something went wrong')
         return
       }
 
-      if (data.message?.includes('Free ticket') || data.registered) {
-        setRegisteredUsers(prev => prev + 1)
-        setStatusMsg(data.message || 'Registered!')
+      // Update stage and counters from backend response
+      setStage(data.stage)
+      if (data.counters) {
+        setRegisteredCounters(data.counters)
       } else {
-        setStatusMsg(data.message || 'Something went wrong')
+        // fallback if backend doesn't return counters
+        if (data.stage === 'prebook') setRegisteredCounters(prev => ({ ...prev, prebook_count: prev.prebook_count + 1 }))
+        if (data.stage === 'book') setRegisteredCounters(prev => ({ ...prev, book_count: prev.book_count + 1 }))
       }
-    } catch {
-      setStatusMsg('Network error')
+
+      setStatusMsg(data.stage === 'prebook' ? '✅ Added to Guestlist' : '✅ Booking confirmed!')
+
+      // If Stripe checkout or external URL is returned
+      if (data.url) window.location.href = data.url
+
+    } catch (err) {
+      console.error(err)
+      setStatusMsg('⚠️ Server error')
     } finally {
       setLoading(false)
       setTimeout(() => setStatusMsg(''), 2000)
     }
   }
 
+  // --------------------------
+  // Button label logic
+  // --------------------------
   function getWebButtonLabel() {
     if (loading) {
       return (
@@ -95,13 +116,16 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
     }
 
     if (statusMsg) return statusMsg
-    if (stage === 'prebook') return 'Prebook'
-    if (stage === 'book') return !event.price || Number(event.price) === 0 ? 'Book Free' : 'Book Ticket'
+    if (stage === 'prebook') return 'Guestlist'
+    if (stage === 'book') return !event.price || Number(event.price) === 0 ? 'Book Free' : 'Pay Now'
     return 'Registration Closed'
   }
 
   const isDisabled = loading || (!requiresConfirmation && stage !== 'prebook' && stage !== 'book')
 
+  // --------------------------
+  // Render component
+  // --------------------------
   return (
     <>
       {/* Event Card */}
@@ -118,10 +142,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
 
         <div className="flex justify-between items-center mt-auto mb-2 gap-2">
           <button
-            onClick={() => {
-              if (requiresConfirmation) setConfirmModalOpen(true)
-              else handleWebAction(stage)
-            }}
+            onClick={() => requiresConfirmation ? setConfirmModalOpen(true) : handleWebAction()}
             disabled={isDisabled}
             className={`flex-1 px-3 py-1 rounded ${eventConfirmed ? 'bg-blue-600 hover:bg-blue-700' : 'bg-yellow-600 hover:bg-yellow-700'} text-white text-sm disabled:opacity-50`}
           >
@@ -131,7 +152,9 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
 
         <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
           <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
-          <span>👥 {registeredUsers} Users</span>
+          <span>
+            👥 Guestlist: {registeredCounters.prebook_count} / {event.min_attendees} | Booked: {registeredCounters.book_count}
+          </span>
         </div>
 
         <button onClick={() => setInternalModalOpen(true)} className="mt-2 w-full px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-sm">
@@ -175,7 +198,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
                   disabled={!agree || loading}
                   onClick={async () => {
                     setConfirmModalOpen(false)
-                    await handleWebAction(stage)
+                    await handleWebAction()
                   }}
                   className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm disabled:opacity-50"
                 >
