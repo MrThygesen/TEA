@@ -28,33 +28,32 @@ function clearAuth() {
 // ---------------------------
 // Event Card Component
 // ---------------------------
+'use client'
 
-export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
+import { useState } from 'react'
+
+export default function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
   const [internalModalOpen, setInternalModalOpen] = useState(false)
   const [confirmModalOpen, setConfirmModalOpen] = useState(false)
   const [agree, setAgree] = useState(false)
 
-  // Counters for each stage
   const [registeredUsers, setRegisteredUsers] = useState({
     prebook: event.prebook_count || 0,
     book: event.book_count || 0
   })
-
   const [stage, setStage] = useState(event.stage || 'prebook')
+
   const eventConfirmed = stage === 'book'
   const requiresConfirmation = stage === 'prebook' || stage === 'book'
-
-  // Disable button if loading or no auth
   const isDisabled = loading || !authUser
 
   // --------------------------
-  // Handle registration / guestlist / booking
+  // Handle Registration
   // --------------------------
   async function handleWebAction(stageParam) {
-    const token = localStorage.getItem('token')
-    if (!authUser || !token) {
+    if (!authUser) {
       setShowAccountModal(true)
       return
     }
@@ -63,6 +62,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
     setStatusMsg(stageParam === 'prebook' ? 'Joining...' : 'Booking...')
 
     try {
+      const token = localStorage.getItem('token')
       const res = await fetch('/api/events/register', {
         method: 'POST',
         headers: {
@@ -73,28 +73,20 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
       })
       const data = await res.json()
 
+      // Sync counters
+      if (data.counters) setRegisteredUsers(data.counters)
+      // Sync stage
+      if (data.stage) setStage(data.stage)
+
       if (data.clientSecret) {
-        // Paid booking flow
         setStatusMsg('Redirecting to payment...')
         return
       }
 
-if (data.counters) {
-  setRegisteredUsers(data.counters)
-}
-
-// **Sync the stage to reflect backend**
-if (data.stage) {
-  setStage(data.stage)
-}
-
-      if (data.stage === 'prebook') {
-        setStatusMsg('Added to Guestlist!')
-      } else if (data.stage === 'book') {
-        setStatusMsg('Booking confirmed!')
-      } else {
-        setStatusMsg(data.message || 'Registered!')
-      }
+      // Update status message
+      if (data.stage === 'prebook') setStatusMsg('Added to Guestlist!')
+      else if (data.stage === 'book') setStatusMsg('Booking confirmed!')
+      else setStatusMsg(data.message || 'Registered!')
     } catch (err) {
       console.error(err)
       setStatusMsg('Error registering')
@@ -105,7 +97,7 @@ if (data.stage) {
   }
 
   // --------------------------
-  // Button label logic
+  // Dynamic button label
   // --------------------------
   function getWebButtonLabel() {
     if (loading) {
@@ -119,6 +111,7 @@ if (data.stage) {
         </span>
       )
     }
+
     if (statusMsg) return statusMsg
     if (stage === 'prebook') return 'Guestlist'
     if (stage === 'book') return !event.price || Number(event.price) === 0 ? 'Book Free' : 'Pay Now'
@@ -126,7 +119,7 @@ if (data.stage) {
   }
 
   // --------------------------
-  // Render component
+  // Render
   // --------------------------
   return (
     <>
@@ -143,7 +136,7 @@ if (data.stage) {
 
         <div className="flex justify-between items-center mt-auto mb-2 gap-2">
           <button
-            onClick={() => requiresConfirmation ? setConfirmModalOpen(true) : handleWebAction()}
+            onClick={() => requiresConfirmation ? setConfirmModalOpen(true) : handleWebAction(stage)}
             disabled={isDisabled}
             className={`flex-1 px-3 py-1 rounded ${eventConfirmed ? 'bg-blue-600 hover:bg-blue-700' : 'bg-yellow-600 hover:bg-yellow-700'} text-white text-sm disabled:opacity-50`}
           >
@@ -161,7 +154,7 @@ if (data.stage) {
         </button>
       </div>
 
-      {/* Event Preview Modal */}
+      {/* Preview Modal */}
       {internalModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={() => setInternalModalOpen(false)}>
           <div className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
@@ -197,7 +190,7 @@ if (data.stage) {
                   disabled={!agree || loading}
                   onClick={async () => {
                     setConfirmModalOpen(false)
-                    await handleWebAction()
+                    await handleWebAction(stage)
                   }}
                   className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm disabled:opacity-50"
                 >
