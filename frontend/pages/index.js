@@ -29,13 +29,14 @@ function clearAuth() {
 // Event Card Component
 // ---------------------------
 
-export function DynamicEventCard({ event, authUser, setShowAccountModal, refreshTickets }) {
+export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
   const [internalModalOpen, setInternalModalOpen] = useState(false)
   const [confirmModalOpen, setConfirmModalOpen] = useState(false)
   const [agree, setAgree] = useState(false)
 
+  // Counters for each stage
   const [registeredUsers, setRegisteredUsers] = useState({
     prebook: event.prebook_count || 0,
     book: event.book_count || 0
@@ -44,8 +45,13 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
   const [stage, setStage] = useState(event.stage || 'prebook')
   const eventConfirmed = stage === 'book'
   const requiresConfirmation = stage === 'prebook' || stage === 'book'
+
+  // Disable button if loading or no auth
   const isDisabled = loading || !authUser
 
+  // --------------------------
+  // Handle registration / guestlist / booking
+  // --------------------------
   async function handleWebAction(stageParam) {
     const token = localStorage.getItem('token')
     if (!authUser || !token) {
@@ -68,12 +74,19 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       const data = await res.json()
 
       if (data.clientSecret) {
+        // Paid booking flow
         setStatusMsg('Redirecting to payment...')
         return
       }
 
-      if (data.counters) setRegisteredUsers(data.counters)
-      if (data.stage) setStage(data.stage)
+if (data.counters) {
+  setRegisteredUsers(data.counters)
+}
+
+// **Sync the stage to reflect backend**
+if (data.stage) {
+  setStage(data.stage)
+}
 
       if (data.stage === 'prebook') {
         setStatusMsg('Added to Guestlist!')
@@ -82,9 +95,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       } else {
         setStatusMsg(data.message || 'Registered!')
       }
-
-      // <-- refresh YourAccountModal after booking -->
-      if (refreshTickets) refreshTickets()
     } catch (err) {
       console.error(err)
       setStatusMsg('Error registering')
@@ -94,6 +104,9 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
     }
   }
 
+  // --------------------------
+  // Button label logic
+  // --------------------------
   function getWebButtonLabel() {
     if (loading) {
       return (
@@ -112,6 +125,9 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
     return 'Registration Closed'
   }
 
+  // --------------------------
+  // Render component
+  // --------------------------
   return (
     <>
       <div className="border border-zinc-700 rounded-lg p-4 text-left bg-zinc-800 shadow flex flex-col justify-between">
@@ -308,13 +324,6 @@ export default function Home() {
 
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [showEventModal, setShowEventModal] = useState(false)
-  const [modalKey, setModalKey] = useState(0)
-
-function refreshTickets() {
-  setModalKey(prev => prev + 1)
-}
-
-
 
   // --- fetch events ---
   useEffect(() => {
@@ -382,15 +391,6 @@ function refreshTickets() {
       setAuthError('Network error')
     }
   }
-
-
-<DynamicEventCard
-  key={event.id}
-  event={event}
-  authUser={authUser}
-  setShowAccountModal={setShowAccountModal}
-  refreshTickets={refreshTickets}
-/>
 
   async function handleSignup(e) {
     e.preventDefault()
@@ -611,7 +611,6 @@ function refreshTickets() {
 {/* Account/Login/Signup Modals */}
 {showAccountModal && authUser && (
   <YourAccountModal
-    key={modalKey}
     profile={authUser}
     onClose={() => setShowAccountModal(false)}
   />
