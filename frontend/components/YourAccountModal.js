@@ -1,4 +1,3 @@
-// components/YourAccountModal.js
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -22,20 +21,24 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         const profileRes = await fetch('/api/user/me', {
           headers: { Authorization: `Bearer ${token}` }
         })
-        const ticketsRes = await fetch('/api/user/myTickets', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-
         if (profileRes.ok) {
           const data = await profileRes.json()
           setProfile(data)
         }
+
+        // fetch tickets
+        const ticketsRes = await fetch('/api/user/myTickets', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
         if (ticketsRes.ok) {
           const data = await ticketsRes.json()
-          setTickets(data.tickets || [])
+          setTickets(Array.isArray(data.tickets) ? data.tickets : [])
+        } else {
+          setTickets([])
         }
       } catch (err) {
         console.error('Failed to load account info', err)
+        setTickets([])
       } finally {
         setLoading(false)
       }
@@ -83,13 +86,17 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                     key={ticket.id}
                     className="p-2 bg-zinc-800 rounded flex justify-between items-center"
                   >
-                    <span>{ticket.event_name} — {ticket.stage}</span>
-                    {ticket.qrImage && (
+                    <span>
+                      {ticket.event_name} — {ticket.stage}
+                    </span>
+                    {ticket.qrImage ? (
                       <img
                         src={ticket.qrImage}
                         alt="QR Code"
                         className="w-12 h-12 object-contain"
                       />
+                    ) : (
+                      <span className="text-xs text-gray-400">No QR</span>
                     )}
                   </li>
                 ))}

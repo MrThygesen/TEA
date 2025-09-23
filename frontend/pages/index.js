@@ -28,19 +28,19 @@ function clearAuth() {
 // ---------------------------
 // Event Card Component
 // ---------------------------
-export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
+
+export function DynamicEventCard({ event, authUser, setShowAccountModal, setTicketRefreshTrigger }) {
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
   const [internalModalOpen, setInternalModalOpen] = useState(false)
   const [confirmModalOpen, setConfirmModalOpen] = useState(false)
   const [agree, setAgree] = useState(false)
-  const [ticketRefreshTrigger, setTicketRefreshTrigger] = useState(0)
 
   const [registeredUsers, setRegisteredUsers] = useState({
     prebook: event.prebook_count || 0,
     book: event.book_count || 0,
   })
-  const [stage, setStage] = useState(event.stage || 'prebook')
+  const [stage, setStage] = useState('prebook') // default, updated by API
 
   const isDisabled = loading || !authUser
 
@@ -72,20 +72,25 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
         throw new Error(data.error || 'Registration failed')
       }
 
-      // Update counters and stage
-      if (data.counters) setRegisteredUsers(data.counters)
+      // Normalize counters
+      if (data.counters) {
+        setRegisteredUsers({
+          prebook: data.counters.prebook_count || 0,
+          book: data.counters.book_count || 0,
+        })
+      }
       if (data.stage) setStage(data.stage)
 
-      // Trigger refresh for modal
-      setTicketRefreshTrigger(prev => prev + 1)
+      // Trigger account modal refresh
+      if (setTicketRefreshTrigger) {
+        setTicketRefreshTrigger((prev) => prev + 1)
+      }
 
-      // Payment case
       if (data.clientSecret) {
         setStatusMsg('Redirecting to payment…')
         return
       }
 
-      // Status messages
       if (data.stage === 'prebook') setStatusMsg('Added to Guestlist!')
       else if (data.stage === 'book') setStatusMsg('Booking confirmed!')
     } catch (err) {
@@ -126,10 +131,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
 
     if (statusMsg) return statusMsg
 
-    // Guestlist stage
     if (stage === 'prebook') return 'Join Guestlist'
-
-    // Booking stage
     if (stage === 'book') {
       if (!event.price || Number(event.price) === 0) return 'Book Free'
       return 'Pay Now'
@@ -167,7 +169,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
             ))}
         </div>
 
-        {/* Main Action */}
         <div className="flex justify-between items-center mt-auto mb-2 gap-2">
           <button
             onClick={() => setConfirmModalOpen(true)}
@@ -182,7 +183,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
           </button>
         </div>
 
-        {/* Counters */}
         <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
           <span>
             💰{' '}
@@ -191,12 +191,10 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
               : 'Free'}
           </span>
           <span>
-            👥 Guestlist: {registeredUsers.prebook} | Booked:{' '}
-            {registeredUsers.book}
+            👥 Guestlist: {registeredUsers.prebook} | Booked: {registeredUsers.book}
           </span>
         </div>
 
-        {/* Preview */}
         <button
           onClick={() => setInternalModalOpen(true)}
           className="mt-2 w-full px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-sm"
@@ -261,8 +259,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
             </h2>
             <p className="mb-6 text-sm text-gray-300 text-center leading-relaxed">
               By confirming, you declare a genuine interest in participating.
-              Participation includes receiving emails and following event
-              guidelines.
             </p>
 
             <div className="flex flex-col gap-4">
@@ -272,7 +268,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
                   checked={agree}
                   onChange={(e) => setAgree(e.target.checked)}
                 />
-                I agree to guidelines and receival of emails for this event.
+                I agree to guidelines and receive emails for this event.
               </label>
 
               <div className="flex gap-2 justify-end">
