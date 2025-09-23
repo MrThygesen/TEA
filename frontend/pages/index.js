@@ -37,13 +37,16 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   const [agree, setAgree] = useState(false)
 
   // Counters for each stage
+// Corrected
 const [registeredUsers, setRegisteredUsers] = useState({
   prebook: event.prebook_count || 0,
   book: event.book_count || 0
+})
 
-  const [stage, setStage] = useState(event.stage || 'prebook')
-  const eventConfirmed = stage === 'book'
-  const requiresConfirmation = stage === 'prebook' || stage === 'book'
+const [stage, setStage] = useState(event.stage || 'prebook')
+const eventConfirmed = stage === 'book'
+const requiresConfirmation = stage === 'prebook' || stage === 'book'
+
 
   // --------------------------
   // Handle registration / guestlist / booking
