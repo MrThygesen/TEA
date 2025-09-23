@@ -37,96 +37,94 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   const [agree, setAgree] = useState(false)
 
   // Counters for each stage
-// Corrected
-const [registeredUsers, setRegisteredUsers] = useState({
-  prebook: event.prebook_count || 0,
-  book: event.book_count || 0
-})
+  const [registeredUsers, setRegisteredUsers] = useState({
+    prebook: event.prebook_count || 0,
+    book: event.book_count || 0
+  })
 
-const [stage, setStage] = useState(event.stage || 'prebook')
-const eventConfirmed = stage === 'book'
-const requiresConfirmation = stage === 'prebook' || stage === 'book'
+  const [stage, setStage] = useState(event.stage || 'prebook')
+  const eventConfirmed = stage === 'book'
+  const requiresConfirmation = stage === 'prebook' || stage === 'book'
 
+  // Disable button if loading or no auth
+  const isDisabled = loading || !authUser
 
   // --------------------------
   // Handle registration / guestlist / booking
   // --------------------------
   async function handleWebAction(stageParam) {
-  const token = localStorage.getItem('token')
-  if (!authUser || !token) {
-    setShowAccountModal(true)
-    return
-  }
-
-  setLoading(true)
-  setStatusMsg(stageParam === 'prebook' ? 'Joining...' : 'Booking...')
-
-  try {
-    const res = await fetch('/api/events/register', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ eventId: event.id })
-    })
-    const data = await res.json()
-
-    if (data.clientSecret) {
-      // Paid booking flow
-      // Redirect to Stripe checkout or show payment flow
-      setStatusMsg('Redirecting to payment...')
+    const token = localStorage.getItem('token')
+    if (!authUser || !token) {
+      setShowAccountModal(true)
       return
     }
 
-    if (data.counters) {
-      setRegisteredUsers(data.counters)
-    }
+    setLoading(true)
+    setStatusMsg(stageParam === 'prebook' ? 'Joining...' : 'Booking...')
 
-    if (data.stage === 'prebook') {
-      setStatusMsg('Added to Guestlist!')
-    } else if (data.stage === 'book') {
-      setStatusMsg('Booking confirmed!')
-    } else {
-      setStatusMsg(data.message || 'Registered!')
+    try {
+      const res = await fetch('/api/events/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ eventId: event.id })
+      })
+      const data = await res.json()
+
+      if (data.clientSecret) {
+        // Paid booking flow
+        setStatusMsg('Redirecting to payment...')
+        return
+      }
+
+      if (data.counters) {
+        setRegisteredUsers(data.counters)
+      }
+
+      if (data.stage === 'prebook') {
+        setStatusMsg('Added to Guestlist!')
+      } else if (data.stage === 'book') {
+        setStatusMsg('Booking confirmed!')
+      } else {
+        setStatusMsg(data.message || 'Registered!')
+      }
+    } catch (err) {
+      console.error(err)
+      setStatusMsg('Error registering')
+    } finally {
+      setLoading(false)
+      setTimeout(() => setStatusMsg(''), 2000)
     }
-  } catch (err) {
-    console.error(err)
-    setStatusMsg('Error registering')
-  } finally {
-    setLoading(false)
-    setTimeout(() => setStatusMsg(''), 2000)
   }
-}
-
 
   // --------------------------
   // Button label logic
   // --------------------------
-function getWebButtonLabel() {
-  if (loading) {
-    return (
-      <span className="flex items-center justify-center gap-2">
-        <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-        </svg>
-        {statusMsg || (stage === 'prebook' ? 'Guestlist...' : 'Pay Now...')}
-      </span>
-    )
+  function getWebButtonLabel() {
+    if (loading) {
+      return (
+        <span className="flex items-center justify-center gap-2">
+          <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+          </svg>
+          {statusMsg || (stage === 'prebook' ? 'Guestlist...' : 'Pay Now...')}
+        </span>
+      )
+    }
+    if (statusMsg) return statusMsg
+    if (stage === 'prebook') return 'Guestlist'
+    if (stage === 'book') return !event.price || Number(event.price) === 0 ? 'Book Free' : 'Pay Now'
+    return 'Registration Closed'
   }
-  if (statusMsg) return statusMsg
-  if (stage === 'prebook') return 'Guestlist'
-  if (stage === 'book') return !event.price || Number(event.price) === 0 ? 'Book Free' : 'Pay Now'
-  return 'Registration Closed'
-}
 
   // --------------------------
   // Render component
   // --------------------------
   return (
     <>
-      {/* Event Card */}
       <div className="border border-zinc-700 rounded-lg p-4 text-left bg-zinc-800 shadow flex flex-col justify-between">
         <img src={event.image_url || '/default-event.jpg'} alt={event.name} className="w-full h-40 object-cover rounded mb-3" />
         <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
@@ -148,20 +146,10 @@ function getWebButtonLabel() {
           </button>
         </div>
 
-     
-<div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
-  <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
-  <span>👥 Guestlist: {registeredUsers.prebook} | Booked: {registeredUsers.book}</span>
-</div>
-
-
-/*
-   <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
+        <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
           <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
-          <span>
-            👥 Guestlist: {registeredCounters.prebook_count} / {event.min_attendees} | Booked: {registeredCounters.book_count}
-          </span>
-        </div> */
+          <span>👥 Guestlist: {registeredUsers.prebook} | Booked: {registeredUsers.book}</span>
+        </div>
 
         <button onClick={() => setInternalModalOpen(true)} className="mt-2 w-full px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-sm">
           Preview
@@ -208,7 +196,7 @@ function getWebButtonLabel() {
                   }}
                   className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm disabled:opacity-50"
                 >
-                  {stage === 'prebook' ? 'Join Guestlist' : !event.price || Number(event.price) === 0 ? 'Book Free' : 'Pay Now'}
+                  {stage === 'prebook' ? 'Join Guestlist' : (!event.price || Number(event.price) === 0 ? 'Book Free' : 'Pay Now')}
                 </button>
               </div>
             </div>
