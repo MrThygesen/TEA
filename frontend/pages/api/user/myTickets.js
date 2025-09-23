@@ -1,7 +1,6 @@
 // pages/api/user/myTickets.js
 import { pool } from '../../../lib/postgres.js'
 import { auth } from '../../../lib/auth.js'
-import QRCode from 'qrcode'
 
 export default async function handler(req, res) {
   const token = auth.getTokenFromReq(req)
@@ -21,7 +20,8 @@ export default async function handler(req, res) {
   try {
     const { rows } = await pool.query(
       `
-      SELECT r.*, e.name AS event_name, e.city, e.datetime, e.price, e.is_confirmed
+      SELECT r.id AS registration_id, r.stage, r.ticket_sent, r.ticket_code, r.has_paid, r.timestamp,
+             e.id AS event_id, e.name AS event_name, e.city, e.datetime, e.price, e.is_confirmed
       FROM registrations r
       JOIN events e ON r.event_id = e.id
       WHERE r.user_id=$1 OR r.telegram_user_id=$2
@@ -30,20 +30,13 @@ export default async function handler(req, res) {
       [userId, telegramUserId]
     )
 
-    const tickets = await Promise.all(rows.map(async (t) => {
+    const tickets = rows.map(t => {
       const isBookStage = t.stage === 'book'
       const stage = isBookStage ? 'book' : 'prebook'
       const isFree = !t.price || Number(t.price) === 0
 
-      let qrData = null
-      let qrImage = null
-      if (t.ticket_sent && (isFree || t.has_paid)) {
-        qrData = t.ticket_code
-        qrImage = await QRCode.toDataURL(qrData)
-      }
-
       return {
-        id: t.id,
+        id: t.registration_id,     // stable key
         event_id: t.event_id,
         event_name: t.event_name,
         city: t.city,
@@ -55,10 +48,9 @@ export default async function handler(req, res) {
         is_free: isFree,
         stage,
         is_book_stage: isBookStage,
-        qrData,
-        qrImage,
+        qrData: t.ticket_sent && (isFree || t.has_paid) ? t.ticket_code : null
       }
-    }))
+    })
 
     return res.status(200).json({ tickets })
 

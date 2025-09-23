@@ -1,6 +1,6 @@
-//YourAccountModal.js Test 
 'use client'
 import { useState, useEffect } from 'react'
+import QRCode from 'react-qr-code'
 
 export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [profile, setProfile] = useState(null)
@@ -87,14 +87,10 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                     className="p-2 bg-zinc-800 rounded flex justify-between items-center"
                   >
                     <span>
-                      {ticket.event_name} — {ticket.stage}
+                      {ticket.event_name || 'Unknown Event'} — {ticket.stage || 'Unknown'}
                     </span>
-                    {ticket.qrImage ? (
-                      <img
-                        src={ticket.qrImage}
-                        alt="QR Code"
-                        className="w-12 h-12 object-contain"
-                      />
+                    {ticket.qrData ? (
+                      <QRCode value={ticket.qrData} size={48} />
                     ) : (
                       <span className="text-xs text-gray-400">No QR</span>
                     )}
