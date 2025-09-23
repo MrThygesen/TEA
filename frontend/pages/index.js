@@ -28,10 +28,6 @@ function clearAuth() {
 // ---------------------------
 // Event Card Component
 // ---------------------------
-'use client'
-
-import { useState } from 'react'
-
 export default function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
