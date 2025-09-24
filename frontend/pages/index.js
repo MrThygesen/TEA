@@ -35,6 +35,15 @@ function computeStage(preCount, minAttendees) {
 // ---------------------------
 // DynamicEventCard
 // ---------------------------
+// ---------------------------
+// DynamicEventCard
+// ---------------------------
+import { useState, useEffect } from 'react'
+
+// Helper: compute stage
+function computeStage(preCount, minAttendees) {
+  return preCount < (minAttendees || 0) ? 'prebook' : 'book';
+}
 
 export function DynamicEventCard({ event, authUser, setShowAccountModal, counters = { prebook: 0, book: 0 }, onUpdateCounters }) {
   const [registeredUsers, setRegisteredUsers] = useState(counters)
@@ -45,29 +54,26 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, counter
   const [confirmModalOpen, setConfirmModalOpen] = useState(false)
   const [agree, setAgree] = useState(false)
 
-  // -------------------------
-  // Fetch live counts from API
-  // -------------------------
+  // --- Fetch counters from API when component mounts ---
   useEffect(() => {
     async function fetchCounters() {
       try {
         const res = await fetch(`/api/events/counters?eventId=${event.id}`)
-        if (!res.ok) return
+        if (!res.ok) throw new Error('Failed to fetch counters')
         const data = await res.json()
-        const preCount = data.prebook_count ?? counters.prebook
-        const bookCount = data.book_count ?? counters.book
-        const newCounters = { prebook: preCount, book: bookCount }
+        const newCounters = { prebook: data.prebook_count || 0, book: data.book_count || 0 }
         setRegisteredUsers(newCounters)
-        setStage(computeStage(preCount, event.min_attendees))
+        setStage(computeStage(newCounters.prebook, event.min_attendees))
         if (onUpdateCounters) onUpdateCounters(newCounters)
       } catch (err) {
-        console.error('Failed to fetch counters', err)
+        console.error('Error fetching event counters:', err)
       }
     }
+
     fetchCounters()
-  }, [event.id, counters, event.min_attendees, onUpdateCounters])
-  
-  // Sync parent counters if changed
+  }, [event.id])
+
+  // Sync counters from parent if they change
   useEffect(() => {
     setRegisteredUsers(counters)
     setStage(computeStage(counters.prebook, event.min_attendees))
@@ -76,8 +82,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, counter
   const displayCount = stage === 'prebook' ? registeredUsers.prebook : registeredUsers.book
   const isDisabled = loading
 
-  // handleWebAction stays exactly the same...}
-
+  // --- Handle registration ---
   async function handleWebAction() {
     setLoading(true)
     setStatusMsg(stage === 'prebook' ? 'Joining...' : 'Booking...')
@@ -144,7 +149,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, counter
         </div>
 
         <div className="flex flex-col gap-2 mt-auto mb-2">
-          {/* Main action button */}
           <button
             onClick={() => setConfirmModalOpen(true)}
             disabled={isDisabled}
@@ -153,7 +157,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, counter
             {getWebButtonLabel()}
           </button>
 
-          {/* Preview button */}
           <button
             onClick={() => setInternalModalOpen(true)}
             className="w-full px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-sm"
@@ -168,7 +171,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, counter
         </div>
       </div>
 
-      {/* Internal Preview Modal */}
+       {/* Internal Preview Modal */}
       {internalModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={() => setInternalModalOpen(false)}>
           <div className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
