@@ -25,9 +25,6 @@ function clearAuth() {
   try { localStorage.removeItem('edgy_auth_user') } catch (_) {}
 }
 
-// ---------------------------
-// DynamicEventCard
-// ---------------------------
 export function DynamicEventCard({ event, authUser, setShowAccountModal, setTicketRefreshTrigger }) {
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
@@ -36,10 +33,10 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
   const [agree, setAgree] = useState(false)
 
   const [registeredUsers, setRegisteredUsers] = useState({
-    prebook: 0,
-    book: 0,
+    prebook: event.prebook_count || 0,
+    book: event.book_count || 0,
   })
-  const [stage, setStage] = useState('prebook') // derived from event and min_attendees
+  const [stage, setStage] = useState('prebook')
 
   const isDisabled = loading
 
@@ -50,6 +47,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
     const pre = event.prebook_count || 0
     const book = event.book_count || 0
     setRegisteredUsers({ prebook: pre, book })
+
     // Determine stage based on min_attendees
     setStage(pre < (event.min_attendees || 0) ? 'prebook' : 'book')
   }, [event])
@@ -81,16 +79,16 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Registration failed')
 
-      // Update counters from API response
+      // Update counters safely
       if (data.counters) {
         setRegisteredUsers({
-          prebook: data.counters.prebook_count || 0,
-          book: data.counters.book_count || 0,
+          prebook: data.counters.prebook_count ?? registeredUsers.prebook,
+          book: data.counters.book_count ?? registeredUsers.book,
         })
       }
 
-      // Update stage based on min_attendees
-      const preCount = data.counters?.prebook_count || 0
+      // Recalculate stage
+      const preCount = data.counters?.prebook_count ?? registeredUsers.prebook
       setStage(preCount < (event.min_attendees || 0) ? 'prebook' : 'book')
 
       if (setTicketRefreshTrigger) setTicketRefreshTrigger(prev => prev + 1)
@@ -101,7 +99,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
       }
 
       setStatusMsg(stage === 'prebook' ? 'Added to Guestlist!' : 'Booking confirmed!')
-
     } catch (err) {
       console.error('❌ Registration error:', err)
       setStatusMsg('Error registering')
@@ -111,9 +108,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
     }
   }
 
-  // ---------------------------
-  // Button label
-  // ---------------------------
   function getWebButtonLabel() {
     if (loading) return statusMsg || (stage === 'prebook' ? 'Guestlist…' : 'Processing…')
     if (statusMsg) return statusMsg
@@ -122,39 +116,45 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
     return 'Registration Closed'
   }
 
-  // ---------------------------
-  // Render
-  // ---------------------------
   return (
-    <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800 shadow flex flex-col justify-between">
-      <img src={event.image_url || '/default-event.jpg'} alt={event.name} className="w-full h-40 object-cover rounded mb-3" />
-      <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
-      <p className="text-sm mb-2">{event.description?.split(' ').slice(0, 30).join(' ')}...</p>
+    <>
+      <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800 shadow flex flex-col justify-between">
+        <img
+          src={event.image_url || '/default-event.jpg'}
+          alt={event.name}
+          className="w-full h-40 object-cover rounded mb-3"
+        />
+        <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
+        <p className="text-sm mb-2">{event.description?.split(' ').slice(0, 30).join(' ')}...</p>
 
-      <div className="flex flex-wrap gap-1 mb-2">
-        {[event.tag1, event.tag2, event.tag3].filter(Boolean).map((tag, i) => (
-          <span key={i} className="bg-blue-700 text-xs px-2 py-1 rounded">{tag}</span>
-        ))}
-      </div>
+        <div className="flex flex-wrap gap-1 mb-2">
+          {[event.tag1, event.tag2, event.tag3].filter(Boolean).map((tag, i) => (
+            <span key={i} className="bg-blue-700 text-xs px-2 py-1 rounded">{tag}</span>
+          ))}
+        </div>
 
-      <div className="flex justify-between items-center mt-auto mb-2 gap-2">
+        <div className="flex justify-between items-center mt-auto mb-2 gap-2">
+          <button
+            onClick={() => setConfirmModalOpen(true)}
+            disabled={isDisabled}
+            className={`flex-1 px-3 py-1 rounded ${stage === 'book' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-yellow-600 hover:bg-yellow-700'} text-white text-sm disabled:opacity-50`}
+          >
+            {getWebButtonLabel()}
+          </button>
+        </div>
+
+        <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
+          <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
+          <span>👥 {stage === 'prebook' ? 'Guestlist' : 'Booked'}: {displayCount}</span>
+        </div>
+
         <button
-          onClick={() => setConfirmModalOpen(true)}
-          disabled={isDisabled}
-          className={`flex-1 px-3 py-1 rounded ${stage === 'book' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-yellow-600 hover:bg-yellow-700'} text-white text-sm disabled:opacity-50`}
+          onClick={() => setInternalModalOpen(true)}
+          className="mt-2 w-full px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-sm"
         >
-          {getWebButtonLabel()}
+          Preview
         </button>
       </div>
-
-      <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
-        <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
-        <span>👥 {stage === 'prebook' ? 'Guestlist' : 'Booked'}: {displayCount}</span>
-      </div>
-    </div>
-  )
-}
-
 
       {/* Internal Modal */}
       {internalModalOpen && (
