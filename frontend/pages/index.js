@@ -25,6 +25,16 @@ function clearAuth() {
   try { localStorage.removeItem('edgy_auth_user') } catch (_) {}
 }
 
+
+// Helpers
+// ---------------------------
+function computeStage(preCount, minAttendees) {
+  return preCount < (minAttendees || 0) ? 'prebook' : 'book';
+}
+
+// ---------------------------
+// DynamicEventCard
+// ---------------------------
 export function DynamicEventCard({ event, authUser, setShowAccountModal, setTicketRefreshTrigger }) {
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
@@ -36,7 +46,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
     prebook: event.prebook_count || 0,
     book: event.book_count || 0,
   })
-  const [stage, setStage] = useState('prebook')
+  const [stage, setStage] = useState(computeStage(registeredUsers.prebook, event.min_attendees))
 
   const isDisabled = loading
 
@@ -46,10 +56,8 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
   useEffect(() => {
     const pre = event.prebook_count || 0
     const book = event.book_count || 0
-    setRegisteredUsers({ prebook: pre, book })
-
-    // Determine stage based on min_attendees
-    setStage(pre < (event.min_attendees || 0) ? 'prebook' : 'book')
+    setRegisteredUsers(prev => ({ prebook: Math.max(prev.prebook, pre), book: Math.max(prev.book, book) }))
+    setStage(computeStage(Math.max(registeredUsers.prebook, pre), event.min_attendees))
   }, [event])
 
   const displayCount = stage === 'prebook' ? registeredUsers.prebook : registeredUsers.book
@@ -79,17 +87,18 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Registration failed')
 
-      // Update counters safely
+      // --- Update counts and stage ---
       if (data.counters) {
-        setRegisteredUsers({
-          prebook: data.counters.prebook_count ?? registeredUsers.prebook,
-          book: data.counters.book_count ?? registeredUsers.book,
-        })
-      }
+        const preCount = data.counters.prebook_count ?? registeredUsers.prebook
+        const bookCount = data.counters.book_count ?? registeredUsers.book
 
-      // Recalculate stage
-      const preCount = data.counters?.prebook_count ?? registeredUsers.prebook
-      setStage(preCount < (event.min_attendees || 0) ? 'prebook' : 'book')
+        setRegisteredUsers({ prebook: preCount, book: bookCount })
+
+        const newStage = computeStage(preCount, event.min_attendees)
+        setStage(newStage)
+
+        setStatusMsg(newStage === 'prebook' ? 'Added to Guestlist!' : 'Booking confirmed!')
+      }
 
       if (setTicketRefreshTrigger) setTicketRefreshTrigger(prev => prev + 1)
 
@@ -98,7 +107,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
         return
       }
 
-      setStatusMsg(stage === 'prebook' ? 'Added to Guestlist!' : 'Booking confirmed!')
     } catch (err) {
       console.error('❌ Registration error:', err)
       setStatusMsg('Error registering')
