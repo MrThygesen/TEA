@@ -31,238 +31,125 @@ function computeStage(preCount, minAttendees) {
   return preCount < (minAttendees || 0) ? 'prebook' : 'book'
 }
 
-export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
-  const [counters, setCounters] = useState({ prebook_count: 0, book_count: 0 })
-  const [stage, setStage] = useState(computeStage(0, event.min_attendees))
-  const [loading, setLoading] = useState(false)
-  const [statusMsg, setStatusMsg] = useState('')
-  const [userTickets, setUserTickets] = useState(0)
-  const [maxPerUser, setMaxPerUser] = useState(event.tag1 === 'group' ? 5 : 1)
+// ---------------------------
+// Dynamic Event Card
+// ---------------------------
+export function DynamicEventCard({ event, onRegister, user }) {
+  const [internalModalOpen, setInternalModalOpen] = useState(false)
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false)
+  const [agree, setAgree] = useState(false)
+  const [isDisabled, setIsDisabled] = useState(false)
+  const [registeredUsers, setRegisteredUsers] = useState({ pre: 0, book: 0 })
 
-  // Fetch counters + user info
-  useEffect(() => {
-    async function fetchCounters() {
-      try {
-        const res = await fetch(`/api/events/counters?eventId=${event.id}`)
-        if (res.ok) {
-          const data = await res.json()
-          const newStage = computeStage(data.prebook_count, event.min_attendees)
-          setCounters(data)
-          setStage(newStage)
-        }
-      } catch (err) {
-        console.error('❌ Failed counters:', err)
-      }
+  const stage = computeStage(event, registeredUsers.pre + registeredUsers.book)
+
+  const handleRegisterClick = () => {
+    if (stage === 'prebook') {
+      setInternalModalOpen(true)
+    } else if (stage === 'book') {
+      setConfirmModalOpen(true)
     }
-    fetchCounters()
-  }, [event.id, event.min_attendees])
+  }
 
-  useEffect(() => {
-    async function fetchMe() {
-      if (!authUser) return
-      try {
-        const token = localStorage.getItem('token')
-        if (!token) return
-        const res = await fetch('/api/user/me', {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        if (!res.ok) return
-        const data = await res.json()
-        const reg = (data.registrations || []).find(r => r.event_id === event.id)
-        if (reg) {
-          setUserTickets(reg.user_tickets)
-          setMaxPerUser(reg.max_per_user)
-        }
-      } catch (err) {
-        console.error('❌ Failed me:', err)
-      }
-    }
-    fetchMe()
-  }, [authUser, event.id])
-
-  const displayCount = stage === 'prebook' ? counters.prebook_count : counters.book_count
-  const reachedLimit = userTickets >= maxPerUser
-
-  async function handleWebAction() {
-    setLoading(true)
-    setStatusMsg(stage === 'prebook' ? 'Joining…' : 'Booking…')
+  const handleConfirm = async () => {
+    if (isDisabled) return
+    setIsDisabled(true)
     try {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        setShowAccountModal(true)
-        return
-      }
-      const res = await fetch('/api/events/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ eventId: event.id }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Registration failed')
-
-      setCounters(data.counters)
-      setStage(data.stage)
-      setUserTickets(prev => prev + 1)
-      setStatusMsg(stage === 'prebook' ? 'Added to Guestlist!' : 'Booking confirmed!')
+      await onRegister(event)
+      setConfirmModalOpen(false)
     } catch (err) {
-      console.error('❌ Registration:', err)
-      setStatusMsg('Error registering')
+      console.error('Registration failed', err)
     } finally {
-      setLoading(false)
-      setTimeout(() => setStatusMsg(''), 2000)
+      setIsDisabled(false)
     }
   }
 
-  function getWebButtonLabel() {
-    if (reachedLimit) return `Max ${maxPerUser} tickets`
-    if (loading) return statusMsg || (stage === 'prebook' ? 'Guestlist…' : 'Processing…')
-    if (statusMsg) return statusMsg
-    if (stage === 'prebook') return 'Join Guestlist'
-    if (stage === 'book') return !event.price || Number(event.price) === 0 ? 'Book Free' : 'Pay Now'
-    return 'Registration Closed'
-  }
+  return (
+    <div className="border rounded-xl shadow p-4 bg-white">
+      <h3 className="text-lg font-semibold">{event.title}</h3>
+      <p className="text-sm text-gray-600">{event.description}</p>
 
-return (
-  <>
-    <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800 shadow flex flex-col justify-between">
-      <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
-      <p className="text-sm mb-2">{event.description}</p>
-
-      <div className="flex flex-col gap-2 mt-auto mb-2">
-        <button
-          onClick={handleWebAction}
-          disabled={loading || reachedLimit}
-          className={`w-full px-3 py-1 rounded ${
-            stage === 'book'
-              ? 'bg-blue-600 hover:bg-blue-700'
-              : 'bg-yellow-600 hover:bg-yellow-700'
-          } text-white text-sm disabled:opacity-50`}
-        >
-          {getWebButtonLabel()}
-        </button>
+      <div className="mt-2 text-sm">
+        {stage === 'prebook' && (
+          <span>{registeredUsers.pre} / {event.min_attendees} prebooked</span>
+        )}
+        {stage === 'book' && (
+          <span>{registeredUsers.book} / {event.max_attendees} booked</span>
+        )}
       </div>
 
-      <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
-        <span>💰 {event.price > 0 ? `${event.price} USD` : 'Free'}</span>
-        <span>
-          👥 {stage === 'prebook' ? 'Guestlist' : 'Booked'}: {displayCount} /{' '}
-          {event.max_attendees || '∞'}
-        </span>
-      </div>
-    </div>
-
-    {/* Internal Preview Modal */}
-    {internalModalOpen && (
-      <div
-        className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
-        onClick={() => setInternalModalOpen(false)}
+      <button
+        onClick={handleRegisterClick}
+        className="mt-3 px-4 py-2 rounded bg-indigo-600 text-white"
       >
-        <div
-          className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]"
-          onClick={e => e.stopPropagation()}
-        >
-          <h2 className="text-xl font-bold mb-4">{event.name}</h2>
-          <img
-            src={event.image_url || '/default-event.jpg'}
-            alt={event.name}
-            className="w-full h-56 object-contain rounded mb-4"
-          />
-          <p className="mb-2 text-sm text-gray-400">
-            {new Date(event.datetime).toLocaleString()} @ {event.venue} (
-            {event.venue_type || 'N/A'})
-          </p>
-          <p className="mb-4">{event.details}</p>
-          {event.basic_perk && (
-            <p className="text-sm text-gray-300">
-              <strong>Basic Perk:</strong> {event.basic_perk}
-            </p>
-          )}
-          {registeredUsers.book >= 10 && event.advanced_perk && (
-            <p className="text-sm text-gray-300">
-              <strong>Advanced Perk:</strong> {event.advanced_perk}
-            </p>
-          )}
+        {stage === 'prebook' ? 'Prebook' : 'Book Now'}
+      </button>
 
-          {(stage === 'prebook' || stage === 'book') && (
-            <button
-              disabled={isDisabled}
-              onClick={async () => {
-                setInternalModalOpen(false)
-                await handleWebAction()
-              }}
-              className="mt-4 w-full px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              {stage === 'prebook'
-                ? 'Join Guestlist'
-                : !event.price || Number(event.price) === 0
-                ? 'Book Free'
-                : 'Pay Now'}
-            </button>
-          )}
-
-          <button
-            onClick={() => setInternalModalOpen(false)}
-            className="mt-2 px-4 py-2 rounded bg-zinc-700 hover:bg-zinc-600 text-white w-full"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    )}
-
-    {/* Confirmation Modal */}
-    {confirmModalOpen && (
-      <div
-        className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
-        onClick={() => setConfirmModalOpen(false)}
-      >
-        <div
-          className="bg-zinc-900 rounded-2xl shadow-xl max-w-md w-full p-6 text-white relative"
-          onClick={e => e.stopPropagation()}
-        >
-          <h2 className="text-xl font-semibold mb-4 text-center">{event.name}</h2>
-          <p className="mb-6 text-sm text-gray-300 text-center leading-relaxed">
-            By confirming, you declare a genuine interest in participating.
-          </p>
-
-          <div className="flex flex-col gap-4">
-            <label className="flex items-center gap-2 text-xs text-gray-300">
-              <input
-                type="checkbox"
-                checked={agree}
-                onChange={e => setAgree(e.target.checked)}
-              />
-              I agree to guidelines and receive emails for this event.
-            </label>
-
-            <div className="flex gap-2 justify-end">
+      {/* Internal Modal */}
+      {internalModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white p-6 rounded-xl shadow-lg w-[400px]">
+            <h4 className="text-lg font-bold mb-3">Prebook Event</h4>
+            <p className="mb-4">Do you want to prebook this event?</p>
+            <div className="flex gap-3 justify-end">
               <button
-                onClick={() => setConfirmModalOpen(false)}
-                className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-sm"
+                onClick={() => setInternalModalOpen(false)}
+                className="px-3 py-2 rounded bg-gray-200"
               >
                 Cancel
               </button>
               <button
-                disabled={!agree || loading}
                 onClick={async () => {
-                  setConfirmModalOpen(false)
-                  await handleWebAction()
+                  await onRegister(event)
+                  setInternalModalOpen(false)
                 }}
-                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm disabled:opacity-50"
+                className="px-3 py-2 rounded bg-indigo-600 text-white"
               >
-                {stage === 'prebook'
-                  ? 'Join Guestlist'
-                  : !event.price || Number(event.price) === 0
-                  ? 'Book Free'
-                  : 'Pay Now'}
+                Confirm
               </button>
             </div>
           </div>
         </div>
-      </div>
-    )}
-  </>
-)
+      )}
+
+      {/* Confirm Modal */}
+      {confirmModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white p-6 rounded-xl shadow-lg w-[400px]">
+            <h4 className="text-lg font-bold mb-3">Confirm Booking</h4>
+            <label className="flex items-center gap-2 mb-4">
+              <input
+                type="checkbox"
+                checked={agree}
+                onChange={(e) => setAgree(e.target.checked)}
+              />
+              <span>I agree to the terms</span>
+            </label>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmModalOpen(false)}
+                className="px-3 py-2 rounded bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirm}
+                disabled={!agree || isDisabled}
+                className={`px-3 py-2 rounded ${
+                  !agree || isDisabled
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-indigo-600 text-white'
+                }`}
+              >
+                {isDisabled ? 'Processing...' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 
 
