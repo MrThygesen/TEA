@@ -78,9 +78,10 @@ async function sendPrebookEmail(to, event) {
 // --------------------------
 // Upgrade prebook → book email
 // --------------------------
-async function sendUpgradeToBookEmail(to, event) {
+async function sendUpgradeToBookEmail(to, event, user) {
   if (!to || !event) return
   try {
+    // Link goes to event preview with pay option
     const buyUrl = `${BASE_URL}/events/${event.id}?action=buy`
 
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
