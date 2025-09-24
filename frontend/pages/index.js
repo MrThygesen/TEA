@@ -1,8 +1,3 @@
-
-  // rest of the code...
-}
-
-
 'use client'      
 
 import { useState, useEffect } from 'react'
@@ -40,8 +35,6 @@ function computeStage(preCount, minAttendees) {
 // ---------------------------
 // DynamicEventCard
 // ---------------------------
-
-
 
 export function DynamicEventCard({ event, authUser, setShowAccountModal, counters = { prebook: 0, book: 0 }, onUpdateCounters }) {
   const [registeredUsers, setRegisteredUsers] = useState(counters)
