@@ -45,7 +45,29 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, counter
   const [confirmModalOpen, setConfirmModalOpen] = useState(false)
   const [agree, setAgree] = useState(false)
 
-  // Sync counters from parent
+  // -------------------------
+  // Fetch live counts from API
+  // -------------------------
+  useEffect(() => {
+    async function fetchCounters() {
+      try {
+        const res = await fetch(`/api/events/counters?eventId=${event.id}`)
+        if (!res.ok) return
+        const data = await res.json()
+        const preCount = data.prebook_count ?? counters.prebook
+        const bookCount = data.book_count ?? counters.book
+        const newCounters = { prebook: preCount, book: bookCount }
+        setRegisteredUsers(newCounters)
+        setStage(computeStage(preCount, event.min_attendees))
+        if (onUpdateCounters) onUpdateCounters(newCounters)
+      } catch (err) {
+        console.error('Failed to fetch counters', err)
+      }
+    }
+    fetchCounters()
+  }, [event.id, counters, event.min_attendees, onUpdateCounters])
+  
+  // Sync parent counters if changed
   useEffect(() => {
     setRegisteredUsers(counters)
     setStage(computeStage(counters.prebook, event.min_attendees))
@@ -53,6 +75,9 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, counter
 
   const displayCount = stage === 'prebook' ? registeredUsers.prebook : registeredUsers.book
   const isDisabled = loading
+
+  // handleWebAction stays exactly the same...
+}
 
   async function handleWebAction() {
     setLoading(true)
