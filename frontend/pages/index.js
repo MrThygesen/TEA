@@ -26,9 +26,8 @@ function clearAuth() {
 }
 
 // ---------------------------
-// Event Card Component
+// DynamicEventCard
 // ---------------------------
-
 export function DynamicEventCard({ event, authUser, setShowAccountModal, setTicketRefreshTrigger }) {
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
@@ -37,15 +36,28 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
   const [agree, setAgree] = useState(false)
 
   const [registeredUsers, setRegisteredUsers] = useState({
-    prebook: event.prebook_count || 0,
-    book: event.book_count || 0,
+    prebook: 0,
+    book: 0,
   })
-  const [stage, setStage] = useState(event.stage || 'prebook') // initialize with event.stage if available
+  const [stage, setStage] = useState('prebook') // derived from event and min_attendees
 
   const isDisabled = loading
 
   // ---------------------------
-  // Handle Registration safely
+  // Sync counters & stage from props
+  // ---------------------------
+  useEffect(() => {
+    const pre = event.prebook_count || 0
+    const book = event.book_count || 0
+    setRegisteredUsers({ prebook: pre, book })
+    // Determine stage based on min_attendees
+    setStage(pre < (event.min_attendees || 0) ? 'prebook' : 'book')
+  }, [event])
+
+  const displayCount = stage === 'prebook' ? registeredUsers.prebook : registeredUsers.book
+
+  // ---------------------------
+  // Handle Registration
   // ---------------------------
   async function handleWebAction() {
     setLoading(true)
@@ -53,7 +65,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
 
     try {
       const token = localStorage.getItem('token')
-
       if (!token) {
         setShowAccountModal(true)
         return
@@ -67,29 +78,21 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
         },
         body: JSON.stringify({ eventId: event.id }),
       })
-
       const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Registration failed')
 
-      if (!res.ok) {
-        if (data.error === 'Invalid token' || data.error === 'Not authenticated') {
-          setShowAccountModal(true)
-          return
-        }
-        throw new Error(data.error || 'Registration failed')
-      }
-
-      // Merge counters safely
+      // Update counters from API response
       if (data.counters) {
-        setRegisteredUsers(prev => ({
-          prebook: data.counters.prebook_count ?? prev.prebook,
-          book: data.counters.book_count ?? prev.book,
-        }))
+        setRegisteredUsers({
+          prebook: data.counters.prebook_count || 0,
+          book: data.counters.book_count || 0,
+        })
       }
 
-      // Update stage
-      if (data.stage) setStage(data.stage)
+      // Update stage based on min_attendees
+      const preCount = data.counters?.prebook_count || 0
+      setStage(preCount < (event.min_attendees || 0) ? 'prebook' : 'book')
 
-      // Trigger account modal refresh
       if (setTicketRefreshTrigger) setTicketRefreshTrigger(prev => prev + 1)
 
       if (data.clientSecret) {
@@ -97,9 +100,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
         return
       }
 
-      // Status message
-      if (data.stage === 'prebook') setStatusMsg('Added to Guestlist!')
-      else if (data.stage === 'book') setStatusMsg('Booking confirmed!')
+      setStatusMsg(stage === 'prebook' ? 'Added to Guestlist!' : 'Booking confirmed!')
 
     } catch (err) {
       console.error('❌ Registration error:', err)
@@ -122,44 +123,35 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
   }
 
   // ---------------------------
-  // Counter to display
-  // ---------------------------
-  const displayCount = stage === 'prebook' ? registeredUsers.prebook : registeredUsers.book
-
-  // ---------------------------
   // Render
   // ---------------------------
   return (
-    <>
-      <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800 shadow flex flex-col justify-between">
-        <img
-          src={event.image_url || '/default-event.jpg'}
-          alt={event.name}
-          className="w-full h-40 object-cover rounded mb-3"
-        />
-        <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
-        <p className="text-sm mb-2">{event.description?.split(' ').slice(0, 30).join(' ')}...</p>
+    <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800 shadow flex flex-col justify-between">
+      <img src={event.image_url || '/default-event.jpg'} alt={event.name} className="w-full h-40 object-cover rounded mb-3" />
+      <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
+      <p className="text-sm mb-2">{event.description?.split(' ').slice(0, 30).join(' ')}...</p>
 
-        <div className="flex flex-wrap gap-1 mb-2">
-          {[event.tag1, event.tag2, event.tag3].filter(Boolean).map((tag, i) => (
-            <span key={i} className="bg-blue-700 text-xs px-2 py-1 rounded">{tag}</span>
-          ))}
-        </div>
+      <div className="flex flex-wrap gap-1 mb-2">
+        {[event.tag1, event.tag2, event.tag3].filter(Boolean).map((tag, i) => (
+          <span key={i} className="bg-blue-700 text-xs px-2 py-1 rounded">{tag}</span>
+        ))}
+      </div>
 
-        <div className="flex justify-between items-center mt-auto mb-2 gap-2">
-          <button
-            onClick={() => setConfirmModalOpen(true)}
-            disabled={isDisabled}
-            className={`flex-1 px-3 py-1 rounded ${stage === 'book' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-yellow-600 hover:bg-yellow-700'} text-white text-sm disabled:opacity-50`}
-          >
-            {getWebButtonLabel()}
-          </button>
-        </div>
+      <div className="flex justify-between items-center mt-auto mb-2 gap-2">
+        <button
+          onClick={() => setConfirmModalOpen(true)}
+          disabled={isDisabled}
+          className={`flex-1 px-3 py-1 rounded ${stage === 'book' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-yellow-600 hover:bg-yellow-700'} text-white text-sm disabled:opacity-50`}
+        >
+          {getWebButtonLabel()}
+        </button>
+      </div>
 
-        <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
-          <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
-          <span>👥 {stage === 'prebook' ? 'Guestlist' : 'Booked'}: {displayCount}</span>
-        </div>
+      <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
+        <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
+        <span>👥 {stage === 'prebook' ? 'Guestlist' : 'Booked'}: {displayCount}</span>
+      </div>
+    </div>
 
         <button
           onClick={() => setInternalModalOpen(true)}
