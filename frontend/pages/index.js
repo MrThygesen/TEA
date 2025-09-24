@@ -26,90 +26,101 @@ function clearAuth() {
 }
 
 
+// ---------------------------
 // Helpers
 // ---------------------------
 function computeStage(preCount, minAttendees) {
-  return preCount < (minAttendees || 0) ? 'prebook' : 'book';
+  return preCount < (minAttendees || 0) ? 'prebook' : 'book'
 }
 
-// ---------------------------
-// DynamicEventCard
-// ---------------------------
-export function DynamicEventCard({ event, authUser, setShowAccountModal, counters = { prebook: 0, book: 0 }, onUpdateCounters }) {
-  const [registeredUsers, setRegisteredUsers] = useState(counters)
-  const [stage, setStage] = useState(computeStage(counters.prebook, event.min_attendees))
+export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
+  const [counters, setCounters] = useState({ prebook_count: 0, book_count: 0 })
+  const [stage, setStage] = useState(
+    event.is_confirmed ? 'book' : computeStage(0, event.min_attendees)
+  )
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
+  const [userTickets, setUserTickets] = useState(0)
+  const [maxPerUser, setMaxPerUser] = useState(event.tag1 === 'group' ? 5 : 1)
+
+  // 🔹 add missing state
   const [internalModalOpen, setInternalModalOpen] = useState(false)
   const [confirmModalOpen, setConfirmModalOpen] = useState(false)
   const [agree, setAgree] = useState(false)
+  const [registeredUsers, setRegisteredUsers] = useState({ prebook: 0, book: 0 })
+  const [isDisabled, setIsDisabled] = useState(false)
 
-  // --- Fetch counters from API when component mounts ---
+  // ... your existing effects and handleWebAction() ...
+  // Fetch counters + recompute stage
   useEffect(() => {
     async function fetchCounters() {
       try {
         const res = await fetch(`/api/events/counters?eventId=${event.id}`)
-        if (!res.ok) throw new Error('Failed to fetch counters')
-        const data = await res.json()
-        const newCounters = { prebook: data.prebook_count || 0, book: data.book_count || 0 }
-        setRegisteredUsers(newCounters)
-        setStage(computeStage(newCounters.prebook, event.min_attendees))
-        if (onUpdateCounters) onUpdateCounters(newCounters)
+        if (res.ok) {
+          const data = await res.json()
+          const newStage = event.is_confirmed
+            ? 'book'
+            : computeStage(data.prebook_count, event.min_attendees)
+          setCounters(data)
+          setStage(newStage)
+        }
       } catch (err) {
-        console.error('Error fetching event counters:', err)
+        console.error('❌ Failed counters:', err)
       }
     }
-
     fetchCounters()
-  }, [event.id])
+  }, [event.id, event.min_attendees, event.is_confirmed])
 
-  // Sync counters from parent if they change
+  // Fetch user registrations for this event
   useEffect(() => {
-    setRegisteredUsers(counters)
-    setStage(computeStage(counters.prebook, event.min_attendees))
-  }, [counters, event.min_attendees])
+    async function fetchMe() {
+      if (!authUser) return
+      try {
+        const token = localStorage.getItem('token')
+        if (!token) return
+        const res = await fetch('/api/user/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        const reg = (data.registrations || []).find(r => r.event_id === event.id)
+        if (reg) {
+          setUserTickets(reg.user_tickets || 1)
+          setMaxPerUser(reg.max_per_user || (event.tag1 === 'group' ? 5 : 1))
+        }
+      } catch (err) {
+        console.error('❌ Failed me:', err)
+      }
+    }
+    fetchMe()
+  }, [authUser, event.id, event.tag1])
 
-  const displayCount = stage === 'prebook' ? registeredUsers.prebook : registeredUsers.book
-  const isDisabled = loading
+  const displayCount = stage === 'prebook' ? counters.prebook_count : counters.book_count
+  const reachedLimit = userTickets >= maxPerUser
 
-  // --- Handle registration ---
   async function handleWebAction() {
     setLoading(true)
-    setStatusMsg(stage === 'prebook' ? 'Joining...' : 'Booking...')
-
+    setStatusMsg(stage === 'prebook' ? 'Joining…' : 'Booking…')
     try {
       const token = localStorage.getItem('token')
       if (!token) {
         setShowAccountModal(true)
         return
       }
-
       const res = await fetch('/api/events/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ eventId: event.id })
+        body: JSON.stringify({ eventId: event.id }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Registration failed')
 
-      if (data.counters) {
-        const preCount = data.counters.prebook_count ?? registeredUsers.prebook
-        const bookCount = data.counters.book_count ?? registeredUsers.book
-
-        const newStage = computeStage(preCount, event.min_attendees)
-        const newCounters = { prebook: preCount, book: bookCount }
-
-        setRegisteredUsers(newCounters)
-        setStage(newStage)
-
-        if (onUpdateCounters) onUpdateCounters(newCounters)
-
-        setStatusMsg(newStage === 'prebook' ? 'Added to Guestlist!' : 'Booking confirmed!')
-      }
-
-      if (data.clientSecret) setStatusMsg('Redirecting to payment…')
+      setCounters(data.counters)
+      setStage(data.stage)
+      setUserTickets(prev => prev + 1)
+      setStatusMsg(stage === 'prebook' ? 'Added to Guestlist!' : 'Booking confirmed!')
     } catch (err) {
-      console.error('❌ Registration error:', err)
+      console.error('❌ Registration:', err)
       setStatusMsg('Error registering')
     } finally {
       setLoading(false)
@@ -118,6 +129,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, counter
   }
 
   function getWebButtonLabel() {
+    if (reachedLimit) return `Max ${maxPerUser} tickets`
     if (loading) return statusMsg || (stage === 'prebook' ? 'Guestlist…' : 'Processing…')
     if (statusMsg) return statusMsg
     if (stage === 'prebook') return 'Join Guestlist'
@@ -125,92 +137,144 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, counter
     return 'Registration Closed'
   }
 
+
   return (
     <>
+      {/* Main Event Card */}
       <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800 shadow flex flex-col justify-between">
-        <img src={event.image_url || '/default-event.jpg'} alt={event.name} className="w-full h-40 object-cover rounded mb-3" />
         <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
-        <p className="text-sm mb-2">{event.description?.split(' ').slice(0, 30).join(' ')}...</p>
-
-        <div className="flex flex-wrap gap-1 mb-2">
-          {[event.tag1, event.tag2, event.tag3].filter(Boolean).map((tag, i) => (
-            <span key={i} className="bg-blue-700 text-xs px-2 py-1 rounded">{tag}</span>
-          ))}
-        </div>
+        <p className="text-sm mb-2">{event.description}</p>
 
         <div className="flex flex-col gap-2 mt-auto mb-2">
           <button
-            onClick={() => setConfirmModalOpen(true)}
-            disabled={isDisabled}
-            className={`w-full px-3 py-1 rounded ${stage === 'book' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-yellow-600 hover:bg-yellow-700'} text-white text-sm disabled:opacity-50`}
+            onClick={() => setInternalModalOpen(true)}
+            disabled={loading || userTickets >= maxPerUser}
+            className={`w-full px-3 py-1 rounded ${
+              stage === 'book'
+                ? 'bg-blue-600 hover:bg-blue-700'
+                : 'bg-yellow-600 hover:bg-yellow-700'
+            } text-white text-sm disabled:opacity-50`}
           >
             {getWebButtonLabel()}
-          </button>
-
-          <button
-            onClick={() => setInternalModalOpen(true)}
-            className="w-full px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-sm"
-          >
-            Preview
           </button>
         </div>
 
         <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
-          <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
-          <span>👥 {stage === 'prebook' ? 'Guestlist' : 'Booked'}: {displayCount}</span>
+          <span>💰 {event.price > 0 ? `${event.price} USD` : 'Free'}</span>
+          <span>
+            👥 {stage === 'prebook' ? 'Guestlist' : 'Booked'}:{" "}
+            {stage === 'prebook' ? counters.prebook_count : counters.book_count} /{" "}
+            {event.max_attendees || '∞'}
+          </span>
         </div>
       </div>
 
-       {/* Internal Preview Modal */}
+      {/* Internal Preview Modal */}
       {internalModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={() => setInternalModalOpen(false)}>
-          <div className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          onClick={() => setInternalModalOpen(false)}
+        >
+          <div
+            className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="text-xl font-bold mb-4">{event.name}</h2>
-            <img src={event.image_url || '/default-event.jpg'} alt={event.name} className="w-full h-56 object-contain rounded mb-4"/>
-            <p className="mb-2 text-sm text-gray-400">{new Date(event.datetime).toLocaleString()} @ {event.venue} ({event.venue_type || 'N/A'})</p>
+            <img
+              src={event.image_url || '/default-event.jpg'}
+              alt={event.name}
+              className="w-full h-56 object-contain rounded mb-4"
+            />
+            <p className="mb-2 text-sm text-gray-400">
+              {new Date(event.datetime).toLocaleString()} @ {event.venue} (
+              {event.venue_type || 'N/A'})
+            </p>
             <p className="mb-4">{event.details}</p>
-            {event.basic_perk && <p className="text-sm text-gray-300"><strong>Basic Perk:</strong> {event.basic_perk}</p>}
-            {registeredUsers.book >= 10 && event.advanced_perk && <p className="text-sm text-gray-300"><strong>Advanced Perk:</strong> {event.advanced_perk}</p>}
+            {event.basic_perk && (
+              <p className="text-sm text-gray-300">
+                <strong>Basic Perk:</strong> {event.basic_perk}
+              </p>
+            )}
+            {registeredUsers.book >= 10 && event.advanced_perk && (
+              <p className="text-sm text-gray-300">
+                <strong>Advanced Perk:</strong> {event.advanced_perk}
+              </p>
+            )}
 
-            {/* Buy Now / Join Guestlist inside modal */}
             {(stage === 'prebook' || stage === 'book') && (
               <button
                 disabled={isDisabled}
-                onClick={async () => { setInternalModalOpen(false); await handleWebAction() }}
+                onClick={async () => {
+                  setInternalModalOpen(false)
+                  await handleWebAction()
+                }}
                 className="mt-4 w-full px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
               >
-                {stage === 'prebook' ? 'Join Guestlist' : !event.price || Number(event.price) === 0 ? 'Book Free' : 'Pay Now'}
+                {stage === 'prebook'
+                  ? 'Join Guestlist'
+                  : !event.price || Number(event.price) === 0
+                  ? 'Book Free'
+                  : 'Pay Now'}
               </button>
             )}
 
-            <button onClick={() => setInternalModalOpen(false)} className="mt-2 px-4 py-2 rounded bg-zinc-700 hover:bg-zinc-600 text-white w-full">Close</button>
+            <button
+              onClick={() => setInternalModalOpen(false)}
+              className="mt-2 px-4 py-2 rounded bg-zinc-700 hover:bg-zinc-600 text-white w-full"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}
 
       {/* Confirmation Modal */}
       {confirmModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" onClick={() => setConfirmModalOpen(false)}>
-          <div className="bg-zinc-900 rounded-2xl shadow-xl max-w-md w-full p-6 text-white relative" onClick={e => e.stopPropagation()}>
-            <h2 className="text-xl font-semibold mb-4 text-center">{event.name}</h2>
+        <div
+          className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
+          onClick={() => setConfirmModalOpen(false)}
+        >
+          <div
+            className="bg-zinc-900 rounded-2xl shadow-xl max-w-md w-full p-6 text-white relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-semibold mb-4 text-center">
+              {event.name}
+            </h2>
             <p className="mb-6 text-sm text-gray-300 text-center leading-relaxed">
               By confirming, you declare a genuine interest in participating.
             </p>
 
             <div className="flex flex-col gap-4">
               <label className="flex items-center gap-2 text-xs text-gray-300">
-                <input type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)} />
+                <input
+                  type="checkbox"
+                  checked={agree}
+                  onChange={(e) => setAgree(e.target.checked)}
+                />
                 I agree to guidelines and receive emails for this event.
               </label>
 
               <div className="flex gap-2 justify-end">
-                <button onClick={() => setConfirmModalOpen(false)} className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-sm">Cancel</button>
+                <button
+                  onClick={() => setConfirmModalOpen(false)}
+                  className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-sm"
+                >
+                  Cancel
+                </button>
                 <button
                   disabled={!agree || loading}
-                  onClick={async () => { setConfirmModalOpen(false); await handleWebAction() }}
+                  onClick={async () => {
+                    setConfirmModalOpen(false)
+                    await handleWebAction()
+                  }}
                   className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm disabled:opacity-50"
                 >
-                  {stage === 'prebook' ? 'Join Guestlist' : !event.price || Number(event.price) === 0 ? 'Book Free' : 'Pay Now'}
+                  {stage === 'prebook'
+                    ? 'Join Guestlist'
+                    : !event.price || Number(event.price) === 0
+                    ? 'Book Free'
+                    : 'Pay Now'}
                 </button>
               </div>
             </div>
