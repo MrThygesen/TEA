@@ -28,7 +28,7 @@ function clearAuth() {
 // ---------------------------
 // Event Card Component
 // ---------------------------
-			
+
 export function DynamicEventCard({ event, authUser, setShowAccountModal, setTicketRefreshTrigger }) {
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
@@ -40,7 +40,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
     prebook: event.prebook_count || 0,
     book: event.book_count || 0,
   })
-  const [stage, setStage] = useState('prebook') // default, updated by API
+  const [stage, setStage] = useState(event.stage || 'prebook') // initialize with event.stage if available
 
   const isDisabled = loading
 
@@ -55,7 +55,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
       const token = localStorage.getItem('token')
 
       if (!token) {
-        console.warn('No token found, showing login modal')
         setShowAccountModal(true)
         return
       }
@@ -73,20 +72,21 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
 
       if (!res.ok) {
         if (data.error === 'Invalid token' || data.error === 'Not authenticated') {
-          console.warn('Invalid token, forcing login modal')
           setShowAccountModal(true)
           return
         }
         throw new Error(data.error || 'Registration failed')
       }
 
-      // Update counters & stage
+      // Merge counters safely
       if (data.counters) {
-        setRegisteredUsers({
-          prebook: data.counters.prebook_count || 0,
-          book: data.counters.book_count || 0,
-        })
+        setRegisteredUsers(prev => ({
+          prebook: data.counters.prebook_count ?? prev.prebook,
+          book: data.counters.book_count ?? prev.book,
+        }))
       }
+
+      // Update stage
       if (data.stage) setStage(data.stage)
 
       // Trigger account modal refresh
@@ -97,6 +97,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
         return
       }
 
+      // Status message
       if (data.stage === 'prebook') setStatusMsg('Added to Guestlist!')
       else if (data.stage === 'book') setStatusMsg('Booking confirmed!')
 
@@ -119,6 +120,11 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
     if (stage === 'book') return !event.price || Number(event.price) === 0 ? 'Book Free' : 'Pay Now'
     return 'Registration Closed'
   }
+
+  // ---------------------------
+  // Counter to display
+  // ---------------------------
+  const displayCount = stage === 'prebook' ? registeredUsers.prebook : registeredUsers.book
 
   // ---------------------------
   // Render
@@ -152,7 +158,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
 
         <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
           <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
-          <span>👥 Guestlist: {registeredUsers.prebook} | Booked: {registeredUsers.book}</span>
+          <span>👥 {stage === 'prebook' ? 'Guestlist' : 'Booked'}: {displayCount}</span>
         </div>
 
         <button
@@ -162,6 +168,13 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
           Preview
         </button>
       </div>
+
+      {/* Internal Modal & Confirmation Modal (same as before) */}
+    </>
+  )
+}
+
+			
 
       {/* Internal Modal */}
       {internalModalOpen && (
