@@ -152,14 +152,9 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
         <span>👥 {stage === 'prebook' ? 'Guestlist' : 'Booked'}: {displayCount}</span>
       </div>
     </div>
+  )
+}
 
-        <button
-          onClick={() => setInternalModalOpen(true)}
-          className="mt-2 w-full px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-sm"
-        >
-          Preview
-        </button>
-      </div>
 
       {/* Internal Modal */}
       {internalModalOpen && (
