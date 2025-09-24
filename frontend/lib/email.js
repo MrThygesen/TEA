@@ -76,6 +76,39 @@ async function sendPrebookEmail(to, event) {
 }
 
 // --------------------------
+// Upgrade prebook → book email
+// --------------------------
+async function sendUpgradeToBookEmail(to, event) {
+  if (!to || !event) return
+  try {
+    const buyUrl = `${BASE_URL}/events/${event.id}?action=buy`
+
+    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
+    sendSmtpEmail.sender = { name: 'Edgy Events', email: MAIL_FROM }
+    sendSmtpEmail.to = [{ email: to }]
+    sendSmtpEmail.subject = `Event Confirmed: ${event.name}`
+    sendSmtpEmail.htmlContent = `
+      <h1>Great news 🎉</h1>
+      <p>The event you prebooked is now confirmed and ready for booking:</p>
+      <p><strong>${event.name}</strong> (${event.city || 'TBA'})</p>
+      <p>Date/Time: ${event.datetime ? new Date(event.datetime).toLocaleString() : 'TBA'}</p>
+      <p>Venue: ${event.venue || 'TBA'}</p>
+      <p style="margin: 20px 0;">
+        <a href="${buyUrl}" style="background-color:#4CAF50;color:white;padding:12px 24px;text-decoration:none;border-radius:5px;display:inline-block;">Book Now</a>
+      </p>
+      <p>If the button doesn’t work, copy this link:</p>
+      <p>${buyUrl}</p>
+    `
+    await apiInstance.sendTransacEmail(sendSmtpEmail)
+    console.log('✅ Upgrade-to-book email sent to', to)
+  } catch (err) {
+    console.error('❌ Failed to send upgrade-to-book email:', err?.response?.body || err)
+  }
+}
+
+
+
+// --------------------------
 // Ticket email
 // --------------------------
 async function sendTicketEmail(to, event, user) {
@@ -123,5 +156,6 @@ module.exports = {
   sendVerificationEmail,
   sendPrebookEmail,
   sendTicketEmail,
+  sendUpgradeToBookEmail,
 }
 
