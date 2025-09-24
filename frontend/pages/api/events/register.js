@@ -43,7 +43,10 @@ export default async function handler(req, res) {
     const { eventId } = req.body
     if (!eventId) return res.status(400).json({ error: 'Missing eventId' })
 
-    const { rows: events } = await pool.query('SELECT * FROM events WHERE id=$1', [eventId])
+    const { rows: events } = await pool.query(
+      'SELECT * FROM events WHERE id=$1',
+      [eventId]
+    )
     if (!events.length) return res.status(404).json({ error: 'Event not found' })
     const event = events[0]
 
@@ -160,47 +163,30 @@ export default async function handler(req, res) {
     let registration
     let clientSecret = null
 
-    if (stage === 'prebook') {
-      // Prebook only
-      const { rows } = await pool.query(
-        `INSERT INTO registrations
-         (event_id, user_id, stage)
-         VALUES ($1,$2,'prebook')
-         RETURNING *`,
-        [eventId, userId]
-      )
-      registration = rows[0]
-
-      if (user.email) {
-        try {
-          await sendPrebookEmail(user.email, event)
-        } catch (err) {
-          console.warn('Email sending failed:', err)
-        }
-      }
-
-      counters.prebook_count += 1
-    } else if (price === 0) {
-      // Free booking
+    if (stage === 'prebook' || price === 0) {
+      // Prebook / free booking
       const { rows } = await pool.query(
         `INSERT INTO registrations
          (event_id, user_id, stage, ticket_code, ticket_sent)
-         VALUES ($1,$2,'book',$3,TRUE)
+         VALUES ($1,$2,$3,$4,$5)
          RETURNING *`,
-        [eventId, userId, ticketCode]
+        [eventId, userId, stage, ticketCode, price === 0]
       )
       registration = rows[0]
 
       if (user.email) {
         try {
-          await sendTicketEmail(user.email, event, { ...user, ticket_code: ticketCode })
+          if (stage === 'prebook') {
+            await sendPrebookEmail(user.email, event)
+          } else {
+            await sendTicketEmail(user.email, event, { ...user, ticket_code: ticketCode })
+          }
         } catch (err) {
           console.warn('Email sending failed:', err)
         }
       }
 
-      counters.book_count += 1
-      stage = 'book'
+      counters[stage + '_count'] += 1
     } else {
       // Paid booking
       let paymentIntent
@@ -225,7 +211,6 @@ export default async function handler(req, res) {
       )
       registration = rows[0]
       clientSecret = paymentIntent.client_secret
-
       counters.book_count += 1
       stage = 'book'
     }
