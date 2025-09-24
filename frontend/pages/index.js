@@ -150,8 +150,10 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
       </div>
     </div>
 
-       {/* Internal Preview Modal */}
+    <>
+      {/* Internal Preview Modal */}
       {internalModalOpen && (
+
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={() => setInternalModalOpen(false)}>
           <div className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
             <h2 className="text-xl font-bold mb-4">{event.name}</h2>
