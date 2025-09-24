@@ -28,9 +28,8 @@ function clearAuth() {
 
 // Helpers
 // ---------------------------
-function computeStage(preCount, minAttendees) {
-  return preCount < (minAttendees || 0) ? 'prebook' : 'book';
-}
+//function computeStage(preCount, minAttendees) {
+//  return preCount < (minAttendees || 0) ? 'prebook' : 'book'; }
 
 // ---------------------------
 // DynamicEventCard
