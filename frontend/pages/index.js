@@ -76,8 +76,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, counter
   const displayCount = stage === 'prebook' ? registeredUsers.prebook : registeredUsers.book
   const isDisabled = loading
 
-  // handleWebAction stays exactly the same...
-}
+  // handleWebAction stays exactly the same...}
 
   async function handleWebAction() {
     setLoading(true)
