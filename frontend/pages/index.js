@@ -35,36 +35,25 @@ function computeStage(preCount, minAttendees) {
 // ---------------------------
 // DynamicEventCard
 // ---------------------------
-export function DynamicEventCard({ event, authUser, setShowAccountModal, setTicketRefreshTrigger }) {
+export function DynamicEventCard({ event, authUser, setShowAccountModal, counters, onUpdateCounters }) {
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
   const [internalModalOpen, setInternalModalOpen] = useState(false)
   const [confirmModalOpen, setConfirmModalOpen] = useState(false)
   const [agree, setAgree] = useState(false)
 
-  const [registeredUsers, setRegisteredUsers] = useState({
-    prebook: event.prebook_count || 0,
-    book: event.book_count || 0,
-  })
-  const [stage, setStage] = useState(computeStage(registeredUsers.prebook, event.min_attendees))
+  const [registeredUsers, setRegisteredUsers] = useState(counters)
+  const [stage, setStage] = useState(computeStage(counters.prebook, event.min_attendees))
 
-  const isDisabled = loading
-
-  // ---------------------------
-  // Sync counters & stage from props
-  // ---------------------------
+  // Sync counters from parent
   useEffect(() => {
-    const pre = event.prebook_count || 0
-    const book = event.book_count || 0
-    setRegisteredUsers(prev => ({ prebook: Math.max(prev.prebook, pre), book: Math.max(prev.book, book) }))
-    setStage(computeStage(Math.max(registeredUsers.prebook, pre), event.min_attendees))
-  }, [event])
+    setRegisteredUsers(counters)
+    setStage(computeStage(counters.prebook, event.min_attendees))
+  }, [counters, event.min_attendees])
 
   const displayCount = stage === 'prebook' ? registeredUsers.prebook : registeredUsers.book
+  const isDisabled = loading
 
-  // ---------------------------
-  // Handle Registration
-  // ---------------------------
   async function handleWebAction() {
     setLoading(true)
     setStatusMsg(stage === 'prebook' ? 'Joining...' : 'Booking...')
@@ -78,35 +67,28 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
 
       const res = await fetch('/api/events/register', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ eventId: event.id }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ eventId: event.id })
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Registration failed')
 
-      // --- Update counts and stage ---
       if (data.counters) {
         const preCount = data.counters.prebook_count ?? registeredUsers.prebook
         const bookCount = data.counters.book_count ?? registeredUsers.book
 
-        setRegisteredUsers({ prebook: preCount, book: bookCount })
-
         const newStage = computeStage(preCount, event.min_attendees)
+        const newCounters = { prebook: preCount, book: bookCount }
+
+        setRegisteredUsers(newCounters)
         setStage(newStage)
+
+        if (onUpdateCounters) onUpdateCounters(newCounters)
 
         setStatusMsg(newStage === 'prebook' ? 'Added to Guestlist!' : 'Booking confirmed!')
       }
 
-      if (setTicketRefreshTrigger) setTicketRefreshTrigger(prev => prev + 1)
-
-      if (data.clientSecret) {
-        setStatusMsg('Redirecting to payment…')
-        return
-      }
-
+      if (data.clientSecret) setStatusMsg('Redirecting to payment…')
     } catch (err) {
       console.error('❌ Registration error:', err)
       setStatusMsg('Error registering')
@@ -127,11 +109,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
   return (
     <>
       <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800 shadow flex flex-col justify-between">
-        <img
-          src={event.image_url || '/default-event.jpg'}
-          alt={event.name}
-          className="w-full h-40 object-cover rounded mb-3"
-        />
+        <img src={event.image_url || '/default-event.jpg'} alt={event.name} className="w-full h-40 object-cover rounded mb-3" />
         <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
         <p className="text-sm mb-2">{event.description?.split(' ').slice(0, 30).join(' ')}...</p>
 
@@ -141,13 +119,22 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
           ))}
         </div>
 
-        <div className="flex justify-between items-center mt-auto mb-2 gap-2">
+        <div className="flex flex-col gap-2 mt-auto mb-2">
+          {/* Main action button */}
           <button
             onClick={() => setConfirmModalOpen(true)}
             disabled={isDisabled}
-            className={`flex-1 px-3 py-1 rounded ${stage === 'book' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-yellow-600 hover:bg-yellow-700'} text-white text-sm disabled:opacity-50`}
+            className={`w-full px-3 py-1 rounded ${stage === 'book' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-yellow-600 hover:bg-yellow-700'} text-white text-sm disabled:opacity-50`}
           >
             {getWebButtonLabel()}
+          </button>
+
+          {/* Preview button */}
+          <button
+            onClick={() => setInternalModalOpen(true)}
+            className="w-full px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-sm"
+          >
+            Preview
           </button>
         </div>
 
@@ -155,16 +142,9 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
           <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
           <span>👥 {stage === 'prebook' ? 'Guestlist' : 'Booked'}: {displayCount}</span>
         </div>
-
-        <button
-          onClick={() => setInternalModalOpen(true)}
-          className="mt-2 w-full px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-sm"
-        >
-          Preview
-        </button>
       </div>
 
-      {/* Internal Modal */}
+      {/* Internal Preview Modal */}
       {internalModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={() => setInternalModalOpen(false)}>
           <div className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
@@ -174,7 +154,19 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
             <p className="mb-4">{event.details}</p>
             {event.basic_perk && <p className="text-sm text-gray-300"><strong>Basic Perk:</strong> {event.basic_perk}</p>}
             {registeredUsers.book >= 10 && event.advanced_perk && <p className="text-sm text-gray-300"><strong>Advanced Perk:</strong> {event.advanced_perk}</p>}
-            <button onClick={() => setInternalModalOpen(false)} className="mt-6 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">Close</button>
+
+            {/* Buy Now / Join Guestlist inside modal */}
+            {(stage === 'prebook' || stage === 'book') && (
+              <button
+                disabled={isDisabled}
+                onClick={async () => { setInternalModalOpen(false); await handleWebAction() }}
+                className="mt-4 w-full px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {stage === 'prebook' ? 'Join Guestlist' : !event.price || Number(event.price) === 0 ? 'Book Free' : 'Pay Now'}
+              </button>
+            )}
+
+            <button onClick={() => setInternalModalOpen(false)} className="mt-2 px-4 py-2 rounded bg-zinc-700 hover:bg-zinc-600 text-white w-full">Close</button>
           </div>
         </div>
       )}
@@ -198,10 +190,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
                 <button onClick={() => setConfirmModalOpen(false)} className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-sm">Cancel</button>
                 <button
                   disabled={!agree || loading}
-                  onClick={async () => {
-                    setConfirmModalOpen(false)
-                    await handleWebAction()
-                  }}
+                  onClick={async () => { setConfirmModalOpen(false); await handleWebAction() }}
                   className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm disabled:opacity-50"
                 >
                   {stage === 'prebook' ? 'Join Guestlist' : !event.price || Number(event.price) === 0 ? 'Book Free' : 'Pay Now'}
@@ -214,6 +203,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, setTick
     </>
   )
 }
+
 
 
 function VideoHero() {
