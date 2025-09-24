@@ -27,89 +27,85 @@ function clearAuth() {
 
 
 // Helpers
-// ---------------------------
 function computeStage(preCount, minAttendees) {
-  return preCount < (minAttendees || 0) ? 'prebook' : 'book';
+  return preCount < (minAttendees || 0) ? 'prebook' : 'book'
 }
 
-// ---------------------------
-// DynamicEventCard
-// ---------------------------
-export function DynamicEventCard({ event, authUser, setShowAccountModal, counters = { prebook: 0, book: 0 }, onUpdateCounters }) {
-  const [registeredUsers, setRegisteredUsers] = useState(counters)
-  const [stage, setStage] = useState(computeStage(counters.prebook, event.min_attendees))
+export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
+  const [counters, setCounters] = useState({ prebook_count: 0, book_count: 0 })
+  const [stage, setStage] = useState(computeStage(0, event.min_attendees))
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
-  const [internalModalOpen, setInternalModalOpen] = useState(false)
-  const [confirmModalOpen, setConfirmModalOpen] = useState(false)
-  const [agree, setAgree] = useState(false)
+  const [userTickets, setUserTickets] = useState(0)
+  const [maxPerUser, setMaxPerUser] = useState(event.tag1 === 'group' ? 5 : 1)
 
-  // --- Fetch counters from API when component mounts ---
+  // Fetch counters + user info
   useEffect(() => {
     async function fetchCounters() {
       try {
         const res = await fetch(`/api/events/counters?eventId=${event.id}`)
-        if (!res.ok) throw new Error('Failed to fetch counters')
-        const data = await res.json()
-        const newCounters = { prebook: data.prebook_count || 0, book: data.book_count || 0 }
-        setRegisteredUsers(newCounters)
-        setStage(computeStage(newCounters.prebook, event.min_attendees))
-        if (onUpdateCounters) onUpdateCounters(newCounters)
+        if (res.ok) {
+          const data = await res.json()
+          const newStage = computeStage(data.prebook_count, event.min_attendees)
+          setCounters(data)
+          setStage(newStage)
+        }
       } catch (err) {
-        console.error('Error fetching event counters:', err)
+        console.error('❌ Failed counters:', err)
       }
     }
-
     fetchCounters()
-  }, [event.id])
+  }, [event.id, event.min_attendees])
 
-  // Sync counters from parent if they change
   useEffect(() => {
-    setRegisteredUsers(counters)
-    setStage(computeStage(counters.prebook, event.min_attendees))
-  }, [counters, event.min_attendees])
+    async function fetchMe() {
+      if (!authUser) return
+      try {
+        const token = localStorage.getItem('token')
+        if (!token) return
+        const res = await fetch('/api/user/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        const reg = (data.registrations || []).find(r => r.event_id === event.id)
+        if (reg) {
+          setUserTickets(reg.user_tickets)
+          setMaxPerUser(reg.max_per_user)
+        }
+      } catch (err) {
+        console.error('❌ Failed me:', err)
+      }
+    }
+    fetchMe()
+  }, [authUser, event.id])
 
-  const displayCount = stage === 'prebook' ? registeredUsers.prebook : registeredUsers.book
-  const isDisabled = loading
+  const displayCount = stage === 'prebook' ? counters.prebook_count : counters.book_count
+  const reachedLimit = userTickets >= maxPerUser
 
-  // --- Handle registration ---
   async function handleWebAction() {
     setLoading(true)
-    setStatusMsg(stage === 'prebook' ? 'Joining...' : 'Booking...')
-
+    setStatusMsg(stage === 'prebook' ? 'Joining…' : 'Booking…')
     try {
       const token = localStorage.getItem('token')
       if (!token) {
         setShowAccountModal(true)
         return
       }
-
       const res = await fetch('/api/events/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ eventId: event.id })
+        body: JSON.stringify({ eventId: event.id }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Registration failed')
 
-      if (data.counters) {
-        const preCount = data.counters.prebook_count ?? registeredUsers.prebook
-        const bookCount = data.counters.book_count ?? registeredUsers.book
-
-        const newStage = computeStage(preCount, event.min_attendees)
-        const newCounters = { prebook: preCount, book: bookCount }
-
-        setRegisteredUsers(newCounters)
-        setStage(newStage)
-
-        if (onUpdateCounters) onUpdateCounters(newCounters)
-
-        setStatusMsg(newStage === 'prebook' ? 'Added to Guestlist!' : 'Booking confirmed!')
-      }
-
-      if (data.clientSecret) setStatusMsg('Redirecting to payment…')
+      setCounters(data.counters)
+      setStage(data.stage)
+      setUserTickets(prev => prev + 1)
+      setStatusMsg(stage === 'prebook' ? 'Added to Guestlist!' : 'Booking confirmed!')
     } catch (err) {
-      console.error('❌ Registration error:', err)
+      console.error('❌ Registration:', err)
       setStatusMsg('Error registering')
     } finally {
       setLoading(false)
@@ -118,6 +114,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, counter
   }
 
   function getWebButtonLabel() {
+    if (reachedLimit) return `Max ${maxPerUser} tickets`
     if (loading) return statusMsg || (stage === 'prebook' ? 'Guestlist…' : 'Processing…')
     if (statusMsg) return statusMsg
     if (stage === 'prebook') return 'Join Guestlist'
@@ -126,40 +123,32 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, counter
   }
 
   return (
-    <>
-      <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800 shadow flex flex-col justify-between">
-        <img src={event.image_url || '/default-event.jpg'} alt={event.name} className="w-full h-40 object-cover rounded mb-3" />
-        <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
-        <p className="text-sm mb-2">{event.description?.split(' ').slice(0, 30).join(' ')}...</p>
+    <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800 shadow flex flex-col justify-between">
+      <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
+      <p className="text-sm mb-2">{event.description}</p>
 
-        <div className="flex flex-wrap gap-1 mb-2">
-          {[event.tag1, event.tag2, event.tag3].filter(Boolean).map((tag, i) => (
-            <span key={i} className="bg-blue-700 text-xs px-2 py-1 rounded">{tag}</span>
-          ))}
-        </div>
-
-        <div className="flex flex-col gap-2 mt-auto mb-2">
-          <button
-            onClick={() => setConfirmModalOpen(true)}
-            disabled={isDisabled}
-            className={`w-full px-3 py-1 rounded ${stage === 'book' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-yellow-600 hover:bg-yellow-700'} text-white text-sm disabled:opacity-50`}
-          >
-            {getWebButtonLabel()}
-          </button>
-
-          <button
-            onClick={() => setInternalModalOpen(true)}
-            className="w-full px-3 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-sm"
-          >
-            Preview
-          </button>
-        </div>
-
-        <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
-          <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
-          <span>👥 {stage === 'prebook' ? 'Guestlist' : 'Booked'}: {displayCount}</span>
-        </div>
+      <div className="flex flex-col gap-2 mt-auto mb-2">
+        <button
+          onClick={handleWebAction}
+          disabled={loading || reachedLimit}
+          className={`w-full px-3 py-1 rounded ${
+            stage === 'book'
+              ? 'bg-blue-600 hover:bg-blue-700'
+              : 'bg-yellow-600 hover:bg-yellow-700'
+          } text-white text-sm disabled:opacity-50`}
+        >
+          {getWebButtonLabel()}
+        </button>
       </div>
+
+      <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
+        <span>💰 {event.price > 0 ? `${event.price} USD` : 'Free'}</span>
+        <span>
+          👥 {stage === 'prebook' ? 'Guestlist' : 'Booked'}: {displayCount} /{' '}
+          {event.max_attendees || '∞'}
+        </span>
+      </div>
+    </div>
 
        {/* Internal Preview Modal */}
       {internalModalOpen && (
