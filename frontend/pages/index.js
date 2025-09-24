@@ -35,16 +35,6 @@ function computeStage(preCount, minAttendees) {
 // ---------------------------
 // DynamicEventCard
 // ---------------------------
-// ---------------------------
-// DynamicEventCard
-// ---------------------------
-import { useState, useEffect } from 'react'
-
-// Helper: compute stage
-function computeStage(preCount, minAttendees) {
-  return preCount < (minAttendees || 0) ? 'prebook' : 'book';
-}
-
 export function DynamicEventCard({ event, authUser, setShowAccountModal, counters = { prebook: 0, book: 0 }, onUpdateCounters }) {
   const [registeredUsers, setRegisteredUsers] = useState(counters)
   const [stage, setStage] = useState(computeStage(counters.prebook, event.min_attendees))
