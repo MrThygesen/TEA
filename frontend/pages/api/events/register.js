@@ -103,18 +103,76 @@ export default async function handler(req, res) {
       }
     }
 
-// --------------------------
-// Check existing ticket count
-// --------------------------
-const { rows: existingTickets } = await pool.query(
-  `SELECT COUNT(*)::int AS count FROM registrations WHERE event_id=$1 AND user_id=$2`,
-  [eventId, userId]
-)
-const userTickets = existingTickets[0].count
-const maxPerUser = event.tag1 === 'group' ? 5 : 1
-if (userTickets >= maxPerUser) {
-  return res.status(400).json({ error: `Max ${maxPerUser} tickets per user reached`, counters })
-}
+    // --------------------------
+    // Check existing registration
+    // --------------------------
+    const { rows: existing } = await pool.query(
+      `SELECT * FROM registrations WHERE event_id=$1 AND user_id=$2`,
+      [eventId, userId]
+    )
+
+    if (existing.length > 0) {
+      const existingReg = existing[0]
+
+      // Already booked
+      if (existingReg.stage === 'book') {
+        return res.status(400).json({ error: 'Already booked', counters })
+      }
+
+      // Upgrade prebook → book
+      if (newStage === 'book' && existingReg.stage === 'prebook') {
+        if (price > 0) {
+          const paymentIntent = await stripe.paymentIntents.create({
+            amount: Math.round(price * 100),
+            currency: 'usd',
+            metadata: { eventId, userId },
+            receipt_email: user.email || undefined,
+          })
+
+          const { rows } = await pool.query(
+            `UPDATE registrations
+             SET stage='book', stripe_payment_intent_id=$1
+             WHERE id=$2
+             RETURNING *`,
+            [paymentIntent.id, existingReg.id]
+          )
+
+          counters.prebook_count -= 1
+          counters.book_count += 1
+
+          return res.status(200).json({
+            success: true,
+            stage: 'book',
+            registration: rows[0],
+            counters,
+            clientSecret: paymentIntent.client_secret,
+          })
+        } else {
+          // Free upgrade
+          const { rows } = await pool.query(
+            `UPDATE registrations SET stage='book' WHERE id=$1 RETURNING *`,
+            [existingReg.id]
+          )
+
+          counters.prebook_count -= 1
+          counters.book_count += 1
+
+          if (user.email) {
+            await sendTicketEmail(user.email, event, { ...user, ticket_code: existingReg.ticket_code })
+          }
+
+          return res.status(200).json({
+            success: true,
+            stage: 'book',
+            registration: rows[0],
+            counters,
+            clientSecret: null,
+          })
+        }
+      }
+
+      return res.status(400).json({ error: 'Already registered', counters })
+    }
 
     // --------------------------
     // New registration
