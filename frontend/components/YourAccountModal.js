@@ -6,6 +6,8 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [profile, setProfile] = useState(null)
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
+  const [qrModal, setQrModal] = useState(null)
+
 
   useEffect(() => {
     async function loadAccount() {
@@ -31,7 +33,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         }
 
         // fetch tickets
-        const ticketsRes = await fetch('/api/user/myTickets', {
+          const ticketsRes = await fetch('/api/user/myTickets', {
           headers: { Authorization: `Bearer ${token}` }
         })
         if (ticketsRes.ok) {
@@ -92,11 +94,14 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                     <span>
                       {ticket.event_name || 'Unknown Event'} — {ticket.stage || 'Unknown'}
                     </span>
-                    {ticket.qrData ? (
-                      <QRCode value={ticket.qrData} size={48} />
-                    ) : (
-                      <span className="text-xs text-gray-400">No QR</span>
-                    )}
+                   {ticket.qrData ? (
+  <button onClick={() => setQrModal(ticket)}>
+    <QRCode value={ticket.qrData} size={48} />
+  </button>
+) : (
+  <span className="text-xs text-gray-400">No QR</span>
+)}
+
                   </li>
                 ))}
               </ul>
@@ -107,6 +112,30 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         )}
       </div>
     </div>
+{qrModal && (
+  <div
+    className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50"
+    onClick={() => setQrModal(null)}
+  >
+    <div className="bg-zinc-900 p-6 rounded-lg" onClick={e => e.stopPropagation()}>
+      <h3 className="mb-4">{qrModal.event_name}</h3>
+      <QRCode value={qrModal.qrData} size={256} />
+      <button
+        onClick={() => setQrModal(null)}
+        className="mt-4 px-4 py-2 bg-blue-600 rounded text-white"
+      >
+        Close
+      </button>
+    </div>
+  </div>
+)}
+
+
+
   )
 }
+
+
+
+
 

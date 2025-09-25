@@ -1,4 +1,3 @@
-// pages/api/user/myTickets.js
 import { pool } from '../../../lib/postgres.js'
 import { auth } from '../../../lib/auth.js'
 
@@ -6,57 +5,42 @@ export default async function handler(req, res) {
   const token = auth.getTokenFromReq(req)
   if (!token) return res.status(401).json({ error: 'Not authenticated' })
 
-  let user
+  let decoded
   try {
-    user = auth.verifyToken(token)
-  } catch {
+    decoded = auth.verifyToken(token)
+  } catch (err) {
     return res.status(401).json({ error: 'Invalid token' })
   }
 
-  const userId = user.id || null
-  const telegramUserId = user.telegram_user_id || null
-  if (!userId && !telegramUserId) return res.status(400).json({ error: 'No valid user in token' })
+  const userId = decoded.id
+  if (!userId) return res.status(400).json({ error: 'Invalid user' })
 
   try {
     const { rows } = await pool.query(
       `
-      SELECT r.id AS registration_id, r.stage, r.ticket_sent, r.ticket_code, r.has_paid, r.timestamp,
-             e.id AS event_id, e.name AS event_name, e.city, e.datetime, e.price, e.is_confirmed
+      SELECT r.id, r.stage, r.ticket_code, e.name AS event_name
       FROM registrations r
       JOIN events e ON r.event_id = e.id
-      WHERE r.user_id=$1 OR r.telegram_user_id=$2
-      ORDER BY e.datetime DESC
+      WHERE r.user_id = $1
+      ORDER BY r.timestamp DESC
       `,
-      [userId, telegramUserId]
+      [userId]
     )
 
-    const tickets = rows.map(t => {
-      const isBookStage = t.stage === 'book'
-      const stage = isBookStage ? 'book' : 'prebook'
-      const isFree = !t.price || Number(t.price) === 0
+    const tickets = rows.map(r => ({
+      id: r.id,
+      event_name: r.event_name,
+      stage: r.stage,
+      ticket_code: r.ticket_code,
+      qrData: r.ticket_code
+        ? JSON.stringify({ code: r.ticket_code, event: r.event_name })
+        : null
+    }))
 
-      return {
-        id: t.registration_id,     // stable key
-        event_id: t.event_id,
-        event_name: t.event_name,
-        city: t.city,
-        datetime: t.datetime,
-        price: t.price,
-        has_paid: t.has_paid,
-        ticket_sent: t.ticket_sent,
-        registered_at: t.timestamp,
-        is_free: isFree,
-        stage,
-        is_book_stage: isBookStage,
-        qrData: t.ticket_sent && (isFree || t.has_paid) ? t.ticket_code : null
-      }
-    })
-
-    return res.status(200).json({ tickets })
-
+    res.json({ tickets })
   } catch (err) {
-    console.error('❌ myTickets error:', err)
-    return res.status(500).json({ error: 'Internal server error', details: err.message })
+    console.error('Error in /api/user/myTickets:', err)
+    res.status(500).json({ error: 'Server error', details: err.message })
   }
 }
 
