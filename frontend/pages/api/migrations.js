@@ -1,17 +1,21 @@
-// migrations/001_init.js
+// pages/api/migrations.js
 import pkg from 'pg'
 import dotenv from 'dotenv'
 dotenv.config()
 const { Pool } = pkg
 
-async function migrate() {
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed. Use POST.' })
+  }
+
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false },
   })
 
   try {
-    console.log('🔹 Running migration 001_init.js...')
+    console.log('🚀 Running migrations...')
 
     // ----------------------------
     // TELEGRAM USER PROFILES
@@ -29,7 +33,7 @@ async function migrate() {
     `)
 
     // ----------------------------
-    // WEB USER PROFILES
+    // USER PROFILES
     // ----------------------------
     await pool.query(`
       CREATE TABLE IF NOT EXISTS user_profiles (
@@ -49,7 +53,7 @@ async function migrate() {
     `)
 
     // ----------------------------
-    // EMAIL VERIFICATION TOKENS (Web)
+    // EMAIL VERIFICATION TOKENS
     // ----------------------------
     await pool.query(`
       CREATE TABLE IF NOT EXISTS email_verification_tokens (
@@ -125,16 +129,10 @@ async function migrate() {
         )
       );
     `)
-    await pool.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_registrations_event_user
-      ON registrations(event_id, user_id)
-      WHERE user_id IS NOT NULL;
-    `)
-    await pool.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_registrations_event_tguser
-      ON registrations(event_id, telegram_user_id)
-      WHERE telegram_user_id IS NOT NULL;
-    `)
+
+    // 🔹 Ensure old unique indexes are dropped (to allow multiple tickets per user)
+    await pool.query(`DROP INDEX IF EXISTS idx_registrations_event_user;`)
+    await pool.query(`DROP INDEX IF EXISTS idx_registrations_event_tguser;`)
 
     // ----------------------------
     // INVITATIONS
@@ -183,7 +181,7 @@ async function migrate() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_favorites_tg ON favorites(telegram_user_id);`)
 
     // ----------------------------
-    // updated_at trigger
+    // updated_at triggers
     // ----------------------------
     await pool.query(`
       CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -194,9 +192,11 @@ async function migrate() {
       END;
       $$ LANGUAGE 'plpgsql';
     `)
+
     await pool.query(`DROP TRIGGER IF EXISTS trg_update_user_profiles_updated_at ON user_profiles;`)
     await pool.query(`DROP TRIGGER IF EXISTS trg_update_telegram_user_profiles_updated_at ON telegram_user_profiles;`)
     await pool.query(`DROP TRIGGER IF EXISTS trg_update_events_updated_at ON events;`)
+
     await pool.query(`
       CREATE TRIGGER trg_update_user_profiles_updated_at
       BEFORE UPDATE ON user_profiles
@@ -216,13 +216,13 @@ async function migrate() {
       EXECUTE FUNCTION update_updated_at_column();
     `)
 
-    console.log('✅ Migration 001_init.js completed successfully.')
+    console.log('✅ Migrations completed.')
+    res.status(200).json({ success: true, message: 'Migrations completed' })
   } catch (err) {
-    console.error('❌ Migration failed:', err)
+    console.error('❌ Migration error:', err)
+    res.status(500).json({ error: 'Server error', details: err.message })
   } finally {
     await pool.end()
   }
 }
-
-migrate()
 

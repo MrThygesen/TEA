@@ -17,9 +17,7 @@ export default async function handler(req, res) {
   try {
     console.log('🔹 Initializing database...')
 
-    // ----------------------------
     // TELEGRAM USER PROFILES
-    // ----------------------------
     await pool.query(`
       CREATE TABLE IF NOT EXISTS telegram_user_profiles (
         id SERIAL PRIMARY KEY,
@@ -32,9 +30,7 @@ export default async function handler(req, res) {
       );
     `)
 
-    // ----------------------------
-    // WEB USER PROFILES
-    // ----------------------------
+    // USER PROFILES
     await pool.query(`
       CREATE TABLE IF NOT EXISTS user_profiles (
         id SERIAL PRIMARY KEY,
@@ -52,9 +48,7 @@ export default async function handler(req, res) {
       );
     `)
 
-    // ----------------------------
-    // WEB EMAIL VERIFICATION TOKENS
-    // ----------------------------
+    // EMAIL VERIFICATION TOKENS
     await pool.query(`
       CREATE TABLE IF NOT EXISTS email_verification_tokens (
         token TEXT PRIMARY KEY,
@@ -69,9 +63,7 @@ export default async function handler(req, res) {
       ON email_verification_tokens(user_id);
     `)
 
-    // ----------------------------
     // EVENTS
-    // ----------------------------
     await pool.query(`
       CREATE TABLE IF NOT EXISTS events (
         id SERIAL PRIMARY KEY,
@@ -99,9 +91,7 @@ export default async function handler(req, res) {
     `)
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_events_city ON events(LOWER(city));`)
 
-    // ----------------------------
     // REGISTRATIONS
-    // ----------------------------
     await pool.query(`
       CREATE TABLE IF NOT EXISTS registrations (
         id SERIAL PRIMARY KEY,
@@ -129,20 +119,12 @@ export default async function handler(req, res) {
         )
       );
     `)
-    await pool.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_registrations_event_user
-      ON registrations(event_id, user_id)
-      WHERE user_id IS NOT NULL;
-    `)
-    await pool.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_registrations_event_tguser
-      ON registrations(event_id, telegram_user_id)
-      WHERE telegram_user_id IS NOT NULL;
-    `)
 
-    // ----------------------------
+    // ❌ REMOVE these unique constraints (we allow multiple rows per user)
+    // await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_registrations_event_user ...`)
+    // await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_registrations_event_tguser ...`)
+
     // INVITATIONS
-    // ----------------------------
     await pool.query(`
       CREATE TABLE IF NOT EXISTS invitations (
         id SERIAL PRIMARY KEY,
@@ -156,9 +138,7 @@ export default async function handler(req, res) {
       );
     `)
 
-    // ----------------------------
     // USER EMAILS
-    // ----------------------------
     await pool.query(`
       CREATE TABLE IF NOT EXISTS user_emails (
         user_id INTEGER PRIMARY KEY REFERENCES user_profiles(id) ON DELETE CASCADE,
@@ -167,9 +147,7 @@ export default async function handler(req, res) {
       );
     `)
 
-    // ----------------------------
     // FAVORITES
-    // ----------------------------
     await pool.query(`
       CREATE TABLE IF NOT EXISTS favorites (
         id SERIAL PRIMARY KEY,
@@ -186,9 +164,7 @@ export default async function handler(req, res) {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_favorites_web ON favorites(user_id);`)
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_favorites_tg ON favorites(telegram_user_id);`)
 
-    // ----------------------------
-    // updated_at trigger for all tables with updated_at
-    // ----------------------------
+    // updated_at trigger
     await pool.query(`
       CREATE OR REPLACE FUNCTION update_updated_at_column()
       RETURNS TRIGGER AS $$

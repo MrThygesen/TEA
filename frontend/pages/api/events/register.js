@@ -40,8 +40,9 @@ export default async function handler(req, res) {
     // --------------------------
     // Input validation
     // --------------------------
-    const { eventId } = req.body
+    const { eventId, quantity = 1 } = req.body
     if (!eventId) return res.status(400).json({ error: 'Missing eventId' })
+    if (quantity < 1) return res.status(400).json({ error: 'Quantity must be at least 1' })
 
     const { rows: eventRows } = await pool.query('SELECT * FROM events WHERE id=$1', [eventId])
     if (!eventRows.length) return res.status(404).json({ error: 'Event not found' })
@@ -49,9 +50,10 @@ export default async function handler(req, res) {
 
     const price = Number(event.price) || 0
     const minAttendees = Number(event.min_attendees) || 0
+    const maxAttendees = Number(event.max_attendees) || 40
 
     // --------------------------
-    // Count existing registrations
+    // Count existing registrations (overall)
     // --------------------------
     const { rows: countRows } = await pool.query(
       `SELECT stage, COUNT(*)::int AS count 
@@ -78,7 +80,6 @@ export default async function handler(req, res) {
         `UPDATE events SET is_confirmed=$1 WHERE id=$2`,
         [newStage === 'book', eventId]
       )
-
       event.is_confirmed = newStage === 'book'
 
       // Notify prebook users if event is now confirmed
@@ -91,11 +92,9 @@ export default async function handler(req, res) {
              WHERE r.event_id=$1 AND r.stage='prebook'`,
             [eventId]
           )
-
           for (const u of prebookUsers) {
             if (u.email) await sendUpgradeToBookEmail(u.email, event, { ...u })
           }
-
           console.log(`✅ Event ${eventId} confirmed, notified ${prebookUsers.length} prebook users`)
         } catch (err) {
           console.error('❌ Failed to notify prebook users:', err)
@@ -104,23 +103,37 @@ export default async function handler(req, res) {
     }
 
     // --------------------------
-    // Check existing registration
+    // Enforce per-user limit
     // --------------------------
-    const { rows: existing } = await pool.query(
-      `SELECT * FROM registrations WHERE event_id=$1 AND user_id=$2`,
+    const maxPerUser = event.tag1 === 'group' ? 5 : 1
+    const { rows: userCountRows } = await pool.query(
+      `SELECT COUNT(*)::int AS cnt FROM registrations WHERE event_id=$1 AND user_id=$2`,
       [eventId, userId]
     )
+    const userCount = userCountRows[0]?.cnt || 0
+    if (userCount + quantity > maxPerUser) {
+      return res.status(400).json({ error: 'Max tickets reached', counters })
+    }
 
-    if (existing.length > 0) {
-      const existingReg = existing[0]
+    // Enforce global max_attendees
+    const totalRegistrations = counters.prebook_count + counters.book_count
+    if (totalRegistrations + quantity > maxAttendees) {
+      return res.status(400).json({ error: 'Event full', counters })
+    }
 
-      // Already booked
-      if (existingReg.stage === 'book') {
-        return res.status(400).json({ error: 'Already booked', counters })
-      }
+    // --------------------------
+    // Upgrade one existing prebook if stage is book
+    // --------------------------
+    if (newStage === 'book') {
+      const { rows: prebookRows } = await pool.query(
+        `SELECT * FROM registrations 
+         WHERE event_id=$1 AND user_id=$2 AND stage='prebook' 
+         ORDER BY timestamp ASC LIMIT 1`,
+        [eventId, userId]
+      )
+      if (prebookRows.length > 0) {
+        const existingReg = prebookRows[0]
 
-      // Upgrade prebook → book
-      if (newStage === 'book' && existingReg.stage === 'prebook') {
         if (price > 0) {
           const paymentIntent = await stripe.paymentIntents.create({
             amount: Math.round(price * 100),
@@ -130,14 +143,13 @@ export default async function handler(req, res) {
           })
 
           const { rows } = await pool.query(
-            `UPDATE registrations
-             SET stage='book', stripe_payment_intent_id=$1
-             WHERE id=$2
-             RETURNING *`,
+            `UPDATE registrations 
+             SET stage='book', stripe_payment_intent_id=$1 
+             WHERE id=$2 RETURNING *`,
             [paymentIntent.id, existingReg.id]
           )
 
-          counters.prebook_count -= 1
+          counters.prebook_count = Math.max(0, counters.prebook_count - 1)
           counters.book_count += 1
 
           return res.status(200).json({
@@ -148,17 +160,19 @@ export default async function handler(req, res) {
             clientSecret: paymentIntent.client_secret,
           })
         } else {
-          // Free upgrade
           const { rows } = await pool.query(
             `UPDATE registrations SET stage='book' WHERE id=$1 RETURNING *`,
             [existingReg.id]
           )
 
-          counters.prebook_count -= 1
+          counters.prebook_count = Math.max(0, counters.prebook_count - 1)
           counters.book_count += 1
 
           if (user.email) {
-            await sendTicketEmail(user.email, event, { ...user, ticket_code: existingReg.ticket_code })
+            await sendTicketEmail(user.email, event, {
+              ...user,
+              ticket_code: existingReg.ticket_code,
+            })
           }
 
           return res.status(200).json({
@@ -170,69 +184,67 @@ export default async function handler(req, res) {
           })
         }
       }
-
-      return res.status(400).json({ error: 'Already registered', counters })
     }
 
     // --------------------------
-    // New registration
+    // New registrations (loop quantity)
     // --------------------------
-    const ticketCode = crypto.randomBytes(8).toString('hex')
-    let registration
+    const registrations = []
     let clientSecret = null
 
-    if (newStage === 'prebook') {
-      // Prebook registration
-      const { rows } = await pool.query(
-        `INSERT INTO registrations (event_id, user_id, stage)
-         VALUES ($1,$2,'prebook') RETURNING *`,
-        [eventId, userId]
-      )
-      registration = rows[0]
+    for (let i = 0; i < quantity; i++) {
+      const ticketCode = crypto.randomBytes(8).toString('hex')
+      let reg
 
-      if (user.email) {
-        await sendPrebookEmail(user.email, event)
+      if (newStage === 'prebook') {
+        const { rows } = await pool.query(
+          `INSERT INTO registrations (event_id, user_id, stage)
+           VALUES ($1,$2,'prebook') RETURNING *`,
+          [eventId, userId]
+        )
+        reg = rows[0]
+        counters.prebook_count += 1
+
+        if (user.email) {
+          await sendPrebookEmail(user.email, event)
+        }
+      } else if (price === 0) {
+        const { rows } = await pool.query(
+          `INSERT INTO registrations (event_id, user_id, stage, ticket_code, ticket_sent)
+           VALUES ($1,$2,'book',$3,TRUE) RETURNING *`,
+          [eventId, userId, ticketCode]
+        )
+        reg = rows[0]
+        counters.book_count += 1
+
+        if (user.email) {
+          await sendTicketEmail(user.email, event, { ...user, ticket_code: ticketCode })
+        }
+      } else {
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: Math.round(price * 100),
+          currency: 'usd',
+          metadata: { eventId, userId },
+          receipt_email: user.email || undefined,
+        })
+
+        const { rows } = await pool.query(
+          `INSERT INTO registrations (event_id, user_id, stage, ticket_code, stripe_payment_intent_id)
+           VALUES ($1,$2,'book',$3,$4) RETURNING *`,
+          [eventId, userId, ticketCode, paymentIntent.id]
+        )
+        reg = rows[0]
+        counters.book_count += 1
+        clientSecret = paymentIntent.client_secret
       }
 
-      counters.prebook_count += 1
-    } else if (price === 0) {
-      // Free booking
-      const { rows } = await pool.query(
-        `INSERT INTO registrations (event_id, user_id, stage, ticket_code, ticket_sent)
-         VALUES ($1,$2,'book',$3,TRUE) RETURNING *`,
-        [eventId, userId, ticketCode]
-      )
-      registration = rows[0]
-
-      if (user.email) {
-        await sendTicketEmail(user.email, event, { ...user, ticket_code: ticketCode })
-      }
-
-      counters.book_count += 1
-    } else {
-      // Paid booking
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(price * 100),
-        currency: 'usd',
-        metadata: { eventId, userId },
-        receipt_email: user.email || undefined,
-      })
-
-      const { rows } = await pool.query(
-        `INSERT INTO registrations (event_id, user_id, stage, ticket_code, stripe_payment_intent_id)
-         VALUES ($1,$2,'book',$3,$4) RETURNING *`,
-        [eventId, userId, ticketCode, paymentIntent.id]
-      )
-      registration = rows[0]
-      clientSecret = paymentIntent.client_secret
-
-      counters.book_count += 1
+      registrations.push(reg)
     }
 
     return res.status(200).json({
       success: true,
       stage: newStage,
-      registration,
+      registrations,
       counters,
       clientSecret,
     })
