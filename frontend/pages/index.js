@@ -33,9 +33,12 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   const [userTickets, setUserTickets] = useState(0)
   const [maxPerUser, setMaxPerUser] = useState(event.tag1 === 'group' ? 5 : 1)
 
+  const [showPolicyModal, setShowPolicyModal] = useState(false)
+  const [agreed, setAgreed] = useState(false)
+
   const HEART_THRESHOLD = 10
 
-  // Fetch hearts
+  // --- fetch hearts ---
   useEffect(() => {
     async function fetchHearts() {
       try {
@@ -51,7 +54,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
     fetchHearts()
   }, [event.id, event.is_confirmed])
 
-  // Fetch user's tickets
+  // --- fetch user tickets ---
   useEffect(() => {
     if (!authUser) return
     async function fetchMyTickets() {
@@ -77,7 +80,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
 
   const reachedLimit = userTickets >= maxPerUser
 
-  // Handle booking
+  // --- booking handler ---
   async function handleBooking() {
     if (!authUser) {
       setShowAccountModal(true)
@@ -100,7 +103,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
       setUserTickets(prev => prev + 1)
       setStatusMsg('Booking confirmed!')
 
-      // Paid event -> redirect to Stripe checkout
+      // redirect paid event → Stripe
       if (data.clientSecret) {
         window.location.href = `/api/events/checkout?payment_intent_client_secret=${data.clientSecret}`
       }
@@ -110,10 +113,12 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
     } finally {
       setLoading(false)
       setTimeout(() => setStatusMsg(''), 2500)
+      setShowPolicyModal(false)
+      setAgreed(false)
     }
   }
 
-  // Handle hearts
+  // --- hearts handler ---
   async function handleHeartClick() {
     try {
       const token = localStorage.getItem('token') || ''
@@ -144,63 +149,103 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   }
 
   return (
-<>  
-  <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800 shadow flex flex-col justify-between">
-      <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
-      <p className="text-sm mb-2">{event.description}</p>
-
-      {/* Hearts */}
-      <div className="flex items-center gap-2 mb-2">
-        <button onClick={handleHeartClick} className="text-red-500 text-xl">❤️</button>
-        <span className="text-sm text-gray-400">{heartCount} hearts</span>
-      </div>
-
-      {/* Booking button */}
-      <div className="flex flex-col gap-2 mt-auto mb-2">
+    <>
+      <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800 shadow flex flex-col justify-between relative">
+        {/* Heart top right */}
         <button
-          onClick={handleBooking}
-          disabled={!bookable || loading || reachedLimit}
-          className={`w-full px-3 py-1 rounded ${
-            !authUser
-              ? 'bg-zinc-600 cursor-not-allowed'
-              : 'bg-blue-600 hover:bg-blue-700'
-          } text-white text-sm disabled:opacity-50`}
+          onClick={handleHeartClick}
+          className="absolute top-2 right-2 text-red-500 text-xl"
         >
-          {getButtonLabel()}
+          ❤️ {heartCount}/{HEART_THRESHOLD}
         </button>
-      </div>
 
-      {/* Footer info */}
-      <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
-        <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
-        <span>👥 Booked: {userTickets} / {event.max_attendees || '∞'}</span>
-      </div>
-    </div>
+        <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
+        <p className="text-sm mb-2">{event.description}</p>
 
-    {/* Internal Modal */}
-    {internalModalOpen && (
-      <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
-           onClick={() => setInternalModalOpen(false)}>
-        <div className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]"
-             onClick={(e) => e.stopPropagation()}>
-          {/* ...modal content... */}
+        {/* Booking */}
+        <div className="flex flex-col gap-2 mt-auto mb-2">
+          <button
+            onClick={() => {
+              if (!authUser) return setShowAccountModal(true)
+              if (!bookable || reachedLimit) return
+              setShowPolicyModal(true)
+            }}
+            disabled={!bookable || loading || reachedLimit}
+            className={`w-full px-3 py-1 rounded ${
+              !authUser
+                ? 'bg-zinc-600 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700'
+            } text-white text-sm disabled:opacity-50`}
+          >
+            {getButtonLabel()}
+          </button>
+        </div>
+
+        {/* Footer info */}
+        <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
+          <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
+          <span>👥 Booked: {userTickets} / {event.max_attendees || '∞'}</span>
         </div>
       </div>
-    )}
 
-    {/* Confirmation Modal */}
-    {confirmModalOpen && (
-      <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
-           onClick={() => setConfirmModalOpen(false)}>
-        <div className="bg-zinc-900 rounded-2xl shadow-xl max-w-md w-full p-6 text-white relative"
-             onClick={(e) => e.stopPropagation()}>
-          {/* ...modal content... */}
+      {/* Policy Modal */}
+      {showPolicyModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowPolicyModal(false)}
+        >
+          <div
+            className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh] text-white"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold mb-2">{event.name}</h2>
+            <img
+              src={event.image_url || '/default-event.jpg'}
+              alt={event.name}
+              className="w-full h-48 object-cover rounded mb-4"
+            />
+            <p className="text-sm text-gray-300 mb-4">{event.details || event.description}</p>
+
+            {/* Guidelines */}
+            <div className="bg-zinc-800 p-3 rounded mb-4">
+              <h3 className="font-semibold mb-2">Event Guidelines</h3>
+              <p className="text-xs text-gray-400">
+                By booking, you agree to follow venue rules, respect other attendees,
+                and adhere to community guidelines.
+              </p>
+            </div>
+
+            <label className="flex items-center gap-2 mb-4">
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+                className="form-checkbox"
+              />
+              <span className="text-sm">I agree to the event guidelines</span>
+            </label>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowPolicyModal(false)}
+                className="px-4 py-2 bg-zinc-700 rounded hover:bg-zinc-600"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBooking}
+                disabled={!agreed || loading}
+                className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
+              >
+                {loading ? 'Processing…' : 'Confirm & Book'}
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-    )}
-  </>
-)
-} 
+      )}
+    </>
+  )
+}
 
 function VideoHero() {
   const [open, setOpen] = useState(false);
