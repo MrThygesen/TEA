@@ -202,7 +202,7 @@ return (
     )}
   </>
 )
-
+} 
 
 function VideoHero() {
   const [open, setOpen] = useState(false);
