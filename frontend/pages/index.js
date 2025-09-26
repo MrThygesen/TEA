@@ -27,9 +27,6 @@ function clearAuth() {
 
 
 //DynamicEventCard
-// DynamicEventCard
-import { useState, useEffect } from 'react'
-
 export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   const [heartCount, setHeartCount] = useState(0)
   const [bookable, setBookable] = useState(event.is_confirmed)
@@ -39,8 +36,8 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   const [maxPerUser, setMaxPerUser] = useState(event.tag1 === 'group' ? 5 : 1)
   const [internalModalOpen, setInternalModalOpen] = useState(false)
   const [confirmModalOpen, setConfirmModalOpen] = useState(false)
+  const [agree, setAgree] = useState(false)
 
-  const maxHearts = 3 // Adjust here if needed
 
   // Fetch hearts count
   useEffect(() => {
@@ -50,7 +47,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
         if (!res.ok) return
         const data = await res.json()
         setHeartCount(data.count)
-        setBookable(data.count >= maxHearts || event.is_confirmed)
+        setBookable(data.count >= 10 || event.is_confirmed)
       } catch (err) {
         console.error('❌ Failed to fetch hearts:', err)
       }
@@ -134,9 +131,8 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
       })
       if (!res.ok) throw new Error('Failed to like')
       const data = await res.json()
-      const newCount = Math.min(data.count, maxHearts)
-      setHeartCount(newCount)
-      if (newCount >= maxHearts) setBookable(true)
+      setHeartCount(data.count)
+      if (data.count >= 10) setBookable(true)
     } catch (err) {
       console.error(err)
     }
@@ -145,69 +141,68 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   function getWebButtonLabel() {
     if (!authUser) return 'Go to login'
     if (reachedLimit) return `Max ${maxPerUser} tickets`
-    if (!bookable) return `Needs ${maxHearts} hearts (${heartCount}/${maxHearts})`
+    if (!bookable) return `Needs 10 hearts (${heartCount}/10)`
     if (loading) return statusMsg || 'Processing…'
     if (statusMsg) return statusMsg
     return !event.price || Number(event.price) === 0 ? 'Book Free' : 'Pay Now'
   }
 
-  return (
-    <>
-      <div className="relative border border-zinc-700 rounded-lg p-4 bg-zinc-800 shadow flex flex-col justify-between">
-        <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
-        <p className="text-sm mb-2">{event.description}</p>
+return (
+  <>
+    <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800 shadow flex flex-col justify-between">
+      <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
+      <p className="text-sm mb-2">{event.description}</p>
 
-        {/* Heart top-right */}
-        <div className="absolute top-2 right-2 flex items-center gap-1 cursor-pointer select-none"
-             onClick={handleHeartClick}>
-          <span className="text-red-500 text-xl">❤️</span>
-          <span className="text-sm text-gray-200">{heartCount}/{maxHearts}</span>
-        </div>
-
-        <div className="flex flex-col gap-2 mt-auto mb-2">
-          <button
-            onClick={handleWebAction}
-            disabled={loading || reachedLimit || !bookable}
-            className={`w-full px-3 py-1 rounded ${
-              !authUser
-                ? 'bg-zinc-600 cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-700'
-            } text-white text-sm disabled:opacity-50`}
-          >
-            {getWebButtonLabel()}
-          </button>
-        </div>
-
-        <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
-          <span>💰 {event.price > 0 ? `${event.price} USD` : 'Free'}</span>
-          <span>👥 Booked: {userTickets} / {event.max_attendees || '∞'}</span>
-        </div>
+      {/* Hearts */}
+      <div className="flex items-center gap-2 mb-2">
+        <button onClick={handleHeartClick} className="text-red-500 text-xl">❤️</button>
+        <span className="text-sm text-gray-400">{heartCount} hearts</span>
       </div>
 
-      {/* Internal Modal */}
-      {internalModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
-             onClick={() => setInternalModalOpen(false)}>
-          <div className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]"
-               onClick={(e) => e.stopPropagation()}>
-            {/* ...modal content... */}
-          </div>
-        </div>
-      )}
+      <div className="flex flex-col gap-2 mt-auto mb-2">
+        <button
+          onClick={handleWebAction}
+          disabled={loading || reachedLimit || !bookable}
+          className={`w-full px-3 py-1 rounded ${
+            !authUser
+              ? 'bg-zinc-600 cursor-not-allowed'
+              : 'bg-blue-600 hover:bg-blue-700'
+          } text-white text-sm disabled:opacity-50`}
+        >
+          {getWebButtonLabel()}
+        </button>
+      </div>
 
-      {/* Confirmation Modal */}
-      {confirmModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
-             onClick={() => setConfirmModalOpen(false)}>
-          <div className="bg-zinc-900 rounded-2xl shadow-xl max-w-md w-full p-6 text-white relative"
-               onClick={(e) => e.stopPropagation()}>
-            {/* ...modal content... */}
-          </div>
+      <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
+        <span>💰 {event.price > 0 ? `${event.price} USD` : 'Free'}</span>
+        <span>👥 Booked: {userTickets} / {event.max_attendees || '∞'}</span>
+      </div>
+    </div>
+
+    {/* Internal Modal */}
+    {internalModalOpen && (
+      <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+           onClick={() => setInternalModalOpen(false)}>
+        <div className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]"
+             onClick={(e) => e.stopPropagation()}>
+          {/* ...modal content... */}
         </div>
-      )}
-    </>
-  )
-}
+      </div>
+    )}
+
+    {/* Confirmation Modal */}
+    {confirmModalOpen && (
+      <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
+           onClick={() => setConfirmModalOpen(false)}>
+        <div className="bg-zinc-900 rounded-2xl shadow-xl max-w-md w-full p-6 text-white relative"
+             onClick={(e) => e.stopPropagation()}>
+          {/* ...modal content... */}
+        </div>
+      </div>
+    )}
+  </>
+)
+} // <-- THIS WAS MISSING
 
 function VideoHero() {
   const [open, setOpen] = useState(false);
