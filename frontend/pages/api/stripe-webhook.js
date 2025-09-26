@@ -1,4 +1,3 @@
-// pages/api/stripe-webhook.js
 import Stripe from 'stripe'
 import { buffer } from 'micro'
 import { pool } from '../../lib/postgres.js'
@@ -16,7 +15,11 @@ export default async function handler(req, res) {
 
   let event
   try {
-    event = stripe.webhooks.constructEvent(buf, sig, process.env.STRIPE_WEBHOOK_SECRET)
+    event = stripe.webhooks.constructEvent(
+      buf,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    )
   } catch (err) {
     console.error('❌ Webhook signature verification failed:', err.message)
     return res.status(400).send(`Webhook Error: ${err.message}`)
@@ -36,18 +39,18 @@ export default async function handler(req, res) {
 
       // --- WEB USER FLOW ---
       if (userId) {
-        // Ensure registration exists
         await pool.query(
-          `INSERT INTO registrations (event_id, user_id, email)
-           VALUES ($1, $2, $3)
+          `INSERT INTO registrations (event_id, user_id, email, status)
+           VALUES ($1, $2, $3, 'pending')
            ON CONFLICT (event_id, user_id) DO NOTHING`,
           [eventId, userId, session.customer_details?.email || null]
         )
 
-        // Mark as paid
         const { rows: regRows } = await pool.query(
           `UPDATE registrations
-           SET has_paid = TRUE, paid_at = NOW()
+           SET has_paid = TRUE,
+               paid_at = NOW(),
+               status = 'confirmed'
            WHERE event_id = $1 AND user_id = $2
            RETURNING id, ticket_sent`,
           [eventId, userId]
@@ -58,7 +61,6 @@ export default async function handler(req, res) {
           console.log(`✅ Payment recorded (WEB) for event ${eventId}, user ${userId}`)
 
           if (!reg.ticket_sent) {
-            // Fetch user + event
             const { rows: userRows } = await pool.query(
               'SELECT id, username, email FROM user_profiles WHERE id=$1',
               [userId]
@@ -73,10 +75,22 @@ export default async function handler(req, res) {
 
             if (user && eventObj && user.email) {
               try {
-                // Send ticket email with QR + ICS
-                await sendTicketEmail(user.email, eventObj, user)
+                const eventWithDetails = {
+                  ...eventObj,
+                  detailsBlock: `
+                    <h2 style="margin-top:20px;">Event Details</h2>
+                    <p>${eventObj.details || 'No details provided.'}</p>
+                    <p style="margin-top:20px;">
+                      <label style="display:flex;align-items:center;gap:8px;">
+                        <input type="checkbox" disabled checked />
+                        I declare to have a relevance for the network event according to the description above
+                      </label>
+                    </p>
+                  `,
+                }
 
-                // Mark ticket as sent
+                await sendTicketEmail(user.email, eventWithDetails, user)
+
                 await pool.query(
                   'UPDATE registrations SET ticket_sent = TRUE WHERE id = $1',
                   [reg.id]
@@ -90,20 +104,22 @@ export default async function handler(req, res) {
             console.log(`ℹ Ticket already sent for registration ${reg.id}, skipping`)
           }
         }
-      } 
+      }
 
       // --- TELEGRAM USER FLOW ---
       else if (telegramUserId) {
         await pool.query(
-          `INSERT INTO registrations (event_id, telegram_user_id, email)
-           VALUES ($1, $2, $3)
+          `INSERT INTO registrations (event_id, telegram_user_id, email, status)
+           VALUES ($1, $2, $3, 'pending')
            ON CONFLICT (event_id, telegram_user_id) DO NOTHING`,
           [eventId, telegramUserId, session.customer_details?.email || null]
         )
 
         const { rowCount } = await pool.query(
           `UPDATE registrations
-           SET has_paid = TRUE, paid_at = NOW()
+           SET has_paid = TRUE,
+               paid_at = NOW(),
+               status = 'confirmed'
            WHERE event_id = $1 AND telegram_user_id = $2`,
           [eventId, telegramUserId]
         )
@@ -112,7 +128,7 @@ export default async function handler(req, res) {
           console.log(
             `✅ Payment recorded (TELEGRAM) for event ${eventId}, user ${telegramUserId}`
           )
-          // Telegram users do not receive email
+          // Telegram users don’t get email
         }
       }
     }
