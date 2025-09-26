@@ -36,7 +36,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   const [showPolicyModal, setShowPolicyModal] = useState(false)
   const [agreed, setAgreed] = useState(false)
 
-  const HEART_THRESHOLD = 10
+  const HEART_THRESHOLD = 0
 
   // --- fetch hearts ---
   useEffect(() => {
