@@ -68,7 +68,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                     {tickets.map((t, i) => (
                       <tr key={i} className="odd:bg-zinc-800 even:bg-zinc-700">
                         <td className="border border-zinc-700 px-3 py-1">
-                          {new Date().toLocaleDateString()} {/* Replace if events have datetime */}
+                          {t.datetime ? new Date(t.datetime).toLocaleDateString() : '—'}
                         </td>
                         <td className="border border-zinc-700 px-3 py-1">
                           <a href={`/events/${t.event_id}`} className="text-blue-400 hover:underline">

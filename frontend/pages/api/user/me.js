@@ -1,4 +1,3 @@
-// pages/api/user/me.js
 import { pool } from '../../../lib/postgres.js'
 import { auth } from '../../../lib/auth.js'
 
@@ -7,8 +6,11 @@ export default async function handler(req, res) {
   if (!token) return res.status(401).json({ error: 'Not authenticated' })
 
   let decoded
-  try { decoded = auth.verifyToken(token) } 
-  catch { return res.status(401).json({ error: 'Invalid token' }) }
+  try {
+    decoded = auth.verifyToken(token)
+  } catch {
+    return res.status(401).json({ error: 'Invalid token' })
+  }
 
   const userId = decoded?.id
   if (!userId) return res.status(400).json({ error: 'Invalid user' })
@@ -25,19 +27,21 @@ export default async function handler(req, res) {
       `SELECT r.event_id,
               e.name,
               e.tag1,
+              e.datetime,  -- ✅ added date
               COUNT(r.id)::int AS user_tickets,
               COALESCE(array_remove(array_agg(r.ticket_code), NULL), ARRAY[]::text[]) AS ticket_codes,
               (SELECT COUNT(*) FROM favorites f WHERE f.event_id=e.id) AS hearts
        FROM registrations r
        JOIN events e ON r.event_id = e.id
        WHERE r.user_id=$1
-       GROUP BY r.event_id, e.name, e.tag1`,
+       GROUP BY r.event_id, e.name, e.tag1, e.datetime`,
       [userId]
     )
 
     const registrations = regRows.map(r => ({
       event_id: r.event_id,
       event_name: r.name,
+      datetime: r.datetime,
       user_tickets: r.user_tickets,
       ticket_codes: r.ticket_codes,
       max_per_user: r.tag1 === 'group' ? 5 : 1,

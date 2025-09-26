@@ -34,13 +34,14 @@ export default async function handler(req, res) {
     if (!userRows.length) return res.status(404).json({ error: 'User not found' })
     const userProfile = userRows[0]
 
-    // --- check hearts threshold ---
+    // --- check hearts threshold (disabled for now) ---
     const { rows: heartRows } = await pool.query(
       'SELECT COUNT(*)::int AS hearts FROM favorites WHERE event_id=$1',
       [eventId]
     )
     const hearts = heartRows[0]?.hearts || 0
-    const unlocked = hearts >= 10
+
+    const unlocked = true // ✅ always allow booking
     if (!unlocked) return res.status(400).json({ error: 'Event not yet unlocked', hearts })
 
     // --- enforce per-user limit ---
