@@ -25,10 +25,16 @@ function clearAuth() {
   try { localStorage.removeItem('edgy_auth_user') } catch (_) {}
 }
 
+// -------------------------
+// Helper
+// -------------------------
 function computeStage(preCount, minAttendees) {
   return preCount < (minAttendees || 0) ? 'prebook' : 'book'
 }
 
+// -------------------------
+// Component
+// -------------------------
 export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   const [counters, setCounters] = useState({ prebook_count: 0, book_count: 0 })
   const [stage, setStage] = useState(event.is_confirmed ? 'book' : computeStage(0, event.min_attendees))
@@ -36,42 +42,40 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   const [statusMsg, setStatusMsg] = useState('')
   const [userTickets, setUserTickets] = useState(0)
   const [maxPerUser, setMaxPerUser] = useState(event.tag1 === 'group' ? 5 : 1)
-
   const [internalModalOpen, setInternalModalOpen] = useState(false)
   const [confirmModalOpen, setConfirmModalOpen] = useState(false)
   const [agree, setAgree] = useState(false)
   const [registeredUsers, setRegisteredUsers] = useState({ prebook: 0, book: 0 })
-  const [isDisabled, setIsDisabled] = useState(false)
 
-  // --- fetch counters and stage ---
+  // -------------------------
+  // Fetch counters & stage
+  // -------------------------
   useEffect(() => {
     async function fetchCounters() {
       try {
         const res = await fetch(`/api/events/counters?eventId=${event.id}`)
-        if (res.ok) {
-          const data = await res.json()
-          const newStage = event.is_confirmed
-            ? 'book'
-            : computeStage(data.prebook_count, event.min_attendees)
-          setCounters(data)
-          setStage(newStage)
-        }
+        if (!res.ok) return
+        const data = await res.json()
+        const newStage = event.is_confirmed ? 'book' : computeStage(data.prebook_count, event.min_attendees)
+        setCounters(data)
+        setStage(newStage)
       } catch (err) {
-        console.error('❌ Failed counters:', err)
+        console.error('❌ Failed to fetch counters:', err)
       }
     }
     fetchCounters()
   }, [event.id, event.min_attendees, event.is_confirmed])
 
-  // --- fetch registered users for perks display ---
+  // -------------------------
+  // Fetch registered users for perks
+  // -------------------------
   useEffect(() => {
     async function fetchRegisteredUsers() {
       try {
         const res = await fetch(`/api/events/registeredUsers?eventId=${event.id}`)
-        if (res.ok) {
-          const data = await res.json()
-          setRegisteredUsers(data)
-        }
+        if (!res.ok) return
+        const data = await res.json()
+        setRegisteredUsers(data)
       } catch (err) {
         console.error('❌ Failed registered users:', err)
       }
@@ -79,7 +83,9 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
     fetchRegisteredUsers()
   }, [event.id])
 
-  // --- fetch user tickets ---
+  // -------------------------
+  // Fetch user tickets
+  // -------------------------
   useEffect(() => {
     async function fetchMyTickets() {
       if (!authUser) return
@@ -87,13 +93,13 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
         const token = localStorage.getItem('token')
         if (!token) return
         const res = await fetch('/api/user/me', {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         })
         if (!res.ok) return
         const data = await res.json()
         const reg = (data.registrations || []).find(r => r.event_id === event.id)
         if (reg) {
-          setUserTickets(reg.user_tickets || 1)
+          setUserTickets(reg.user_tickets || 0)
           setMaxPerUser(reg.max_per_user || (event.tag1 === 'group' ? 5 : 1))
         }
       } catch (err) {
@@ -105,20 +111,24 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
 
   const reachedLimit = userTickets >= maxPerUser
 
-  // --- handle registration ---
+  // -------------------------
+  // Handle registration / Stripe redirect
+  // -------------------------
   async function handleWebAction() {
+    if (!authUser) {
+      setShowAccountModal(true)
+      return
+    }
+    if (reachedLimit) return
+
     setLoading(true)
     setStatusMsg(stage === 'prebook' ? 'Joining…' : 'Booking…')
     try {
       const token = localStorage.getItem('token')
-      if (!token) {
-        setShowAccountModal(true)
-        return
-      }
       const res = await fetch('/api/events/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ eventId: event.id })
+        body: JSON.stringify({ eventId: event.id }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Registration failed')
@@ -127,6 +137,11 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
       setStage(data.stage)
       setUserTickets(prev => prev + 1)
       setStatusMsg(stage === 'prebook' ? 'Added to Guestlist!' : 'Booking confirmed!')
+
+      // Stripe redirect if clientSecret exists (paid event)
+      if (data.clientSecret) {
+        window.location.href = `/api/events/checkout?payment_intent_client_secret=${data.clientSecret}`
+      }
     } catch (err) {
       console.error('❌ Registration:', err)
       setStatusMsg('Error registering')
@@ -136,7 +151,11 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
     }
   }
 
+  // -------------------------
+  // Button label logic
+  // -------------------------
   function getWebButtonLabel() {
+    if (!authUser) return 'Go to login'
     if (reachedLimit) return `Max ${maxPerUser} tickets`
     if (loading) return statusMsg || (stage === 'prebook' ? 'Guestlist…' : 'Processing…')
     if (statusMsg) return statusMsg
@@ -145,6 +164,9 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
     return 'Registration Closed'
   }
 
+  // -------------------------
+  // JSX
+  // -------------------------
   return (
     <>
       {/* Main Card */}
@@ -154,10 +176,12 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
 
         <div className="flex flex-col gap-2 mt-auto mb-2">
           <button
-            onClick={() => setInternalModalOpen(true)}
+            onClick={handleWebAction}
             disabled={loading || reachedLimit}
             className={`w-full px-3 py-1 rounded ${
-              stage === 'book'
+              !authUser
+                ? 'bg-zinc-600 cursor-not-allowed'
+                : stage === 'book'
                 ? 'bg-blue-600 hover:bg-blue-700'
                 : 'bg-yellow-600 hover:bg-yellow-700'
             } text-white text-sm disabled:opacity-50`}
@@ -181,7 +205,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
              onClick={() => setInternalModalOpen(false)}>
           <div className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh]"
-               onClick={(e) => e.stopPropagation()}>
+               onClick={e => e.stopPropagation()}>
             <h2 className="text-xl font-bold mb-4">{event.name}</h2>
             <img src={event.image_url || '/default-event.jpg'} alt={event.name}
                  className="w-full h-56 object-contain rounded mb-4"/>
@@ -196,15 +220,11 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
 
             {(stage === 'prebook' || stage === 'book') && (
               <button
-                disabled={isDisabled}
+                disabled={loading || reachedLimit}
                 onClick={async () => { setInternalModalOpen(false); await handleWebAction() }}
                 className="mt-4 w-full px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
               >
-                {stage === 'prebook'
-                  ? 'Join Guestlist'
-                  : !event.price || Number(event.price) === 0
-                  ? 'Book Free'
-                  : 'Pay Now'}
+                {stage === 'prebook' ? 'Join Guestlist' : !event.price || Number(event.price) === 0 ? 'Book Free' : 'Pay Now'}
               </button>
             )}
 
@@ -221,7 +241,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
              onClick={() => setConfirmModalOpen(false)}>
           <div className="bg-zinc-900 rounded-2xl shadow-xl max-w-md w-full p-6 text-white relative"
-               onClick={(e) => e.stopPropagation()}>
+               onClick={e => e.stopPropagation()}>
             <h2 className="text-xl font-semibold mb-4 text-center">{event.name}</h2>
             <p className="mb-6 text-sm text-gray-300 text-center leading-relaxed">
               By confirming, you declare a genuine interest in participating.
@@ -229,7 +249,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
 
             <div className="flex flex-col gap-4">
               <label className="flex items-center gap-2 text-xs text-gray-300">
-                <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)}/>
+                <input type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)}/>
                 I agree to guidelines and receive emails for this event.
               </label>
 
@@ -241,11 +261,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
                   onClick={async () => { setConfirmModalOpen(false); await handleWebAction() }}
                   className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm disabled:opacity-50"
                 >
-                  {stage === 'prebook'
-                    ? 'Join Guestlist'
-                    : !event.price || Number(event.price) === 0
-                    ? 'Book Free'
-                    : 'Pay Now'}
+                  {stage === 'prebook' ? 'Join Guestlist' : !event.price || Number(event.price) === 0 ? 'Book Free' : 'Pay Now'}
                 </button>
               </div>
             </div>
@@ -255,7 +271,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
     </>
   )
 }
-
 
 
 function VideoHero() {
