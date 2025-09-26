@@ -1,4 +1,3 @@
-// pages/api/events/register.js
 import { pool } from '../../../lib/postgres.js'
 import { auth } from '../../../lib/auth.js'
 import Stripe from 'stripe'
@@ -22,47 +21,48 @@ export default async function handler(req, res) {
     if (!eventId) return res.status(400).json({ error: 'Missing eventId' })
     if (quantity < 1) return res.status(400).json({ error: 'Quantity must be >= 1' })
 
+    // --- fetch event ---
     const { rows: eventRows } = await pool.query('SELECT * FROM events WHERE id=$1', [eventId])
     if (!eventRows.length) return res.status(404).json({ error: 'Event not found' })
     const event = eventRows[0]
 
-    // --------------------------
-    // Count hearts
-    // --------------------------
+    // --- fetch user profile (for email + username) ---
+    const { rows: userRows } = await pool.query(
+      'SELECT username, email FROM user_profiles WHERE id=$1',
+      [userId]
+    )
+    if (!userRows.length) return res.status(404).json({ error: 'User not found' })
+    const userProfile = userRows[0]
+
+    // --- check hearts threshold ---
     const { rows: heartRows } = await pool.query(
       'SELECT COUNT(*)::int AS hearts FROM favorites WHERE event_id=$1',
       [eventId]
     )
     const hearts = heartRows[0]?.hearts || 0
-    const unlocked = hearts >= 10  // event unlock threshold
-
+    const unlocked = hearts >= 10
     if (!unlocked) return res.status(400).json({ error: 'Event not yet unlocked', hearts })
 
-    // --------------------------
-    // Enforce per-user limit
-    // --------------------------
+    // --- enforce per-user limit ---
     const maxPerUser = event.tag1 === 'group' ? 5 : 1
     const { rows: userCountRows } = await pool.query(
-      `SELECT COUNT(*)::int AS cnt FROM registrations WHERE event_id=$1 AND user_id=$2`,
+      'SELECT COUNT(*)::int AS cnt FROM registrations WHERE event_id=$1 AND user_id=$2',
       [eventId, userId]
     )
     const userCount = userCountRows[0]?.cnt || 0
-    if (userCount + quantity > maxPerUser) return res.status(400).json({ error: 'Max tickets reached' })
+    if (userCount + quantity > maxPerUser)
+      return res.status(400).json({ error: 'Max tickets reached' })
 
-    // --------------------------
-    // Enforce global max attendees
-    // --------------------------
+    // --- enforce global max attendees ---
     const { rows: totalRows } = await pool.query(
-      `SELECT COUNT(*)::int AS total FROM registrations WHERE event_id=$1`,
+      'SELECT COUNT(*)::int AS total FROM registrations WHERE event_id=$1',
       [eventId]
     )
     const totalRegistered = totalRows[0]?.total || 0
     if (totalRegistered + quantity > (event.max_attendees || 40))
       return res.status(400).json({ error: 'Event full' })
 
-    // --------------------------
-    // New registrations
-    // --------------------------
+    // --- insert registrations ---
     const registrations = []
     let clientSecret = null
     const price = Number(event.price) || 0
@@ -77,13 +77,20 @@ export default async function handler(req, res) {
           [eventId, userId, ticketCode]
         )
         registrations.push(rows[0])
-        if (decoded.email) await sendTicketEmail(decoded.email, event, { ...decoded, ticket_code: ticketCode })
+
+        // ✅ Always use DB email, not JWT
+        if (userProfile.email) {
+          await sendTicketEmail(userProfile.email, event, {
+            username: userProfile.username,
+            ticket_code: ticketCode,
+          })
+        }
       } else {
         const paymentIntent = await stripe.paymentIntents.create({
           amount: Math.round(price * 100),
           currency: 'usd',
           metadata: { eventId, userId },
-          receipt_email: decoded.email || undefined,
+          receipt_email: userProfile.email || undefined,
         })
 
         const { rows } = await pool.query(
