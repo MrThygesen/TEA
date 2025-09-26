@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     if (!profileRows.length) return res.status(404).json({ error: 'User not found' })
     const profile = profileRows[0]
 
-    // Get user’s registrations with tickets
+    // ✅ Fix: join favorites instead of subquery
     const { rows: regRows } = await pool.query(
       `SELECT r.event_id,
               e.name,
@@ -37,9 +37,10 @@ export default async function handler(req, res) {
               e.datetime,
               COUNT(r.id)::int AS user_tickets,
               COALESCE(array_remove(array_agg(r.ticket_code), NULL), ARRAY[]::text[]) AS ticket_codes,
-              (SELECT COUNT(*) FROM favorites f WHERE f.event_id=e.id) AS hearts
+              COUNT(DISTINCT f.id)::int AS hearts
        FROM registrations r
        JOIN events e ON r.event_id = e.id
+       LEFT JOIN favorites f ON f.event_id = e.id
        WHERE r.user_id=$1
        GROUP BY r.event_id, e.name, e.tag1, e.datetime`,
       [userId]
