@@ -1,50 +1,30 @@
 'use client'
+
 import { useState, useEffect } from 'react'
-import QRCode from 'react-qr-code'
+import QRCode from 'qrcode.react'
 
 export default function YourAccountModal({ onClose, refreshTrigger }) {
-  const [profile, setProfile] = useState(null)
+  const [profile, setProfile] = useState({ username: '', email: '' })
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
-  const [qrModal, setQrModal] = useState(null)
 
   useEffect(() => {
     async function loadAccount() {
       setLoading(true)
-      const token = localStorage.getItem('token')
-      if (!token) {
-        setProfile(null)
-        setTickets([])
-        setLoading(false)
-        return
-      }
-
       try {
-        // fetch profile
-        const profileRes = await fetch('/api/user/me', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        if (profileRes.ok) {
-          const data = await profileRes.json()
-          setProfile(data || null)
-        } else {
-          setProfile(null)
-        }
+        const token = localStorage.getItem('token')
+        if (!token) return
 
-        // fetch tickets
-        const ticketsRes = await fetch('/api/user/myTickets', {
-          headers: { Authorization: `Bearer ${token}` }
+        const res = await fetch('/api/user/me', {
+          headers: { Authorization: `Bearer ${token}` },
         })
-        if (ticketsRes.ok) {
-          const data = await ticketsRes.json()
-          setTickets(Array.isArray(data.tickets) ? data.tickets : [])
-        } else {
-          setTickets([])
-        }
+        if (!res.ok) throw new Error('Failed to load profile')
+        const data = await res.json()
+
+        setProfile({ username: data.username, email: data.email })
+        setTickets(data.registrations || [])
       } catch (err) {
-        console.error('Failed to load account info', err)
-        setProfile(null)
-        setTickets([])
+        console.error(err)
       } finally {
         setLoading(false)
       }
@@ -54,87 +34,59 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
   }, [refreshTrigger])
 
   return (
-    <>
-      {/* Main Account Modal */}
+    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
       <div
-        className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
-        onClick={onClose}
+        className="bg-zinc-900 rounded-lg max-w-3xl w-full p-6 overflow-auto max-h-[90vh]"
+        onClick={(e) => e.stopPropagation()}
       >
-        <div
-          className="bg-zinc-900 rounded-xl max-w-lg w-full p-6 text-white relative overflow-auto max-h-[90vh]"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            onClick={onClose}
-            className="absolute top-2 right-2 text-gray-400 hover:text-gray-200"
-          >
-            ✕
-          </button>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold text-blue-400">Your Account</h2>
+          <button onClick={onClose} className="text-white text-xl font-bold">✕</button>
+        </div>
 
-          <h2 className="text-xl font-bold mb-4">Your Account</h2>
+        {loading ? (
+          <p className="text-gray-400">Loading...</p>
+        ) : (
+          <>
+            <div className="mb-6">
+              <p><strong>Username:</strong> {profile.username}</p>
+              <p><strong>Email:</strong> {profile.email}</p>
+            </div>
 
-          {loading ? (
-            <p className="text-gray-400">Loading...</p>
-          ) : profile ? (
-            <>
-              <div className="mb-4">
-                <p><strong>Username:</strong> {profile.username || '—'}</p>
-                <p><strong>Email:</strong> {profile.email || '—'}</p>
+            <h3 className="text-xl font-semibold mb-2 text-blue-400">Your Bookings</h3>
+            {tickets.length === 0 ? (
+              <p className="text-gray-400">You have no booked tickets.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full table-auto border-collapse border border-zinc-700 text-sm">
+                  <thead>
+                    <tr className="bg-zinc-800">
+                      <th className="border border-zinc-700 px-3 py-1 text-left">Date</th>
+                      <th className="border border-zinc-700 px-3 py-1 text-left">Event</th>
+                      <th className="border border-zinc-700 px-3 py-1 text-left">Status</th>
+                      <th className="border border-zinc-700 px-3 py-1 text-left">QR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tickets.map((t, i) => (
+                      <tr key={i} className="odd:bg-zinc-800 even:bg-zinc-700">
+                        <td className="border border-zinc-700 px-3 py-1">{new Date(t.datetime).toLocaleDateString()}</td>
+                        <td className="border border-zinc-700 px-3 py-1">
+                          <a href={`/events/${t.event_id}`} className="text-blue-400 hover:underline">{t.event_name}</a>
+                        </td>
+                        <td className="border border-zinc-700 px-3 py-1">{t.user_tickets} / {t.max_per_user}</td>
+                        <td className="border border-zinc-700 px-3 py-1">
+                          <QRCode value={t.qr_code || `${t.event_id}-${t.user_id}`} size={64} bgColor="#1f2937" fgColor="#ffffff" />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-
-              <h3 className="text-lg font-semibold mb-2">Your Tickets</h3>
-              {tickets.length === 0 ? (
-                <p className="text-gray-400">No tickets yet.</p>
-              ) : (
-                <ul className="space-y-2">
-                  {tickets.map((ticket) => (
-                    <li
-                      key={ticket.id || Math.random()}
-                      className="p-2 bg-zinc-800 rounded flex justify-between items-center"
-                    >
-                      <span>
-                        {ticket.event_name || 'Unknown Event'} — {ticket.stage || 'Unknown'}
-                      </span>
-                      {ticket.qrData ? (
-                        <button onClick={() => setQrModal(ticket)}>
-                          <QRCode value={ticket.qrData} size={48} />
-                        </button>
-                      ) : (
-                        <span className="text-xs text-gray-400">No QR</span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
-          ) : (
-            <p className="text-gray-400">Not logged in.</p>
-          )}
-        </div>
+            )}
+          </>
+        )}
       </div>
-
-      {/* QR Enlarge Modal */}
-      {qrModal && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50"
-          onClick={() => setQrModal(null)}
-        >
-          <div
-            className="bg-zinc-900 p-6 rounded-lg"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="mb-4">{qrModal.event_name}</h3>
-            <QRCode value={qrModal.qrData} size={256} />
-            <button
-              onClick={() => setQrModal(null)}
-              className="mt-4 px-4 py-2 bg-blue-600 rounded text-white"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
-    </>
+    </div>
   )
 }
-

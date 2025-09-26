@@ -26,7 +26,8 @@ function clearAuth() {
 }
 
 
-//DynamicEventCard
+import { useState, useEffect } from 'react'
+
 export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   const [heartCount, setHeartCount] = useState(0)
   const [bookable, setBookable] = useState(event.is_confirmed)
@@ -34,12 +35,10 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   const [statusMsg, setStatusMsg] = useState('')
   const [userTickets, setUserTickets] = useState(0)
   const [maxPerUser, setMaxPerUser] = useState(event.tag1 === 'group' ? 5 : 1)
-  const [internalModalOpen, setInternalModalOpen] = useState(false)
-  const [confirmModalOpen, setConfirmModalOpen] = useState(false)
-  const [agree, setAgree] = useState(false)
 
+  const HEART_THRESHOLD = 10
 
-  // Fetch hearts count
+  // Fetch hearts
   useEffect(() => {
     async function fetchHearts() {
       try {
@@ -47,18 +46,18 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
         if (!res.ok) return
         const data = await res.json()
         setHeartCount(data.count)
-        setBookable(data.count >= 10 || event.is_confirmed)
+        setBookable(data.count >= HEART_THRESHOLD || event.is_confirmed)
       } catch (err) {
-        console.error('❌ Failed to fetch hearts:', err)
+        console.error('Failed to fetch hearts', err)
       }
     }
     fetchHearts()
   }, [event.id, event.is_confirmed])
 
-  // Fetch user's booked tickets
+  // Fetch user's tickets
   useEffect(() => {
+    if (!authUser) return
     async function fetchMyTickets() {
-      if (!authUser) return
       try {
         const token = localStorage.getItem('token')
         if (!token) return
@@ -73,7 +72,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
           setMaxPerUser(reg.max_per_user || (event.tag1 === 'group' ? 5 : 1))
         }
       } catch (err) {
-        console.error('❌ Failed to fetch my tickets:', err)
+        console.error('Failed to fetch my tickets', err)
       }
     }
     fetchMyTickets()
@@ -81,13 +80,13 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
 
   const reachedLimit = userTickets >= maxPerUser
 
-  // Handle registration
-  async function handleWebAction() {
+  // Handle booking
+  async function handleBooking() {
     if (!authUser) {
       setShowAccountModal(true)
       return
     }
-    if (reachedLimit || !bookable) return
+    if (!bookable || reachedLimit) return
 
     setLoading(true)
     setStatusMsg('Processing…')
@@ -104,20 +103,20 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
       setUserTickets(prev => prev + 1)
       setStatusMsg('Booking confirmed!')
 
-      // If paid event, redirect to Stripe checkout
+      // Paid event -> redirect to Stripe checkout
       if (data.clientSecret) {
         window.location.href = `/api/events/checkout?payment_intent_client_secret=${data.clientSecret}`
       }
     } catch (err) {
-      console.error('❌ Registration:', err)
+      console.error(err)
       setStatusMsg('Error registering')
     } finally {
       setLoading(false)
-      setTimeout(() => setStatusMsg(''), 2000)
+      setTimeout(() => setStatusMsg(''), 2500)
     }
   }
 
-  // Handle heart click
+  // Handle hearts
   async function handleHeartClick() {
     try {
       const token = localStorage.getItem('token') || ''
@@ -132,24 +131,24 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
       if (!res.ok) throw new Error('Failed to like')
       const data = await res.json()
       setHeartCount(data.count)
-      if (data.count >= 10) setBookable(true)
+      if (data.count >= HEART_THRESHOLD) setBookable(true)
     } catch (err) {
       console.error(err)
     }
   }
 
-  function getWebButtonLabel() {
+  function getButtonLabel() {
     if (!authUser) return 'Go to login'
     if (reachedLimit) return `Max ${maxPerUser} tickets`
-    if (!bookable) return `Needs 10 hearts (${heartCount}/10)`
+    if (!bookable) return `Needs ${HEART_THRESHOLD} hearts (${heartCount}/${HEART_THRESHOLD})`
     if (loading) return statusMsg || 'Processing…'
-    if (statusMsg) return statusMsg
-    return !event.price || Number(event.price) === 0 ? 'Book Free' : 'Pay Now'
+    if (event.price && Number(event.price) > 0) return 'Pay Now'
+    return 'Book Free'
   }
 
-return (
-  <>
-    <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800 shadow flex flex-col justify-between">
+  return (
+<>  
+  <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800 shadow flex flex-col justify-between">
       <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
       <p className="text-sm mb-2">{event.description}</p>
 
@@ -159,22 +158,24 @@ return (
         <span className="text-sm text-gray-400">{heartCount} hearts</span>
       </div>
 
+      {/* Booking button */}
       <div className="flex flex-col gap-2 mt-auto mb-2">
         <button
-          onClick={handleWebAction}
-          disabled={loading || reachedLimit || !bookable}
+          onClick={handleBooking}
+          disabled={!bookable || loading || reachedLimit}
           className={`w-full px-3 py-1 rounded ${
             !authUser
               ? 'bg-zinc-600 cursor-not-allowed'
               : 'bg-blue-600 hover:bg-blue-700'
           } text-white text-sm disabled:opacity-50`}
         >
-          {getWebButtonLabel()}
+          {getButtonLabel()}
         </button>
       </div>
 
+      {/* Footer info */}
       <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
-        <span>💰 {event.price > 0 ? `${event.price} USD` : 'Free'}</span>
+        <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
         <span>👥 Booked: {userTickets} / {event.max_attendees || '∞'}</span>
       </div>
     </div>
@@ -202,7 +203,7 @@ return (
     )}
   </>
 )
-} // <-- THIS WAS MISSING
+} 
 
 function VideoHero() {
   const [open, setOpen] = useState(false);
