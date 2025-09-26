@@ -4,98 +4,105 @@ import { useState, useEffect } from 'react'
 import QRCode from 'qrcode.react'
 
 export default function YourAccountModal({ onClose, refreshTrigger }) {
-  const [profile, setProfile] = useState({ username: '', email: '' })
-  const [tickets, setTickets] = useState([])
+  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function loadAccount() {
       setLoading(true)
       try {
-        const token = localStorage.getItem('token')
-        if (!token) return
+        const token = localStorage.getItem('auth_token')
+        if (!token) {
+          setProfile(null)
+          setLoading(false)
+          return
+        }
+
         const res = await fetch('/api/user/me', {
           headers: { Authorization: `Bearer ${token}` },
         })
-        if (!res.ok) throw new Error('Failed to load profile')
         const data = await res.json()
-        setProfile({ username: data.username, email: data.email })
-        setTickets(data.registrations || [])
+        if (res.ok) {
+          setProfile(data)
+        } else {
+          console.error('❌ me.js error:', data)
+          setProfile(null)
+        }
       } catch (err) {
-        console.error('❌ Load account:', err)
-      } finally {
-        setLoading(false)
+        console.error('❌ Fetch error in YourAccountModal:', err)
+        setProfile(null)
       }
+      setLoading(false)
     }
     loadAccount()
   }, [refreshTrigger])
 
+  if (loading) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="bg-white p-6 rounded shadow-md">Loading...</div>
+      </div>
+    )
+  }
+
+  if (!profile) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="bg-white p-6 rounded shadow-md">
+          <p>No profile found. Please log in.</p>
+          <button onClick={onClose} className="mt-4 px-4 py-2 bg-blue-500 text-white rounded">
+            Close
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
-      <div
-        className="bg-zinc-900 rounded-lg max-w-3xl w-full p-6 overflow-auto max-h-[90vh]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold text-blue-400">Your Account</h2>
-          <button onClick={onClose} className="text-white text-xl font-bold">✕</button>
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 overflow-y-auto">
+      <div className="bg-white p-6 rounded shadow-lg w-full max-w-lg">
+        <h2 className="text-xl font-bold mb-4">Your Account</h2>
+
+        {/* Profile Info */}
+        <div className="mb-4">
+          <p><strong>Username:</strong> {profile.username}</p>
+          <p><strong>Email:</strong> {profile.email}</p>
+          <p><strong>Wallet:</strong> {profile.wallet_address || 'N/A'}</p>
+          <p><strong>City:</strong> {profile.city}</p>
+          <p><strong>Role:</strong> {profile.role}</p>
         </div>
 
-        {loading ? (
-          <p className="text-gray-400">Loading...</p>
+        {/* Tickets */}
+        <h3 className="text-lg font-semibold mb-2">Your Tickets</h3>
+        {profile.registrations?.length === 0 ? (
+          <p>No tickets yet.</p>
         ) : (
-          <>
-            <div className="mb-6">
-              <p><strong>Username:</strong> {profile.username}</p>
-              <p><strong>Email:</strong> {profile.email}</p>
-            </div>
+          profile.registrations.map((reg) => (
+            <div key={reg.event_id} className="border rounded p-3 mb-4">
+              <p className="font-semibold">{reg.event_name}</p>
+              <p className="text-sm text-gray-600">
+                {new Date(reg.datetime).toLocaleString()}
+              </p>
+              <p className="text-sm">Tickets: {reg.user_tickets} / {reg.max_per_user}</p>
 
-            <h3 className="text-xl font-semibold mb-2 text-blue-400">Your Bookings</h3>
-            {tickets.length === 0 ? (
-              <p className="text-gray-400">You have no booked tickets.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full table-auto border-collapse border border-zinc-700 text-sm">
-                  <thead>
-                    <tr className="bg-zinc-800">
-                      <th className="border border-zinc-700 px-3 py-1 text-left">Date</th>
-                      <th className="border border-zinc-700 px-3 py-1 text-left">Event</th>
-                      <th className="border border-zinc-700 px-3 py-1 text-left">Status</th>
-                      <th className="border border-zinc-700 px-3 py-1 text-left">QR</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tickets.map((t, i) => (
-                      <tr key={i} className="odd:bg-zinc-800 even:bg-zinc-700">
-                        <td className="border border-zinc-700 px-3 py-1">
-                          {t.datetime ? new Date(t.datetime).toLocaleDateString() : '—'}
-                        </td>
-                        <td className="border border-zinc-700 px-3 py-1">
-                          <a href={`/events/${t.event_id}`} className="text-blue-400 hover:underline">
-                            {t.event_name}
-                          </a>
-                        </td>
-                        <td className="border border-zinc-700 px-3 py-1">
-                          {t.user_tickets} / {t.max_per_user}
-                        </td>
-                        <td className="border border-zinc-700 px-3 py-1">
-                          {t.ticket_codes && t.ticket_codes.length > 0 ? (
-                            <QRCode
-                              value={t.ticket_codes[0]}
-                              size={64}
-                              bgColor="#1f2937"
-                              fgColor="#ffffff"
-                            />
-                          ) : '—'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {reg.ticket_codes.map((code, idx) => (
+                  <div key={idx} className="flex flex-col items-center border rounded p-2">
+                    <QRCode value={code} size={80} />
+                    <p className="text-xs mt-1">{code.slice(0, 8)}...</p>
+                  </div>
+                ))}
               </div>
-            )}
-          </>
+            </div>
+          ))
         )}
+
+        <button
+          onClick={onClose}
+          className="mt-4 px-4 py-2 bg-gray-500 text-white rounded"
+        >
+          Close
+        </button>
       </div>
     </div>
   )

@@ -24,7 +24,7 @@ export default async function handler(req, res) {
 
     // Count existing tickets for this user
     const userTicketsRes = await pool.query(
-      'SELECT SUM(user_tickets) AS total FROM registrations WHERE event_id=$1 AND user_id=$2',
+      'SELECT COUNT(*) AS total FROM registrations WHERE event_id=$1 AND user_id=$2',
       [eventId, userId]
     )
     const currentTickets = parseInt(userTicketsRes.rows[0].total) || 0
@@ -35,36 +35,40 @@ export default async function handler(req, res) {
 
     // Price & Stripe logic
     let clientSecret = null
-    if (event.price > 0) {
+    if (parseFloat(event.price) > 0) {
       const paymentIntent = await stripe.paymentIntents.create({
-        amount: event.price * quantity,
+        amount: Math.round(parseFloat(event.price) * 100 * quantity), // convert to cents
         currency: 'usd',
         metadata: { eventId, userId },
       })
       clientSecret = paymentIntent.client_secret
     }
 
-    // Insert registration(s)
-    const insertRes = await pool.query(
-      'INSERT INTO registrations (user_id, event_id, user_tickets) VALUES ($1, $2, $3) RETURNING *',
-      [userId, eventId, quantity]
-    )
+    // Insert one row per ticket
+    const inserted = []
+    for (let i = 0; i < quantity; i++) {
+      const result = await pool.query(
+        'INSERT INTO registrations (user_id, event_id, email) VALUES ($1, $2, $3) RETURNING *',
+        [userId, eventId, req.body.email || null]
+      )
+      inserted.push(result.rows[0])
+    }
 
     // Send email (free or paid)
     await sendEmail({
-      to: req.body.email || userId, // fallback: userId/email mapping
+      to: req.body.email, // make sure frontend sends email in body
       subject: `Your Ticket for ${event.name}`,
       text: `You successfully registered ${quantity} ticket(s) for "${event.name}".`,
     })
 
     res.status(200).json({
       success: true,
-      registrations: insertRes.rows,
+      registrations: inserted,
       clientSecret,
       userTickets: currentTickets + quantity,
     })
   } catch (err) {
-    console.error(err)
+    console.error('❌ register.js error:', err)
     res.status(500).json({ error: 'Server error', details: err.message })
   }
 }

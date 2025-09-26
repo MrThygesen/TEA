@@ -1,3 +1,4 @@
+//index.js 
 'use client'      
 
 import { useState, useEffect } from 'react'
@@ -25,6 +26,8 @@ function clearAuth() {
   try { localStorage.removeItem('edgy_auth_user') } catch (_) {}
 }
 
+
+
 export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   const [heartCount, setHeartCount] = useState(0)
   const [bookable, setBookable] = useState(event.is_confirmed)
@@ -32,6 +35,9 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   const [statusMsg, setStatusMsg] = useState('')
   const [userTickets, setUserTickets] = useState(0)
   const [maxPerUser, setMaxPerUser] = useState(event.tag1 === 'group' ? 5 : 1)
+
+  const [quantity, setQuantity] = useState(1)
+  const [email, setEmail] = useState(authUser?.email || '')
 
   const [showPolicyModal, setShowPolicyModal] = useState(false)
   const [agreed, setAgreed] = useState(false)
@@ -95,12 +101,12 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
       const res = await fetch('/api/events/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ eventId: event.id }),
+        body: JSON.stringify({ eventId: event.id, quantity, email }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Registration failed')
 
-      setUserTickets(prev => prev + 1)
+      setUserTickets(prev => prev + quantity)
       setStatusMsg('Booking confirmed!')
 
       // redirect paid event → Stripe
@@ -215,6 +221,32 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
               </p>
             </div>
 
+            {/* Email input */}
+            <label className="block mb-3 text-sm">
+              Email for ticket:
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className="w-full mt-1 p-2 rounded bg-zinc-800 border border-zinc-600 text-white text-sm"
+                placeholder="you@example.com"
+                required
+              />
+            </label>
+
+            {/* Quantity input */}
+            <label className="block mb-4 text-sm">
+              Quantity:
+              <input
+                type="number"
+                value={quantity}
+                onChange={e => setQuantity(Number(e.target.value))}
+                min={1}
+                max={maxPerUser - userTickets}
+                className="w-full mt-1 p-2 rounded bg-zinc-800 border border-zinc-600 text-white text-sm"
+              />
+            </label>
+
             <label className="flex items-center gap-2 mb-4">
               <input
                 type="checkbox"
@@ -234,7 +266,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
               </button>
               <button
                 onClick={handleBooking}
-                disabled={!agreed || loading}
+                disabled={!agreed || loading || !email}
                 className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
               >
                 {loading ? 'Processing…' : 'Confirm & Book'}
@@ -246,6 +278,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
     </>
   )
 }
+
 
 function VideoHero() {
   const [open, setOpen] = useState(false);
