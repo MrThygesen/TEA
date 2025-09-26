@@ -25,9 +25,6 @@ function clearAuth() {
   try { localStorage.removeItem('edgy_auth_user') } catch (_) {}
 }
 
-
-import { useState, useEffect } from 'react'
-
 export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   const [heartCount, setHeartCount] = useState(0)
   const [bookable, setBookable] = useState(event.is_confirmed)
