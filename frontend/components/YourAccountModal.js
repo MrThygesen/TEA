@@ -14,22 +14,19 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
       try {
         const token = localStorage.getItem('token')
         if (!token) return
-
         const res = await fetch('/api/user/me', {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (!res.ok) throw new Error('Failed to load profile')
         const data = await res.json()
-
         setProfile({ username: data.username, email: data.email })
         setTickets(data.registrations || [])
       } catch (err) {
-        console.error(err)
+        console.error('❌ Load account:', err)
       } finally {
         setLoading(false)
       }
     }
-
     loadAccount()
   }, [refreshTrigger])
 
@@ -70,13 +67,26 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                   <tbody>
                     {tickets.map((t, i) => (
                       <tr key={i} className="odd:bg-zinc-800 even:bg-zinc-700">
-                        <td className="border border-zinc-700 px-3 py-1">{new Date(t.datetime).toLocaleDateString()}</td>
                         <td className="border border-zinc-700 px-3 py-1">
-                          <a href={`/events/${t.event_id}`} className="text-blue-400 hover:underline">{t.event_name}</a>
+                          {new Date().toLocaleDateString()} {/* Replace if events have datetime */}
                         </td>
-                        <td className="border border-zinc-700 px-3 py-1">{t.user_tickets} / {t.max_per_user}</td>
                         <td className="border border-zinc-700 px-3 py-1">
-                          <QRCode value={t.qr_code || `${t.event_id}-${t.user_id}`} size={64} bgColor="#1f2937" fgColor="#ffffff" />
+                          <a href={`/events/${t.event_id}`} className="text-blue-400 hover:underline">
+                            {t.event_name}
+                          </a>
+                        </td>
+                        <td className="border border-zinc-700 px-3 py-1">
+                          {t.user_tickets} / {t.max_per_user}
+                        </td>
+                        <td className="border border-zinc-700 px-3 py-1">
+                          {t.ticket_codes && t.ticket_codes.length > 0 ? (
+                            <QRCode
+                              value={t.ticket_codes[0]}
+                              size={64}
+                              bgColor="#1f2937"
+                              fgColor="#ffffff"
+                            />
+                          ) : '—'}
                         </td>
                       </tr>
                     ))}
@@ -90,3 +100,4 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     </div>
   )
 }
+
