@@ -25,6 +25,8 @@ function clearAuth() {
   try { localStorage.removeItem('edgy_auth_user') } catch (_) {}
 }
 
+
+//DynamicEventCard
 export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   const [heartCount, setHeartCount] = useState(0)
   const [bookable, setBookable] = useState(event.is_confirmed)
@@ -32,6 +34,10 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   const [statusMsg, setStatusMsg] = useState('')
   const [userTickets, setUserTickets] = useState(0)
   const [maxPerUser, setMaxPerUser] = useState(event.tag1 === 'group' ? 5 : 1)
+  const [internalModalOpen, setInternalModalOpen] = useState(false)
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false)
+  const [agree, setAgree] = useState(false)
+
 
   // Fetch hearts count
   useEffect(() => {
