@@ -11,7 +11,8 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     async function loadAccount() {
       setLoading(true)
       try {
-        const token = localStorage.getItem('auth_token')
+        // ✅ Use the correct token key that your backend expects
+        const token = localStorage.getItem('token')  // match frontend storage
         if (!token) {
           setProfile(null)
           setLoading(false)
@@ -21,11 +22,12 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         const res = await fetch('/api/user/me', {
           headers: { Authorization: `Bearer ${token}` },
         })
+
         const data = await res.json()
         if (res.ok) {
           setProfile(data)
         } else {
-          console.error('❌ me.js error:', data)
+          console.error('❌ /api/user/me error:', data)
           setProfile(null)
         }
       } catch (err) {
@@ -34,6 +36,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
       }
       setLoading(false)
     }
+
     loadAccount()
   }, [refreshTrigger])
 
@@ -74,7 +77,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
 
         {/* Tickets */}
         <h3 className="text-lg font-semibold mb-2">Your Tickets</h3>
-        {profile.registrations?.length === 0 ? (
+        {(!profile.registrations || profile.registrations.length === 0) ? (
           <p>No tickets yet.</p>
         ) : (
           profile.registrations.map((reg) => (
