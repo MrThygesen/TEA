@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import QRCode from 'qrcode.react'
 import Link from 'next/link'
 
-export default function YourAccountModal({ onClose, refreshTrigger, userId }) {
+export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [profile, setProfile] = useState(null)
   const [registrations, setRegistrations] = useState([])
   const [loading, setLoading] = useState(true)
@@ -36,9 +36,6 @@ export default function YourAccountModal({ onClose, refreshTrigger, userId }) {
     }
     loadAccount()
   }, [refreshTrigger])
-
-  // Generate QR value
-  const qrValue = (eventId) => `ticket:${eventId}:${profile?.id || userId}`
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
@@ -112,12 +109,16 @@ export default function YourAccountModal({ onClose, refreshTrigger, userId }) {
                           </td>
                           <td className="px-3 py-2 border border-zinc-700">{r.popularity || 0}</td>
                           <td className="px-3 py-2 border border-zinc-700">
-                            <div
-                              className="cursor-pointer"
-                              onClick={() => setActiveQR(qrValue(r.event_id))}
-                            >
-                              <QRCode value={qrValue(r.event_id)} size={48} />
-                            </div>
+                            {r.ticket_code ? (
+                              <div
+                                className="cursor-pointer"
+                                onClick={() => setActiveQR(r.ticket_code)}
+                              >
+                                <QRCode value={r.ticket_code} size={48} />
+                              </div>
+                            ) : (
+                              <span className="text-gray-500">No QR</span>
+                            )}
                           </td>
                         </tr>
                       )
