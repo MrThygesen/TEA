@@ -125,25 +125,29 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   }
 
   // --- hearts handler ---
-  async function handleHeartClick() {
-    try {
-      const token = localStorage.getItem('token') || ''
-      const res = await fetch('/api/events/favorite', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: token ? `Bearer ${token}` : ''
-        },
-        body: JSON.stringify({ eventId: event.id })
-      })
-      if (!res.ok) throw new Error('Failed to like')
-      const data = await res.json()
-      setHeartCount(data.count)
-      if (data.count >= HEART_THRESHOLD) setBookable(true)
-    } catch (err) {
-      console.error(err)
-    }
+ async function handleHeartClick() {
+  try {
+    const token = localStorage.getItem('token') || ''
+    const res = await fetch('/api/events/favorite', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: token ? `Bearer ${token}` : ''
+      },
+      body: JSON.stringify({ eventId: event.id })
+    })
+    if (!res.ok) throw new Error('Failed to like')
+    const data = await res.json()
+    setHeartCount(data.count)
+    if (data.count >= HEART_THRESHOLD) setBookable(true)
+
+    // ✅ move status update here
+    setStatusMsg('❤️ Liked!')
+    setTimeout(() => setStatusMsg(''), 1500)
+  } catch (err) {
+    console.error(err)
   }
+}
 
   function getButtonLabel() {
     if (!authUser) return 'Go to login'
@@ -159,12 +163,13 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
     <>
       <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800 shadow flex flex-col justify-between relative">
         {/* Heart top right */}
-        <button
-          onClick={handleHeartClick}
-          className="absolute top-2 right-2 text-red-500 text-xl"
-        >
-          ❤️ {heartCount}/{HEART_THRESHOLD}
-        </button>
+<button
+  onClick={handleHeartClick}
+  className="relative text-red-500 text-2xl transition-transform transform hover:scale-125 active:scale-90"
+>
+  ❤️ {heartCount}/{HEART_THRESHOLD}
+  <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-0 hover:opacity-40 animate-shine"></span>
+</button>
 
         <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
         <p className="text-sm mb-2">{event.description}</p>

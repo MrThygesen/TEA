@@ -2,7 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Smooth scrolling for all pages */
 html {
   scroll-behavior: smooth;
+}
+
+/* Shiny animation effect */
+@keyframes shine {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.animate-shine {
+  background-size: 200% auto;
+  animation: shine 1s linear infinite;
 }
 
