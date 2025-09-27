@@ -9,31 +9,31 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    async function loadAccount() {
-      setLoading(true)
-      try {
-        const token = localStorage.getItem('token')
-        if (!token) return
+useEffect(() => {
+  async function loadAccount() {
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return
 
-        const res = await fetch('/api/user/myTickets', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+      const res = await fetch('/api/user/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
 
-        if (!res.ok) return
+      if (!res.ok) throw new Error('Failed to load profile')
 
-        const data = await res.json()
-        setProfile(data.user || null)
-        setTickets(data.tickets || [])
-      } catch (err) {
-        console.error('Failed to load account:', err)
-      } finally {
-        setLoading(false)
-      }
+      const data = await res.json()
+      setProfile(data || null)
+      setTickets(data.registrations || [])
+    } catch (err) {
+      console.error('Failed to load account:', err)
+    } finally {
+      setLoading(false)
     }
+  }
 
-    loadAccount()
-  }, [refreshTrigger])
+  loadAccount()
+}, [refreshTrigger])
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">

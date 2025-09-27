@@ -60,33 +60,33 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
     fetchHearts()
   }, [event.id, event.is_confirmed])
 
-  // --- fetch user tickets ---
+  // --- fetch user tickets from /api/user/myTickets ---
   useEffect(() => {
     if (!authUser) return
     async function fetchMyTickets() {
       try {
         const token = localStorage.getItem('token')
         if (!token) return
-        const res = await fetch('/api/user/me', {
-          headers: { Authorization: `Bearer ${token}` },
+        const res = await fetch('/api/user/myTickets', {
+          headers: { Authorization: `Bearer ${token}` }
         })
         if (!res.ok) return
         const data = await res.json()
-        const reg = (data.registrations || []).find(r => r.event_id === event.id)
-        if (reg) {
-          setUserTickets(reg.user_tickets || 0)
-          setMaxPerUser(reg.max_per_user || (event.tag1 === 'group' ? 5 : 1))
-        }
+        // find tickets for this event
+        const myTickets = (data.tickets || []).filter(t => t.event_id === event.id)
+        const total = myTickets.reduce((sum, t) => sum + (t.quantity || 1), 0)
+        setUserTickets(total)
+        setMaxPerUser(event.tag1 === 'group' ? 5 : 1) // keep simple max per user logic
       } catch (err) {
         console.error('Failed to fetch my tickets', err)
       }
     }
     fetchMyTickets()
-  }, [authUser, event.id, event.tag1])
+  }, [authUser, event.id, event.tag1, refreshTrigger])
 
   const reachedLimit = userTickets >= maxPerUser
 
-  // --- booking handler ---
+  // --- handle booking ---
   async function handleBooking() {
     if (!authUser) {
       setShowAccountModal(true)
@@ -101,15 +101,17 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
       const res = await fetch('/api/events/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ eventId: event.id, quantity, email }),
+        body: JSON.stringify({ eventId: event.id, quantity, email })
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Registration failed')
 
+      // update user tickets from response
       setUserTickets(data.userTickets || userTickets + quantity)
       setStatusMsg('Booking confirmed!')
+      setRefreshTrigger(prev => prev + 1)   // <-- notify index.js
 
-      // redirect paid event → Stripe
+      // redirect to Stripe checkout if needed
       if (data.clientSecret) {
         window.location.href = `/api/events/checkout?payment_intent_client_secret=${data.clientSecret}`
       }
@@ -124,30 +126,28 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
     }
   }
 
-  // --- hearts handler ---
- async function handleHeartClick() {
-  try {
-    const token = localStorage.getItem('token') || ''
-    const res = await fetch('/api/events/favorite', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: token ? `Bearer ${token}` : ''
-      },
-      body: JSON.stringify({ eventId: event.id })
-    })
-    if (!res.ok) throw new Error('Failed to like')
-    const data = await res.json()
-    setHeartCount(data.count)
-    if (data.count >= HEART_THRESHOLD) setBookable(true)
-
-    // ✅ move status update here
-    setStatusMsg('❤️ Liked!')
-    setTimeout(() => setStatusMsg(''), 1500)
-  } catch (err) {
-    console.error(err)
+  // --- handle hearts ---
+  async function handleHeartClick() {
+    try {
+      const token = localStorage.getItem('token') || ''
+      const res = await fetch('/api/events/favorite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: token ? `Bearer ${token}` : ''
+        },
+        body: JSON.stringify({ eventId: event.id })
+      })
+      if (!res.ok) throw new Error('Failed to like')
+      const data = await res.json()
+      setHeartCount(data.count)
+      if (data.count >= HEART_THRESHOLD) setBookable(true)
+      setStatusMsg('❤️ Liked!')
+      setTimeout(() => setStatusMsg(''), 1500)
+    } catch (err) {
+      console.error(err)
+    }
   }
-}
 
   function getButtonLabel() {
     if (!authUser) return 'Go to login'
@@ -158,49 +158,39 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
     return 'Book Free'
   }
 
-
   return (
-    <>
-      <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800 shadow flex flex-col justify-between relative">
-        {/* Heart top right */}
-<button
-  onClick={handleHeartClick}
-  className="relative text-red-500 text-2xl transition-transform transform hover:scale-125 active:scale-90"
->
-  ❤️ {heartCount}/{HEART_THRESHOLD}
-  <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-0 hover:opacity-40 animate-shine"></span>
-</button>
+    <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800 shadow flex flex-col justify-between relative">
+      <button
+        onClick={handleHeartClick}
+        className="absolute top-2 right-2 text-red-500 text-2xl"
+      >
+        ❤️ {heartCount}/{HEART_THRESHOLD}
+      </button>
 
-        <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
-        <p className="text-sm mb-2">{event.description}</p>
+      <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
+      <p className="text-sm mb-2">{event.description}</p>
 
-        {/* Booking */}
-        <div className="flex flex-col gap-2 mt-auto mb-2">
-          <button
-            onClick={() => {
-              if (!authUser) return setShowAccountModal(true)
-              if (!bookable || reachedLimit) return
-              setShowPolicyModal(true)
-            }}
-            disabled={!bookable || loading || reachedLimit}
-            className={`w-full px-3 py-1 rounded ${
-              !authUser
-                ? 'bg-zinc-600 cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-700'
-            } text-white text-sm disabled:opacity-50`}
-          >
-            {getButtonLabel()}
-          </button>
-        </div>
-
-        {/* Footer info */}
-        <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
-          <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
-          <span>👥 Booked: {userTickets} / {event.max_attendees || '∞'}</span>
-        </div>
+      <div className="flex flex-col gap-2 mt-auto mb-2">
+        <button
+          onClick={() => {
+            if (!authUser) return setShowAccountModal(true)
+            if (!bookable || reachedLimit) return
+            setShowPolicyModal(true)
+          }}
+          disabled={!bookable || loading || reachedLimit}
+          className={`w-full px-3 py-1 rounded ${
+            !authUser ? 'bg-zinc-600 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+          } text-white text-sm disabled:opacity-50`}
+        >
+          {getButtonLabel()}
+        </button>
       </div>
 
-      {/* Policy Modal */}
+      <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
+        <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
+        <span>👥 Booked: {userTickets} / {event.max_attendees || '∞'}</span>
+      </div>
+
       {showPolicyModal && (
         <div
           className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
@@ -211,23 +201,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-xl font-bold mb-2">{event.name}</h2>
-            <img
-              src={event.image_url || '/default-event.jpg'}
-              alt={event.name}
-              className="w-full h-48 object-cover rounded mb-4"
-            />
-            <p className="text-sm text-gray-300 mb-4">{event.details || event.description}</p>
-
-            {/* Guidelines */}
-            <div className="bg-zinc-800 p-3 rounded mb-4">
-              <h3 className="font-semibold mb-2">Event Guidelines</h3>
-              <p className="text-xs text-gray-400">
-                By booking, you agree to follow venue rules, respect other attendees,
-                and adhere to community guidelines.
-              </p>
-            </div>
-
-            {/* Email input */}
             <label className="block mb-3 text-sm">
               Email for ticket:
               <input
@@ -239,8 +212,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
                 required
               />
             </label>
-
-            {/* Quantity input */}
             <label className="block mb-4 text-sm">
               Quantity:
               <input
@@ -252,7 +223,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
                 className="w-full mt-1 p-2 rounded bg-zinc-800 border border-zinc-600 text-white text-sm"
               />
             </label>
-
             <label className="flex items-center gap-2 mb-4">
               <input
                 type="checkbox"
@@ -262,14 +232,8 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
               />
               <span className="text-sm">I agree to the event guidelines</span>
             </label>
-
             <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setShowPolicyModal(false)}
-                className="px-4 py-2 bg-zinc-700 rounded hover:bg-zinc-600"
-              >
-                Cancel
-              </button>
+              <button onClick={() => setShowPolicyModal(false)} className="px-4 py-2 bg-zinc-700 rounded hover:bg-zinc-600">Cancel</button>
               <button
                 onClick={handleBooking}
                 disabled={!agreed || loading || !email}
@@ -281,7 +245,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
           </div>
         </div>
       )}
-    </>
+    </div>
   )
 }
 
@@ -631,6 +595,7 @@ export default function Home() {
                   event={event}
                   authUser={authUser}
                   setShowAccountModal={setShowAccountModal}
+  refreshTrigger={refreshTrigger}
                 />
               ))}
             </div>
