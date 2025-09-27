@@ -28,7 +28,8 @@ function clearAuth() {
 
 
 
-export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
+export function DynamicEventCard({ event, authUser, setShowAccountModal, refreshTrigger, setRefreshTrigger }) {
+
   const [heartCount, setHeartCount] = useState(0)
   const [bookable, setBookable] = useState(event.is_confirmed)
   const [loading, setLoading] = useState(false)
@@ -41,11 +42,16 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
 
   const [showPolicyModal, setShowPolicyModal] = useState(false)
   const [agreed, setAgreed] = useState(false)
+  setRefreshTrigger(prev => prev + 1)
+
+
 
   const HEART_THRESHOLD = 0
 
   // --- fetch hearts ---
   useEffect(() => {
+  if (typeof window === 'undefined') return  // <<< SSR guard
+
     async function fetchHearts() {
       try {
         const res = await fetch(`/api/events/hearts?eventId=${event.id}`)
@@ -362,6 +368,7 @@ export default function Home() {
 
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [showEventModal, setShowEventModal] = useState(false)
+  const [refreshTrigger, setRefreshTrigger] = useState(0); 
 
   // --- fetch events ---
   useEffect(() => {
@@ -373,6 +380,8 @@ export default function Home() {
 
   // --- load user data on auth ---
   useEffect(() => {
+ if (typeof window === 'undefined') return
+
     async function loadProfile() {
       const token = localStorage.getItem('token')
       if (!token) return
@@ -603,8 +612,9 @@ export default function Home() {
                   event={event}
                   authUser={authUser}
                   setShowAccountModal={setShowAccountModal}
-  refreshTrigger={refreshTrigger}
-                />
+            refreshTrigger={refreshTrigger}
+setRefreshTrigger={setRefreshTrigger}              
+     />
               ))}
             </div>
           ) : (
