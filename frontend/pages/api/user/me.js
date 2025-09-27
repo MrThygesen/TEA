@@ -32,7 +32,7 @@ export default async function handler(req, res) {
       `SELECT id, username, email, tier, wallet_address, city, role
        FROM user_profiles
        WHERE id = $1`,
-      [payload.userId]
+      [payload.id] // <-- FIXED: use payload.id
     )
 
     const profile = profileResult.rows[0]
@@ -61,7 +61,7 @@ export default async function handler(req, res) {
       GROUP BY r.id, r.event_id, r.stage, r.has_paid, r.ticket_code, r.timestamp, e.name, e.datetime, e.price
       ORDER BY e.datetime DESC
       `,
-      [payload.userId]
+      [payload.id] // <-- FIXED: use payload.id
     )
 
     res.status(200).json({
