@@ -60,71 +60,79 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
     fetchHearts()
   }, [event.id, event.is_confirmed])
 
-  // --- fetch user tickets from /api/user/myTickets ---
-  useEffect(() => {
-    if (!authUser) return
-    async function fetchMyTickets() {
-      try {
-        const token = localStorage.getItem('token')
-        if (!token) return
-        const res = await fetch('/api/user/myTickets', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        if (!res.ok) return
-        const data = await res.json()
-        // find tickets for this event
-        const myTickets = (data.tickets || []).filter(t => t.event_id === event.id)
-        const total = myTickets.reduce((sum, t) => sum + (t.quantity || 1), 0)
-        setUserTickets(total)
-        setMaxPerUser(event.tag1 === 'group' ? 5 : 1) // keep simple max per user logic
-      } catch (err) {
-        console.error('Failed to fetch my tickets', err)
-      }
+// --- fetch user tickets from /api/user/myTickets ---
+useEffect(() => {
+  if (!authUser) return
+  if (typeof window === 'undefined') return  // <<< SSR guard
+
+  async function fetchMyTickets() {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token || token.split('.').length !== 3) return  // <<< sanity check
+
+      const res = await fetch('/api/user/myTickets', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (!res.ok) return
+
+      const data = await res.json()
+      // find tickets for this event
+      const myTickets = (data.tickets || []).filter(t => t.event_id === event.id)
+      const total = myTickets.reduce((sum, t) => sum + (t.quantity || 1), 0)
+      setUserTickets(total)
+      setMaxPerUser(event.tag1 === 'group' ? 5 : 1) // keep simple max per user logic
+    } catch (err) {
+      console.error('myTickets error:', err)
     }
-    fetchMyTickets()
-  }, [authUser, event.id, event.tag1, refreshTrigger])
+  }
+
+  fetchMyTickets()
+}, [authUser, event.id, event.tag1, refreshTrigger])
 
   const reachedLimit = userTickets >= maxPerUser
 
-  // --- handle booking ---
-  async function handleBooking() {
-    if (!authUser) {
-      setShowAccountModal(true)
-      return
-    }
-    if (!bookable || reachedLimit) return
-
-    setLoading(true)
-    setStatusMsg('Processing…')
-    try {
-      const token = localStorage.getItem('token')
-      const res = await fetch('/api/events/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ eventId: event.id, quantity, email })
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Registration failed')
-
-      // update user tickets from response
-      setUserTickets(data.userTickets || userTickets + quantity)
-      setStatusMsg('Booking confirmed!')
-      setRefreshTrigger(prev => prev + 1)   // <-- notify index.js
-
-      // redirect to Stripe checkout if needed
-      if (data.clientSecret) {
-        window.location.href = `/api/events/checkout?payment_intent_client_secret=${data.clientSecret}`
-      }
-    } catch (err) {
-      console.error(err)
-      setStatusMsg('Error registering')
-    } finally {
-      setLoading(false)
-      setTimeout(() => setStatusMsg(''), 2500)
-      setShowPolicyModal(false)
-      setAgreed(false)
-    }
+// --- handle booking ---
+async function handleBooking() {
+  if (!authUser) {
+    setShowAccountModal(true)
+    return
   }
+  if (!bookable || reachedLimit) return
+
+  setLoading(true)
+  setStatusMsg('Processing…')
+
+  try {
+    if (typeof window === 'undefined') throw new Error('Client only')
+    const token = localStorage.getItem('token')
+    if (!token || token.split('.').length !== 3) throw new Error('Invalid token')
+
+    const res = await fetch('/api/events/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ eventId: event.id, quantity, email })
+    })
+
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Registration failed')
+
+    setUserTickets(data.userTickets || userTickets + quantity)
+    setStatusMsg('Booking confirmed!')
+    setRefreshTrigger(prev => prev + 1) // notify index.js
+
+    if (data.clientSecret) {
+      window.location.href = `/api/events/checkout?payment_intent_client_secret=${data.clientSecret}`
+    }
+  } catch (err) {
+    console.error(err)
+    setStatusMsg('Error registering')
+  } finally {
+    setLoading(false)
+    setTimeout(() => setStatusMsg(''), 2500)
+    setShowPolicyModal(false)
+    setAgreed(false)
+  }
+}
 
   // --- handle hearts ---
   async function handleHeartClick() {
