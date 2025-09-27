@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import QRCode from 'qrcode.react'
+import Link from 'next/link'
 
 export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [profile, setProfile] = useState(null)
@@ -14,25 +15,29 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
       try {
         const token = localStorage.getItem('token')
         if (!token) return
-        const res = await fetch('/api/user/me', {
+
+        const res = await fetch('/api/user/myTickets', {
           headers: { Authorization: `Bearer ${token}` }
         })
+
         if (!res.ok) return
+
         const data = await res.json()
-        setProfile(data)
-        setTickets(data.registrations || [])
+        setProfile(data.user || null)
+        setTickets(data.tickets || [])
       } catch (err) {
         console.error('Failed to load account:', err)
       } finally {
         setLoading(false)
       }
     }
+
     loadAccount()
   }, [refreshTrigger])
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-lg max-w-lg w-full p-6 text-white relative">
+      <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-lg max-w-4xl w-full p-6 text-white relative">
         
         {/* Close button top right */}
         <button
@@ -52,16 +57,40 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
             <p className="mb-4"><strong>Email:</strong> {profile.email}</p>
 
             {tickets.length > 0 ? (
-              <div>
-                <h3 className="font-semibold mb-2">Your Tickets</h3>
-                <ul className="space-y-2 text-sm">
-                  {tickets.map((t, i) => (
-                    <li key={i} className="bg-zinc-800 p-2 rounded flex justify-between">
-                      <span>{t.event_name}</span>
-                      <QRCode value={t.ticket_qr || ''} size={48} />
-                    </li>
-                  ))}
-                </ul>
+              <div className="overflow-x-auto">
+                <table className="min-w-full table-auto border-collapse border border-zinc-700 text-sm">
+                  <thead>
+                    <tr className="bg-zinc-800">
+                      <th className="px-3 py-2 border border-zinc-700">Date</th>
+                      <th className="px-3 py-2 border border-zinc-700">Time</th>
+                      <th className="px-3 py-2 border border-zinc-700">Event</th>
+                      <th className="px-3 py-2 border border-zinc-700">Popularity</th>
+                      <th className="px-3 py-2 border border-zinc-700">QR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tickets.map((t, i) => {
+                      const dt = new Date(t.datetime)
+                      const date = dt.toLocaleDateString()
+                      const time = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      return (
+                        <tr key={i} className="bg-zinc-800 border border-zinc-700">
+                          <td className="px-3 py-2 border border-zinc-700">{date}</td>
+                          <td className="px-3 py-2 border border-zinc-700">{time}</td>
+                          <td className="px-3 py-2 border border-zinc-700">
+                            <Link href={`/events/${t.event_id}`} className="text-blue-400 hover:underline">
+                              {t.event_name}
+                            </Link>
+                          </td>
+                          <td className="px-3 py-2 border border-zinc-700">{t.popularity}</td>
+                          <td className="px-3 py-2 border border-zinc-700">
+                            <QRCode value={t.ticket_code || ''} size={48} />
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
               </div>
             ) : (
               <p className="text-gray-400">No tickets yet.</p>
@@ -71,7 +100,6 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
           <p className="text-red-400">Failed to load account.</p>
         )}
 
-        {/* Footer close button */}
         <div className="mt-6 flex justify-end">
           <button
             onClick={onClose}
