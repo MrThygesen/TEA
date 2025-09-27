@@ -26,7 +26,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
 
         const data = await res.json()
         setProfile(data || null)
-        setRegistrations(data.registrations || [])
+        setRegistrations(Array.isArray(data.registrations) ? data.registrations : [])
       } catch (err) {
         console.error('❌ Failed to load account:', err)
       } finally {
@@ -38,7 +38,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-lg max-w-5xl w-full p-6 text-white relative">
+      <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-lg max-w-6xl w-full p-6 text-white relative">
 
         {/* Close button */}
         <button
@@ -56,12 +56,12 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
           <>
             {/* Profile section */}
             <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-zinc-800 p-4 rounded-lg border border-zinc-700">
-              <p><span className="font-semibold text-gray-300">Name:</span> {profile.username}</p>
-              <p><span className="font-semibold text-gray-300">Email:</span> {profile.email}</p>
+              <p><span className="font-semibold text-gray-300">Name:</span> {profile.username || '-'}</p>
+              <p><span className="font-semibold text-gray-300">Email:</span> {profile.email || '-'}</p>
               <p><span className="font-semibold text-gray-300">Wallet:</span> {profile.wallet_address || '-'}</p>
               <p><span className="font-semibold text-gray-300">City:</span> {profile.city || '-'}</p>
-              <p><span className="font-semibold text-gray-300">Tier:</span> {profile.tier}</p>
-              <p><span className="font-semibold text-gray-300">Role:</span> {profile.role}</p>
+              <p><span className="font-semibold text-gray-300">Tier:</span> {profile.tier || '-'}</p>
+              <p><span className="font-semibold text-gray-300">Role:</span> {profile.role || '-'}</p>
             </div>
 
             {/* Registrations */}
@@ -75,14 +75,18 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                       <th className="px-3 py-2 border border-zinc-700 text-left">Event</th>
                       <th className="px-3 py-2 border border-zinc-700 text-left">Price</th>
                       <th className="px-3 py-2 border border-zinc-700 text-left">Paid</th>
+                      <th className="px-3 py-2 border border-zinc-700 text-left">Popularity</th>
                       <th className="px-3 py-2 border border-zinc-700 text-left">QR</th>
                     </tr>
                   </thead>
                   <tbody>
                     {registrations.map((r, i) => {
+                      if (!r || !r.event_name || !r.datetime) return null
+
                       const dt = new Date(r.datetime)
                       const date = dt.toLocaleDateString()
                       const time = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
                       return (
                         <tr key={i} className="bg-zinc-800 hover:bg-zinc-700">
                           <td className="px-3 py-2 border border-zinc-700">{date}</td>
@@ -99,11 +103,18 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                             {r.has_paid ? (
                               <span className="text-green-400 font-semibold">Yes</span>
                             ) : (
-                              <span className="text-red-400">No</span>
+                              <span className="text-red-400 font-semibold">No</span>
                             )}
                           </td>
                           <td className="px-3 py-2 border border-zinc-700">
-                            <QRCode value={r.ticket_code || ''} size={48} />
+                            {r.popularity || 0}
+                          </td>
+                          <td className="px-3 py-2 border border-zinc-700">
+                            {r.ticket_code ? (
+                              <QRCode value={r.ticket_code} size={48} />
+                            ) : (
+                              <span className="text-gray-500">Not issued</span>
+                            )}
                           </td>
                         </tr>
                       )
