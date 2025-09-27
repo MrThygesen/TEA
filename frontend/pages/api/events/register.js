@@ -39,7 +39,7 @@ export default async function handler(req, res) {
 
     const maxPerUser = event.tag1 === 'group' ? 5 : 1
 
-    // --- Count existing tickets for this user
+    // --- Count existing tickets
     let currentTickets = 0
     if (userId) {
       const { rows } = await pool.query(
@@ -69,17 +69,16 @@ export default async function handler(req, res) {
     const inserted = []
     for (let i = 0; i < quantity; i++) {
       const { rows } = await pool.query(
-        `INSERT INTO registrations (user_id, event_id, email, status)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO registrations (user_id, event_id, email, stage, has_paid)
+         VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
-        [userId, eventId, email || null, price > 0 ? 'pending' : 'confirmed']
+        [userId, eventId, email || null, price > 0 ? 'prebook' : 'book', price > 0]
       )
       inserted.push(rows[0])
     }
 
     // --- Send ticket email immediately if free event
     if (price === 0) {
-      // Fetch user profile for ticket email
       let user = { id: userId, email }
       if (userId) {
         const { rows: userRows } = await pool.query(
@@ -92,6 +91,10 @@ export default async function handler(req, res) {
       if (user?.email) {
         try {
           await sendTicketEmail(user.email, event, user)
+          await pool.query(
+            'UPDATE registrations SET ticket_sent = TRUE WHERE id = ANY($1::int[])',
+            [inserted.map(r => r.id)]
+          )
         } catch (err) {
           console.error('❌ Failed to send ticket email (register.js):', err)
         }

@@ -9,37 +9,39 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
 
-useEffect(() => {
-  async function loadAccount() {
-    setLoading(true)
-    try {
-      const token = localStorage.getItem('token')
-      if (!token) return
+  useEffect(() => {
+    async function loadAccount() {
+      setLoading(true)
+      try {
+        const token = localStorage.getItem('token')
+        if (!token) return
 
-      const res = await fetch('/api/user/me', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+        const res = await fetch('/api/user/me', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
 
-      if (!res.ok) throw new Error('Failed to load profile')
+        if (!res.ok) throw new Error('Failed to load profile')
 
-      const data = await res.json()
-      setProfile(data || null)
-      setTickets(data.registrations || [])
-    } catch (err) {
-      console.error('Failed to load account:', err)
-    } finally {
-      setLoading(false)
+        const data = await res.json()
+        setProfile(data || null)
+
+        // Expect API to return registrations joined with events
+        setTickets(data.registrations || [])
+      } catch (err) {
+        console.error('Failed to load account:', err)
+      } finally {
+        setLoading(false)
+      }
     }
-  }
 
-  loadAccount()
-}, [refreshTrigger])
+    loadAccount()
+  }, [refreshTrigger])
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
       <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-lg max-w-4xl w-full p-6 text-white relative">
         
-        {/* Close button top right */}
+        {/* Close button */}
         <button
           onClick={onClose}
           className="absolute top-2 right-2 text-gray-400 hover:text-white text-xl"
@@ -62,29 +64,43 @@ useEffect(() => {
                   <thead>
                     <tr className="bg-zinc-800">
                       <th className="px-3 py-2 border border-zinc-700">Date</th>
-                      <th className="px-3 py-2 border border-zinc-700">Time</th>
                       <th className="px-3 py-2 border border-zinc-700">Event</th>
-                      <th className="px-3 py-2 border border-zinc-700">Popularity</th>
-                      <th className="px-3 py-2 border border-zinc-700">QR</th>
+                      <th className="px-3 py-2 border border-zinc-700">Stage</th>
+                      <th className="px-3 py-2 border border-zinc-700">Paid</th>
+                      <th className="px-3 py-2 border border-zinc-700">Ticket</th>
                     </tr>
                   </thead>
                   <tbody>
                     {tickets.map((t, i) => {
                       const dt = new Date(t.datetime)
-                      const date = dt.toLocaleDateString()
-                      const time = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      const date = dt.toLocaleString([], { 
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })
+
                       return (
                         <tr key={i} className="bg-zinc-800 border border-zinc-700">
                           <td className="px-3 py-2 border border-zinc-700">{date}</td>
-                          <td className="px-3 py-2 border border-zinc-700">{time}</td>
                           <td className="px-3 py-2 border border-zinc-700">
                             <Link href={`/events/${t.event_id}`} className="text-blue-400 hover:underline">
-                              {t.event_name}
+                              {t.name}
                             </Link>
                           </td>
-                          <td className="px-3 py-2 border border-zinc-700">{t.popularity}</td>
                           <td className="px-3 py-2 border border-zinc-700">
-                            <QRCode value={t.ticket_code || ''} size={48} />
+                            {t.stage === 'book' ? 'Confirmed' : 'Prebook'}
+                          </td>
+                          <td className="px-3 py-2 border border-zinc-700">
+                            {t.has_paid ? '✅' : '❌'}
+                          </td>
+                          <td className="px-3 py-2 border border-zinc-700">
+                            {t.ticket_code ? (
+                              <QRCode value={t.ticket_code} size={48} />
+                            ) : (
+                              <span className="text-gray-500">Not issued</span>
+                            )}
                           </td>
                         </tr>
                       )
