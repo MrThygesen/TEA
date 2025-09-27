@@ -379,34 +379,41 @@ export default function Home() {
   }, [])
 
   // --- load user data on auth ---
-  useEffect(() => {
- if (typeof window === 'undefined') return
+useEffect(() => {
+  if (typeof window === 'undefined') return
 
-    async function loadProfile() {
-      const token = localStorage.getItem('token')
-      if (!token) return
+  async function loadProfile() {
+    const token = localStorage.getItem('token')
+    if (!token) return
 
-      try {
-        const res = await fetch('/api/user/me', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        if (!res.ok) return
-        const data = await res.json()
-        setProfileName(data.username || '')
-        setProfileEmail(data.email || '')
-        setCoupons(data.paid_coupons || [])
-        setPrebookings(data.prebooked_events || [])
-
-        const updatedUser = { ...authUser, ...data }
-        setAuthUser(updatedUser)
-        saveAuth(updatedUser)
-      } catch (err) {
-        console.error('Error fetching profile:', err)
+    try {
+      const res = await fetch('/api/user/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (!res.ok) {
+        // invalid token: clear auth
+        localStorage.removeItem('token')
+        clearAuth()
+        setAuthUser(null)
+        return
       }
-    }
 
-    if (showAccountModal) loadProfile()
-  }, [showAccountModal])
+      const data = await res.json()
+      setProfileName(data.username || '')
+      setProfileEmail(data.email || '')
+      setCoupons(data.paid_coupons || [])
+      setPrebookings(data.prebooked_events || [])
+
+      const updatedUser = { ...authUser, ...data }
+      setAuthUser(updatedUser)
+      saveAuth(updatedUser)
+    } catch (err) {
+      console.error('Error fetching profile:', err)
+    }
+  }
+
+  loadProfile()
+}, [])
 
   // --- auth handlers ---
   async function handleLogin(e) {
