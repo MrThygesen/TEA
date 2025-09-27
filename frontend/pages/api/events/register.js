@@ -1,8 +1,9 @@
 // pages/api/events/register.js
 import { pool } from '../../../lib/postgres.js'
 import { auth } from '../../../lib/auth.js'
-import sendEmail from '../email.js'
+import { sendTicketEmail } from '../../../lib/email.js'
 import Stripe from 'stripe'
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
 export default async function handler(req, res) {
@@ -11,13 +12,13 @@ export default async function handler(req, res) {
   }
 
   const token = auth.getTokenFromReq(req)
-  if (!token) return res.status(401).json({ error: 'Unauthorized' })
-
-  let decoded
-  try {
-    decoded = auth.verifyToken(token)
-  } catch {
-    return res.status(401).json({ error: 'Invalid token' })
+  let decoded = null
+  if (token) {
+    try {
+      decoded = auth.verifyToken(token)
+    } catch {
+      return res.status(401).json({ error: 'Invalid token' })
+    }
   }
 
   const userId = decoded?.id || null
@@ -28,61 +29,76 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Fetch event
-    const eventRes = await pool.query('SELECT * FROM events WHERE id = $1', [eventId])
-    if (!eventRes.rows.length) return res.status(404).json({ error: 'Event not found' })
-    const event = eventRes.rows[0]
+    // --- Fetch event
+    const { rows: eventRows } = await pool.query(
+      'SELECT * FROM events WHERE id = $1',
+      [eventId]
+    )
+    if (!eventRows.length) return res.status(404).json({ error: 'Event not found' })
+    const event = eventRows[0]
 
     const maxPerUser = event.tag1 === 'group' ? 5 : 1
 
-    // Count existing tickets for this user
-    const userTicketsRes = userId
-      ? await pool.query(
-          'SELECT COUNT(*) AS total FROM registrations WHERE event_id=$1 AND user_id=$2',
-          [eventId, userId]
-        )
-      : { rows: [{ total: 0 }] }
-    const currentTickets = parseInt(userTicketsRes.rows[0].total) || 0
+    // --- Count existing tickets for this user
+    let currentTickets = 0
+    if (userId) {
+      const { rows } = await pool.query(
+        'SELECT COUNT(*) AS total FROM registrations WHERE event_id=$1 AND user_id=$2',
+        [eventId, userId]
+      )
+      currentTickets = parseInt(rows[0].total, 10) || 0
+    }
 
     if (currentTickets + quantity > maxPerUser) {
       return res.status(400).json({ error: `Max ${maxPerUser} tickets per user` })
     }
 
-    // Price & Stripe logic
+    // --- Stripe logic
     let clientSecret = null
-    if (parseFloat(event.price) > 0) {
+    const price = parseFloat(event.price) || 0
+    if (price > 0) {
       const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(parseFloat(event.price) * 100 * quantity), // convert to cents
+        amount: Math.round(price * 100 * quantity),
         currency: 'usd',
         metadata: { eventId, userId },
       })
       clientSecret = paymentIntent.client_secret
     }
 
-    // Insert one row per ticket
+    // --- Insert registrations
     const inserted = []
     for (let i = 0; i < quantity; i++) {
-      const result = await pool.query(
-        `
-        INSERT INTO registrations (user_id, event_id, email)
-        VALUES ($1, $2, $3)
-        RETURNING *
-        `,
-        [userId, eventId, email || null]
+      const { rows } = await pool.query(
+        `INSERT INTO registrations (user_id, event_id, email, status)
+         VALUES ($1, $2, $3, $4)
+         RETURNING *`,
+        [userId, eventId, email || null, price > 0 ? 'pending' : 'confirmed']
       )
-      inserted.push(result.rows[0])
+      inserted.push(rows[0])
     }
 
-    // Send email if provided
-    if (email) {
-      await sendEmail({
-        to: email,
-        subject: `Your Ticket for ${event.name}`,
-        text: `You successfully registered ${quantity} ticket(s) for "${event.name}".`,
-      })
+    // --- Send ticket email immediately if free event
+    if (price === 0) {
+      // Fetch user profile for ticket email
+      let user = { id: userId, email }
+      if (userId) {
+        const { rows: userRows } = await pool.query(
+          'SELECT id, username, email FROM user_profiles WHERE id=$1',
+          [userId]
+        )
+        if (userRows.length) user = userRows[0]
+      }
+
+      if (user?.email) {
+        try {
+          await sendTicketEmail(user.email, event, user)
+        } catch (err) {
+          console.error('❌ Failed to send ticket email (register.js):', err)
+        }
+      }
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       registrations: inserted,
       clientSecret,
@@ -90,7 +106,7 @@ export default async function handler(req, res) {
     })
   } catch (err) {
     console.error('❌ register.js error:', err)
-    res.status(500).json({ error: 'Server error', details: err.message })
+    return res.status(500).json({ error: 'Server error', details: err.message })
   }
 }
 
