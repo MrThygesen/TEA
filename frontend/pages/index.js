@@ -7,7 +7,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'
 import AdminSBTManager from '../components/AdminSBTManager'
 import YourAccountModal from '../components/YourAccountModal'
 
-// ---------------------------
+ // ---------------------------
 // Helpers: Auth persistence Test
 // ---------------------------
 function loadAuth() {
@@ -42,7 +42,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
   const [showPolicyModal, setShowPolicyModal] = useState(false)
   const [agreed, setAgreed] = useState(false)
 
-  const HEART_THRESHOLD = 0
+  const HEART_THRESHOLD = 1
 
   // --- fetch hearts ---
   useEffect(() => {
@@ -106,7 +106,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Registration failed')
 
-      setUserTickets(prev => prev + quantity)
+      setUserTickets(data.userTickets || userTickets + quantity)
       setStatusMsg('Booking confirmed!')
 
       // redirect paid event → Stripe
@@ -153,6 +153,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal }) {
     if (event.price && Number(event.price) > 0) return 'Pay Now'
     return 'Book Free'
   }
+
 
   return (
     <>
