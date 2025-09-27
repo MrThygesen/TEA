@@ -1,9 +1,8 @@
-//YourAccountModal.js
-
 'use client'
 
 import { useState, useEffect } from 'react'
 import QRCode from 'qrcode.react'
+import Link from 'next/link'
 
 export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [profile, setProfile] = useState(null)
@@ -14,12 +13,22 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     async function loadAccount() {
       setLoading(true)
       try {
-        const res = await fetch('/api/user/me')
+        const token = localStorage.getItem('token')
+        if (!token) {
+          console.warn('No token found')
+          return
+        }
+
+        const res = await fetch('/api/user/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!res.ok) throw new Error(`Failed to load profile: ${res.status}`)
+
         const data = await res.json()
         setProfile(data || null)
         setRegistrations(data.registrations || [])
       } catch (err) {
-        console.error('Failed to load account:', err)
+        console.error('❌ Failed to load account:', err)
       } finally {
         setLoading(false)
       }
@@ -27,74 +36,94 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     loadAccount()
   }, [refreshTrigger])
 
-  if (loading) return <div className="p-4">Loading…</div>
-  if (!profile) return <div className="p-4">No profile found.</div>
-
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-      <div className="bg-white rounded-lg p-6 max-w-4xl w-full shadow-lg overflow-auto">
-        <h2 className="text-xl font-bold mb-4">Your Account</h2>
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-lg max-w-5xl w-full p-6 text-white relative">
 
-        <div className="mb-6">
-          <p><strong>Username:</strong> {profile.username}</p>
-          <p><strong>Email:</strong> {profile.email}</p>
-          <p><strong>Role:</strong> {profile.role}</p>
-        </div>
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute top-2 right-2 text-gray-400 hover:text-white text-xl"
+        >
+          ✕
+        </button>
 
-        <h3 className="text-lg font-semibold mb-2">Your Tickets</h3>
-        {registrations.length === 0 ? (
-          <p>You have no tickets yet.</p>
-        ) : (
-          <table className="w-full border border-gray-300 text-sm">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="border px-3 py-2 text-left">Date, Time</th>
-                <th className="border px-3 py-2 text-left">Event</th>
-                <th className="border px-3 py-2 text-right">Price</th>
-                <th className="border px-3 py-2 text-center">Paid</th>
-                <th className="border px-3 py-2 text-center">QR</th>
-              </tr>
-            </thead>
-            <tbody>
-              {registrations.map((r) => (
-                <tr key={r.registration_id} className="hover:bg-gray-50">
-                  <td className="border px-3 py-2">
-                    {new Date(r.datetime).toLocaleDateString()}{" "}
-                    {new Date(r.datetime).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
+        <h2 className="text-2xl font-bold mb-6 text-blue-400">Your Account</h2>
+
+        {loading ? (
+          <p className="text-gray-400">Loading...</p>
+        ) : profile ? (
+          <>
+            {/* Profile section */}
+            <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-zinc-800 p-4 rounded-lg border border-zinc-700">
+              <p><span className="font-semibold text-gray-300">Name:</span> {profile.username}</p>
+              <p><span className="font-semibold text-gray-300">Email:</span> {profile.email}</p>
+              <p><span className="font-semibold text-gray-300">Wallet:</span> {profile.wallet_address || '-'}</p>
+              <p><span className="font-semibold text-gray-300">City:</span> {profile.city || '-'}</p>
+              <p><span className="font-semibold text-gray-300">Tier:</span> {profile.tier}</p>
+              <p><span className="font-semibold text-gray-300">Role:</span> {profile.role}</p>
+            </div>
+
+            {/* Registrations */}
+            {registrations.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full border-collapse border border-zinc-700 text-sm">
+                  <thead>
+                    <tr className="bg-zinc-800 text-gray-300">
+                      <th className="px-3 py-2 border border-zinc-700 text-left">Date</th>
+                      <th className="px-3 py-2 border border-zinc-700 text-left">Time</th>
+                      <th className="px-3 py-2 border border-zinc-700 text-left">Event</th>
+                      <th className="px-3 py-2 border border-zinc-700 text-left">Price</th>
+                      <th className="px-3 py-2 border border-zinc-700 text-left">Paid</th>
+                      <th className="px-3 py-2 border border-zinc-700 text-left">QR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {registrations.map((r, i) => {
+                      const dt = new Date(r.datetime)
+                      const date = dt.toLocaleDateString()
+                      const time = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      return (
+                        <tr key={i} className="bg-zinc-800 hover:bg-zinc-700">
+                          <td className="px-3 py-2 border border-zinc-700">{date}</td>
+                          <td className="px-3 py-2 border border-zinc-700">{time}</td>
+                          <td className="px-3 py-2 border border-zinc-700">
+                            <Link href={`/events/${r.event_id}`} className="text-blue-400 hover:underline">
+                              {r.event_name}
+                            </Link>
+                          </td>
+                          <td className="px-3 py-2 border border-zinc-700">
+                            {r.price ? `${Number(r.price).toFixed(2)} DKK` : 'Free'}
+                          </td>
+                          <td className="px-3 py-2 border border-zinc-700">
+                            {r.has_paid ? (
+                              <span className="text-green-400 font-semibold">Yes</span>
+                            ) : (
+                              <span className="text-red-400">No</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 border border-zinc-700">
+                            <QRCode value={r.ticket_code || ''} size={48} />
+                          </td>
+                        </tr>
+                      )
                     })}
-                  </td>
-                  <td className="border px-3 py-2">
-                    <a
-                      href={`/events/${r.event_id}`}
-                      className="text-blue-600 hover:underline"
-                    >
-                      {r.event_name}
-                    </a>
-                  </td>
-                  <td className="border px-3 py-2 text-right">
-                    {r.price ? `$${r.price}` : 'Free'}
-                  </td>
-                  <td className="border px-3 py-2 text-center">
-                    {r.has_paid ? '✅' : '❌'}
-                  </td>
-                  <td className="border px-3 py-2 text-center">
-                    <QRCode
-                      value={`${window.location.origin}/ticket/${r.ticket_code}`}
-                      size={48}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-gray-400">No registrations yet.</p>
+            )}
+          </>
+        ) : (
+          <p className="text-red-400">Failed to load account.</p>
         )}
 
-        <div className="mt-6 text-right">
+        {/* Close button bottom */}
+        <div className="mt-6 flex justify-end">
           <button
             onClick={onClose}
-            className="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800"
+            className="px-4 py-2 bg-zinc-700 rounded hover:bg-zinc-600"
           >
             Close
           </button>
