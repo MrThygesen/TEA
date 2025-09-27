@@ -42,7 +42,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
 
   const [showPolicyModal, setShowPolicyModal] = useState(false)
   const [agreed, setAgreed] = useState(false)
-  setRefreshTrigger(prev => prev + 1)
+  //setRefreshTrigger(prev => prev + 1)
 
 
 
