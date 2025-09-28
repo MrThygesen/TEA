@@ -1,3 +1,4 @@
+// components/YourAccountModal.js
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -8,7 +9,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [profile, setProfile] = useState(null)
   const [registrations, setRegistrations] = useState([])
   const [loading, setLoading] = useState(true)
-  const [activeQR, setActiveQR] = useState(null) // For enlarged QR
+  const [activeQR, setActiveQR] = useState(null)
 
   useEffect(() => {
     async function loadAccount() {
@@ -40,7 +41,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-lg max-w-6xl w-full p-6 text-white relative">
-
+        
         {/* Close button */}
         <button
           onClick={onClose}
@@ -81,46 +82,72 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                     </tr>
                   </thead>
                   <tbody>
-{registrations.map((r, i) => {
-  if (!r || !r.event_name || !r.datetime) return null
+                    {registrations.map((r, i) => {
+                      if (!r || !r.event_name || !r.datetime) return null
 
-  const dt = new Date(r.datetime)
-  const date = dt.toLocaleDateString()
-  const time = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      const dt = new Date(r.datetime)
+                      const date = dt.toLocaleDateString()
+                      const time = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
-  // ✅ always have a QR value (either ticket_code or fallback)
-  const qrValue = r.ticket_code || `ticket:${r.event_id}:${r.user_id || r.telegram_user_id}`
+                      const qrValue =
+                        r.ticket_code || `ticket:${r.event_id}:${r.user_id || r.telegram_user_id}`
 
-  return (
-    <tr key={i} className="bg-zinc-800 hover:bg-zinc-700">
-      <td className="px-3 py-2 border border-zinc-700">{date}</td>
-      <td className="px-3 py-2 border border-zinc-700">{time}</td>
-      <td className="px-3 py-2 border border-zinc-700">
-        <Link href={`/events/${r.event_id}`} className="text-blue-400 hover:underline">
-          {r.event_name}
-        </Link>
-      </td>
-      <td className="px-3 py-2 border border-zinc-700">
-        {r.price ? `${Number(r.price).toFixed(2)} DKK` : 'Free'}
-      </td>
-      <td className="px-3 py-2 border border-zinc-700">
-        {r.has_paid ? (
-          <span className="text-green-400 font-semibold">Yes</span>
+                      return (
+                        <tr key={i} className="bg-zinc-800 hover:bg-zinc-700">
+                          <td className="px-3 py-2 border border-zinc-700">{date}</td>
+                          <td className="px-3 py-2 border border-zinc-700">{time}</td>
+                          <td className="px-3 py-2 border border-zinc-700">
+                            <Link href={`/events/${r.event_id}`} className="text-blue-400 hover:underline">
+                              {r.event_name}
+                            </Link>
+                          </td>
+                          <td className="px-3 py-2 border border-zinc-700">
+                            {r.price ? `${Number(r.price).toFixed(2)} DKK` : 'Free'}
+                          </td>
+                          <td className="px-3 py-2 border border-zinc-700">
+                            {r.has_paid ? (
+                              <span className="text-green-400 font-semibold">Yes</span>
+                            ) : (
+                              <span className="text-red-400 font-semibold">No</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 border border-zinc-700">{r.popularity || 0}</td>
+                          <td className="px-3 py-2 border border-zinc-700">
+                            {qrValue ? (
+                              <div className="cursor-pointer" onClick={() => setActiveQR(qrValue)}>
+                                <QRCode value={qrValue} size={48} />
+                              </div>
+                            ) : (
+                              <span className="text-gray-500">No QR</span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-gray-400">No tickets found.</p>
+            )}
+          </>
         ) : (
-          <span className="text-red-400 font-semibold">No</span>
+          <p className="text-red-400">Failed to load profile.</p>
         )}
-      </td>
-      <td className="px-3 py-2 border border-zinc-700">{r.popularity || 0}</td>
-      <td className="px-3 py-2 border border-zinc-700">
-        {qrValue ? (
-          <div className="cursor-pointer" onClick={() => setActiveQR(qrValue)}>
-            <QRCode value={qrValue} size={48} />
+      </div>
+
+      {/* Enlarged QR modal */}
+      {activeQR && (
+        <div
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+          onClick={() => setActiveQR(null)}
+        >
+          <div className="bg-white p-6 rounded-xl shadow-lg">
+            <QRCode value={activeQR} size={256} />
           </div>
-        ) : (
-          <span className="text-gray-500">No QR</span>
-        )}
-      </td>
-    </tr>
+        </div>
+      )}
+    </div>
   )
-})}
+}
 
