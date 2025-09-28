@@ -1,6 +1,6 @@
 // pages/api/events/myRsvps.js
 import { auth } from '../../../lib/auth'
-import pool from '../../../lib/db'
+import pool from '../../../lib/postgres.js''
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
