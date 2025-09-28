@@ -163,6 +163,34 @@ async function handleBooking() {
     }
   }
 
+
+async function handleRSVPClick() {
+  if (!authUser) {
+    setShowAccountModal(true)
+    return
+  }
+  try {
+    const token = localStorage.getItem('token') || ''
+    const res = await fetch('/api/events/rsvp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: token ? `Bearer ${token}` : ''
+      },
+      body: JSON.stringify({ eventId: event.id })
+    })
+    if (!res.ok) throw new Error('Failed to RSVP')
+
+    setStatusMsg('📌 RSVP added!')
+    setRefreshTrigger(prev => prev + 1) // trigger UI refresh
+    setTimeout(() => setStatusMsg(''), 1500)
+  } catch (err) {
+    console.error(err)
+    setStatusMsg('Error saving RSVP')
+  }
+}
+
+
   function getButtonLabel() {
     if (!authUser) return 'Go to login'
     if (reachedLimit) return `Max ${maxPerUser} tickets`
@@ -173,7 +201,15 @@ async function handleBooking() {
   }
 
   return (
-    <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800 shadow flex flex-col justify-between relative">
+  <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800 shadow flex flex-col justify-between relative">
+    {/* RSVP Button */}
+    <button
+      onClick={handleRSVPClick}
+      className="absolute top-2 left-2 text-yellow-400 text-xl"
+      title="RSVP to this event"
+    >
+      📌
+    </button>   
       <button
         onClick={handleHeartClick}
         className="absolute top-2 right-2 text-red-500 text-2xl"
