@@ -1,3 +1,4 @@
+//rsvp.js
 import { auth } from '../../../lib/auth'
 import { pool } from '../../../lib/postgres.js'
 
