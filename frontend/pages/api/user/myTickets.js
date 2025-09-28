@@ -1,3 +1,4 @@
+// pages/api/user/myTickets.js
 import { pool } from '../../../lib/postgres.js'
 import { auth } from '../../../lib/auth.js'
 
@@ -21,12 +22,16 @@ export default async function handler(req, res) {
 
   try {
     const { rows: tickets } = await pool.query(`
-      SELECT r.id AS registration_id,
-             r.ticket_code,
-             e.id AS event_id,
-             e.name AS event_name,
-             e.datetime,
-             (SELECT COUNT(*) FROM registrations WHERE event_id = e.id) AS popularity
+      SELECT 
+        r.id AS registration_id,
+        r.ticket_code,
+        r.has_paid,
+        r.stage,
+        e.id AS event_id,
+        e.name AS event_name,
+        e.datetime,
+        e.price,
+        (SELECT COUNT(*) FROM registrations WHERE event_id = e.id) AS popularity
       FROM registrations r
       JOIN events e ON e.id = r.event_id
       WHERE r.user_id = $1

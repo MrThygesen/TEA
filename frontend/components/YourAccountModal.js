@@ -81,80 +81,46 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {registrations.map((r, i) => {
-                      if (!r || !r.event_name || !r.datetime) return null
+{registrations.map((r, i) => {
+  if (!r || !r.event_name || !r.datetime) return null
 
-                      const dt = new Date(r.datetime)
-                      const date = dt.toLocaleDateString()
-                      const time = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const dt = new Date(r.datetime)
+  const date = dt.toLocaleDateString()
+  const time = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
-                      return (
-                        <tr key={i} className="bg-zinc-800 hover:bg-zinc-700">
-                          <td className="px-3 py-2 border border-zinc-700">{date}</td>
-                          <td className="px-3 py-2 border border-zinc-700">{time}</td>
-                          <td className="px-3 py-2 border border-zinc-700">
-                            <Link href={`/events/${r.event_id}`} className="text-blue-400 hover:underline">
-                              {r.event_name}
-                            </Link>
-                          </td>
-                          <td className="px-3 py-2 border border-zinc-700">
-                            {r.price ? `${Number(r.price).toFixed(2)} DKK` : 'Free'}
-                          </td>
-                          <td className="px-3 py-2 border border-zinc-700">
-                            {r.has_paid ? (
-                              <span className="text-green-400 font-semibold">Yes</span>
-                            ) : (
-                              <span className="text-red-400 font-semibold">No</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 border border-zinc-700">{r.popularity || 0}</td>
-                          <td className="px-3 py-2 border border-zinc-700">
-                            {r.ticket_code ? (
-                              <div
-                                className="cursor-pointer"
-                                onClick={() => setActiveQR(r.ticket_code)}
-                              >
-                                <QRCode value={r.ticket_code} size={48} />
-                              </div>
-                            ) : (
-                              <span className="text-gray-500">No QR</span>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="text-gray-400">No registrations yet.</p>
-            )}
-          </>
+  // ✅ always have a QR value (either ticket_code or fallback)
+  const qrValue = r.ticket_code || `ticket:${r.event_id}:${r.user_id || r.telegram_user_id}`
+
+  return (
+    <tr key={i} className="bg-zinc-800 hover:bg-zinc-700">
+      <td className="px-3 py-2 border border-zinc-700">{date}</td>
+      <td className="px-3 py-2 border border-zinc-700">{time}</td>
+      <td className="px-3 py-2 border border-zinc-700">
+        <Link href={`/events/${r.event_id}`} className="text-blue-400 hover:underline">
+          {r.event_name}
+        </Link>
+      </td>
+      <td className="px-3 py-2 border border-zinc-700">
+        {r.price ? `${Number(r.price).toFixed(2)} DKK` : 'Free'}
+      </td>
+      <td className="px-3 py-2 border border-zinc-700">
+        {r.has_paid ? (
+          <span className="text-green-400 font-semibold">Yes</span>
         ) : (
-          <p className="text-red-400">Failed to load account.</p>
+          <span className="text-red-400 font-semibold">No</span>
         )}
-
-        {/* Close button bottom */}
-        <div className="mt-6 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-zinc-700 rounded hover:bg-zinc-600"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-
-      {/* QR Lightbox */}
-      {activeQR && (
-        <div
-          className="fixed inset-0 bg-black/80 flex items-center justify-center z-60"
-          onClick={() => setActiveQR(null)}
-        >
-          <QRCode value={activeQR} size={256} className="rounded-lg shadow-lg" />
-        </div>
-      )}
-    </div>
+      </td>
+      <td className="px-3 py-2 border border-zinc-700">{r.popularity || 0}</td>
+      <td className="px-3 py-2 border border-zinc-700">
+        {qrValue ? (
+          <div className="cursor-pointer" onClick={() => setActiveQR(qrValue)}>
+            <QRCode value={qrValue} size={48} />
+          </div>
+        ) : (
+          <span className="text-gray-500">No QR</span>
+        )}
+      </td>
+    </tr>
   )
-}
+})}
 

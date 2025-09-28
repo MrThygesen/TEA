@@ -112,43 +112,51 @@ async function sendUpgradeToBookEmail(to, event, user) {
 // --------------------------
 // Ticket email
 // --------------------------
-async function sendTicketEmail(to, event, user) {
+async function sendTicketEmail(to, event, user, pool) {
   if (!to || !event || !user || !user.id) {
     console.warn('Skipping ticket email: missing data', { to, eventId: event?.id, userId: user?.id })
     return
   }
 
   try {
-    const qrData = `ticket:${event.id}:${user.id}`
-    const qrBuffer = await QRCode.toBuffer(qrData)
+    // Fetch all tickets for this user and event
+    const ticketsRes = await pool.query(
+      `SELECT * FROM registrations WHERE (user_id=$1 OR telegram_user_id=$2) AND event_id=$3`,
+      [user.id, user.id, event.id]
+    )
+    const tickets = ticketsRes.rows
 
-    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
-    sendSmtpEmail.sender = { name: 'Edgy Events', email: MAIL_FROM }
-    sendSmtpEmail.to = [{ email: to }]
-    sendSmtpEmail.subject = `Your Ticket: ${event.name}`
+    for (const ticket of tickets) {
+      if (!ticket.ticket_code) continue
+      const qrBuffer = await QRCode.toBuffer(ticket.ticket_code)
 
-    let htmlContent = `
-      <h1>Your Ticket 🎟</h1>
-      <p>Hello ${user.username || ''}, here is your ticket for:</p>
-      <p><strong>${event.name}</strong> (${event.city || 'TBA'})</p>
-      <p>Date/Time: ${event.datetime ? new Date(event.datetime).toLocaleString() : 'TBA'}</p>
-      <p>Venue: ${event.venue || 'TBA'}</p>
-      <p>Please show this QR code at the entrance:</p>
-      <p><img src="cid:qrCode" alt="QR Ticket" style="max-width:250px;"/></p>
-      <p><small>QR Data: ${qrData}</small></p>
-      <p>You can also save this into Google Wallet or Apple Wallet.</p>
-    `
-    if (event.detailsBlock) htmlContent += event.detailsBlock
+      const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
+      sendSmtpEmail.sender = { name: 'Edgy Events', email: MAIL_FROM }
+      sendSmtpEmail.to = [{ email: to }]
+      sendSmtpEmail.subject = `Your Ticket: ${event.name}`
 
-    sendSmtpEmail.htmlContent = htmlContent
-    sendSmtpEmail.attachment = [
-      { content: qrBuffer.toString('base64'), name: 'ticket.png', contentId: 'qrCode' }
-    ]
+      let htmlContent = `
+        <h1>Your Ticket 🎟</h1>
+        <p>Hello ${user.username || ''}, here is your ticket for:</p>
+        <p><strong>${event.name}</strong> (${event.city || 'TBA'})</p>
+        <p>Date/Time: ${event.datetime ? new Date(event.datetime).toLocaleString() : 'TBA'}</p>
+        <p>Venue: ${event.venue || 'TBA'}</p>
+        <p>Please show this QR code at the entrance:</p>
+        <p><img src="cid:qrCode" alt="QR Ticket" style="max-width:250px;"/></p>
+        <p><small>QR Data: ${ticket.ticket_code}</small></p>
+      `
+      if (event.detailsBlock) htmlContent += event.detailsBlock
 
-    await apiInstance.sendTransacEmail(sendSmtpEmail)
-    console.log('✅ Ticket email sent to', to)
+      sendSmtpEmail.htmlContent = htmlContent
+      sendSmtpEmail.attachment = [
+        { content: qrBuffer.toString('base64'), name: 'ticket.png', contentId: 'qrCode' }
+      ]
+
+      await apiInstance.sendTransacEmail(sendSmtpEmail)
+      console.log('✅ Ticket email sent to', to, 'ticket_code:', ticket.ticket_code)
+    }
   } catch (err) {
-    console.error('❌ Failed to send ticket email:', err?.response?.body || err)
+    console.error('❌ Failed to send ticket emails:', err?.response?.body || err)
   }
 }
 
