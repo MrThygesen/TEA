@@ -9,17 +9,14 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [profile, setProfile] = useState(null)
   const [registrations, setRegistrations] = useState([])
   const [loading, setLoading] = useState(true)
-  const [activeQR, setActiveQR] = useState(null) // Enlarged QR modal
+  const [activeQR, setActiveQR] = useState(null)
 
   useEffect(() => {
     async function loadAccount() {
       setLoading(true)
       try {
         const token = localStorage.getItem('token')
-        if (!token) {
-          console.warn('No token found')
-          return
-        }
+        if (!token) return
 
         const res = await fetch('/api/user/me', {
           headers: { Authorization: `Bearer ${token}` },
@@ -28,7 +25,15 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
 
         const data = await res.json()
         setProfile(data || null)
-        setRegistrations(Array.isArray(data.registrations) ? data.registrations : [])
+
+        // Make sure each registration has a ticket_code
+        const regs = Array.isArray(data.registrations) ? data.registrations : []
+        regs.forEach((r) => {
+          if (!r.ticket_code && r.event_id) {
+            r.ticket_code = `ticket:${r.event_id}:${data.id}` // fallback if missing
+          }
+        })
+        setRegistrations(regs)
       } catch (err) {
         console.error('❌ Failed to load account:', err)
       } finally {
@@ -42,7 +47,6 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-lg max-w-6xl w-full p-6 text-white relative">
 
-        {/* Close button */}
         <button
           onClick={onClose}
           className="absolute top-2 right-2 text-gray-400 hover:text-white text-xl"
@@ -56,7 +60,6 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
           <p className="text-gray-400">Loading...</p>
         ) : profile ? (
           <>
-            {/* Profile section */}
             <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-zinc-800 p-4 rounded-lg border border-zinc-700">
               <p><span className="font-semibold text-gray-300">Name:</span> {profile.username || '-'}</p>
               <p><span className="font-semibold text-gray-300">Email:</span> {profile.email || '-'}</p>
@@ -66,7 +69,6 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
               <p><span className="font-semibold text-gray-300">Role:</span> {profile.role || '-'}</p>
             </div>
 
-            {/* Registrations */}
             {registrations.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="min-w-full border-collapse border border-zinc-700 text-sm">
@@ -89,9 +91,6 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                       const date = dt.toLocaleDateString()
                       const time = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
-                      // Safe QR value
-                      const qrValue = r.ticket_code || `ticket:${r.event_id}:${profile.id}`
-
                       return (
                         <tr key={i} className="bg-zinc-800 hover:bg-zinc-700">
                           <td className="px-3 py-2 border border-zinc-700">{date}</td>
@@ -113,9 +112,9 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                           </td>
                           <td className="px-3 py-2 border border-zinc-700">{r.popularity || 0}</td>
                           <td className="px-3 py-2 border border-zinc-700">
-                            {qrValue ? (
-                              <div className="cursor-pointer" onClick={() => setActiveQR(qrValue)}>
-                                <QRCodeCanvas value={qrValue} size={48} />
+                            {r.ticket_code ? (
+                              <div className="cursor-pointer" onClick={() => setActiveQR(r.ticket_code)}>
+                                <QRCodeCanvas value={r.ticket_code} size={48} />
                               </div>
                             ) : (
                               <span className="text-gray-500">No QR</span>
@@ -136,7 +135,6 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         )}
       </div>
 
-      {/* Enlarged QR modal */}
       {activeQR && (
         <div
           className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
