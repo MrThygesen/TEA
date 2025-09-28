@@ -1,4 +1,4 @@
-// pages/api/events/myRsvps.js
+//myRsvp.js
 import { auth } from '../../../lib/auth'
 import { pool } from '../../../lib/postgres.js'
 
@@ -21,10 +21,10 @@ export default async function handler(req, res) {
       SELECT f.id AS favorite_id,
              f.event_id,
              f.created_at,
-             e.name AS event_name,
-             e.city AS event_city,
-             e.datetime AS event_datetime,
-             e.price AS event_price
+             e.name AS title,
+             e.city AS location,
+             e.datetime AS date,
+             e.price AS price
       FROM favorites f
       JOIN events e ON e.id = f.event_id
       WHERE f.user_id = $1
