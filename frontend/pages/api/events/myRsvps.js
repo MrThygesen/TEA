@@ -1,6 +1,6 @@
 // pages/api/events/myRsvps.js
 import { auth } from '../../../lib/auth'
-import pool from '../../../lib/postgres.js'
+import { pool } from '../../../lib/postgres.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -18,7 +18,13 @@ export default async function handler(req, res) {
 
     const { rows } = await pool.query(
       `
-      SELECT f.id as favorite_id, f.event_id, f.created_at, e.title, e.date, e.location
+      SELECT f.id AS favorite_id,
+             f.event_id,
+             f.created_at,
+             e.name AS event_name,
+             e.city AS event_city,
+             e.datetime AS event_datetime,
+             e.price AS event_price
       FROM favorites f
       JOIN events e ON e.id = f.event_id
       WHERE f.user_id = $1
@@ -29,7 +35,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ rsvps: rows })
   } catch (err) {
-    console.error('Error fetching RSVPs', err)
+    console.error('❌ MyRSVPs API error:', err)
     return res.status(500).json({ error: 'Server error' })
   }
 }

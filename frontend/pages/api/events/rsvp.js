@@ -1,6 +1,6 @@
 // pages/api/events/rsvp.js
 import { auth } from '../../../lib/auth'
-import pool from '../../../lib/postgres.js'
+import { pool } from '../../../lib/postgres.js'
 
 export default async function handler(req, res) {
   try {
@@ -13,16 +13,16 @@ export default async function handler(req, res) {
     const userId = decoded.userId
     const { eventId } = req.body
 
-    if (!eventId) {
-      return res.status(400).json({ error: 'Missing eventId' })
-    }
+    if (!eventId) return res.status(400).json({ error: 'Missing eventId' })
 
     if (req.method === 'POST') {
       // Add RSVP (insert favorite)
       await pool.query(
-        `INSERT INTO favorites (user_id, event_id)
-         VALUES ($1, $2)
-         ON CONFLICT (user_id, event_id) DO NOTHING`,
+        `
+        INSERT INTO favorites (user_id, event_id)
+        VALUES ($1, $2)
+        ON CONFLICT (user_id, event_id) DO NOTHING
+        `,
         [userId, eventId]
       )
       return res.status(200).json({ success: true })
@@ -31,7 +31,11 @@ export default async function handler(req, res) {
     if (req.method === 'DELETE') {
       // Remove RSVP
       const result = await pool.query(
-        `DELETE FROM favorites WHERE user_id = $1 AND event_id = $2 RETURNING *`,
+        `
+        DELETE FROM favorites
+        WHERE user_id = $1 AND event_id = $2
+        RETURNING *
+        `,
         [userId, eventId]
       )
 
