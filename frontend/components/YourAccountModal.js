@@ -2,14 +2,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import QRCode from 'qrcode.react'
+import { QRCodeCanvas } from 'qrcode.react'
 import Link from 'next/link'
 
 export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [profile, setProfile] = useState(null)
   const [registrations, setRegistrations] = useState([])
   const [loading, setLoading] = useState(true)
-  const [activeQR, setActiveQR] = useState(null)
+  const [activeQR, setActiveQR] = useState(null) // Enlarged QR modal
 
   useEffect(() => {
     async function loadAccount() {
@@ -41,7 +41,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-lg max-w-6xl w-full p-6 text-white relative">
-        
+
         {/* Close button */}
         <button
           onClick={onClose}
@@ -89,8 +89,8 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                       const date = dt.toLocaleDateString()
                       const time = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
-                      const qrValue =
-                        r.ticket_code || `ticket:${r.event_id}:${r.user_id || r.telegram_user_id}`
+                      // Safe QR value
+                      const qrValue = r.ticket_code || `ticket:${r.event_id}:${profile.id}`
 
                       return (
                         <tr key={i} className="bg-zinc-800 hover:bg-zinc-700">
@@ -115,7 +115,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                           <td className="px-3 py-2 border border-zinc-700">
                             {qrValue ? (
                               <div className="cursor-pointer" onClick={() => setActiveQR(qrValue)}>
-                                <QRCode value={qrValue} size={48} />
+                                <QRCodeCanvas value={qrValue} size={48} />
                               </div>
                             ) : (
                               <span className="text-gray-500">No QR</span>
@@ -132,7 +132,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
             )}
           </>
         ) : (
-          <p className="text-red-400">Failed to load profile.</p>
+          <p className="text-red-400">No profile loaded.</p>
         )}
       </div>
 
@@ -142,8 +142,9 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
           className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
           onClick={() => setActiveQR(null)}
         >
-          <div className="bg-white p-6 rounded-xl shadow-lg">
-            <QRCode value={activeQR} size={256} />
+          <div className="bg-white p-6 rounded-lg shadow-lg">
+            <QRCodeCanvas value={activeQR} size={256} />
+            <p className="text-black text-center mt-4">Scan this ticket</p>
           </div>
         </div>
       )}
