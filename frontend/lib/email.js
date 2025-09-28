@@ -12,7 +12,7 @@ apiInstance.setApiKey(
 const MAIL_FROM = process.env.MAIL_FROM || 'no-reply@teanet.xyz'
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 
-// --------------------------
+// -------------------------- 
 // Generate QR Code for ticket
 // --------------------------
 async function generateTicketQRCode(eventId, userId) {
@@ -106,7 +106,7 @@ async function sendUpgradeToBookEmail(to, event, user) {
   }
 }
 
---------------------------
+//--------------------------
 // Ticket email
 // --------------------------
 async function sendTicketEmail(to, event, user, pool) {
