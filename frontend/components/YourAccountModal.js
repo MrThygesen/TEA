@@ -2,40 +2,43 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { QRCodeCanvas } from 'qrcode.react'
-import Link from 'next/link'
+import QRCode from 'qrcode.react'
 
 export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [profile, setProfile] = useState(null)
-  const [registrations, setRegistrations] = useState([])
+  const [tickets, setTickets] = useState([])
+  const [rsvps, setRsvps] = useState([])
   const [loading, setLoading] = useState(true)
-  const [activeQR, setActiveQR] = useState(null)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     async function loadAccount() {
       setLoading(true)
+      setError(null)
       try {
         const token = localStorage.getItem('token')
-        if (!token) return
+        if (!token) throw new Error('Not logged in')
 
-        const res = await fetch('/api/user/me', {
+        // fetch profile + tickets
+        const res = await fetch('/api/me', {
           headers: { Authorization: `Bearer ${token}` },
         })
-        if (!res.ok) throw new Error(`Failed to load profile: ${res.status}`)
-
+        if (!res.ok) throw new Error('Failed to load profile')
         const data = await res.json()
-        setProfile(data || null)
+        setProfile(data.profile)
+        setTickets(data.tickets || [])
 
-        // Make sure each registration has a ticket_code
-        const regs = Array.isArray(data.registrations) ? data.registrations : []
-        regs.forEach((r) => {
-          if (!r.ticket_code && r.event_id) {
-            r.ticket_code = `ticket:${r.event_id}:${data.id}` // fallback if missing
-          }
+        // fetch RSVPs
+        const resRsvp = await fetch('/api/events/myRsvps', {
+          headers: { Authorization: `Bearer ${token}` },
         })
-        setRegistrations(regs)
+        if (resRsvp.ok) {
+          const dataRsvp = await resRsvp.json()
+          setRsvps(dataRsvp.rsvps || [])
+        }
       } catch (err) {
-        console.error('❌ Failed to load account:', err)
+        console.error('Error loading account', err)
+        setError(err.message)
       } finally {
         setLoading(false)
       }
@@ -43,109 +46,142 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     loadAccount()
   }, [refreshTrigger])
 
-  return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-lg max-w-6xl w-full p-6 text-white relative">
+  async function cancelRsvp(eventId) {
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch('/api/events/rsvp', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ eventId }),
+      })
+      if (!res.ok) throw new Error('Failed to cancel RSVP')
+      setRsvps(rsvps.filter((r) => r.event_id !== eventId))
+    } catch (err) {
+      console.error('Error canceling RSVP', err)
+      alert('Could not cancel RSVP')
+    }
+  }
 
-        <button
-          onClick={onClose}
-          className="absolute top-2 right-2 text-gray-400 hover:text-white text-xl"
-        >
-          ✕
-        </button>
-
-        <h2 className="text-2xl font-bold mb-6 text-blue-400">Your Account</h2>
-
-        {loading ? (
-          <p className="text-gray-400">Loading...</p>
-        ) : profile ? (
-          <>
-            <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-zinc-800 p-4 rounded-lg border border-zinc-700">
-              <p><span className="font-semibold text-gray-300">Name:</span> {profile.username || '-'}</p>
-              <p><span className="font-semibold text-gray-300">Email:</span> {profile.email || '-'}</p>
-              <p><span className="font-semibold text-gray-300">Wallet:</span> {profile.wallet_address || '-'}</p>
-              <p><span className="font-semibold text-gray-300">City:</span> {profile.city || '-'}</p>
-              <p><span className="font-semibold text-gray-300">Tier:</span> {profile.tier || '-'}</p>
-              <p><span className="font-semibold text-gray-300">Role:</span> {profile.role || '-'}</p>
-            </div>
-
-            {registrations.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="min-w-full border-collapse border border-zinc-700 text-sm">
-                  <thead>
-                    <tr className="bg-zinc-800 text-gray-300">
-                      <th className="px-3 py-2 border border-zinc-700 text-left">Date</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left">Time</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left">Event</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left">Price</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left">Paid</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left">Popularity</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left">QR</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {registrations.map((r, i) => {
-                      if (!r || !r.event_name || !r.datetime) return null
-
-                      const dt = new Date(r.datetime)
-                      const date = dt.toLocaleDateString()
-                      const time = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-
-                      return (
-                        <tr key={i} className="bg-zinc-800 hover:bg-zinc-700">
-                          <td className="px-3 py-2 border border-zinc-700">{date}</td>
-                          <td className="px-3 py-2 border border-zinc-700">{time}</td>
-                          <td className="px-3 py-2 border border-zinc-700">
-                            <Link href={`/events/${r.event_id}`} className="text-blue-400 hover:underline">
-                              {r.event_name}
-                            </Link>
-                          </td>
-                          <td className="px-3 py-2 border border-zinc-700">
-                            {r.price ? `${Number(r.price).toFixed(2)} DKK` : 'Free'}
-                          </td>
-                          <td className="px-3 py-2 border border-zinc-700">
-                            {r.has_paid ? (
-                              <span className="text-green-400 font-semibold">Yes</span>
-                            ) : (
-                              <span className="text-red-400 font-semibold">No</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 border border-zinc-700">{r.popularity || 0}</td>
-                          <td className="px-3 py-2 border border-zinc-700">
-                            {r.ticket_code ? (
-                              <div className="cursor-pointer" onClick={() => setActiveQR(r.ticket_code)}>
-                                <QRCodeCanvas value={r.ticket_code} size={48} />
-                              </div>
-                            ) : (
-                              <span className="text-gray-500">No QR</span>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="text-gray-400">No tickets found.</p>
-            )}
-          </>
-        ) : (
-          <p className="text-red-400">No profile loaded.</p>
-        )}
-      </div>
-
-      {activeQR && (
-        <div
-          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
-          onClick={() => setActiveQR(null)}
-        >
-          <div className="bg-white p-6 rounded-lg shadow-lg">
-            <QRCodeCanvas value={activeQR} size={256} />
-            <p className="text-black text-center mt-4">Scan this ticket</p>
-          </div>
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 w-full max-w-md text-center">
+          <p className="text-gray-700">Loading your account...</p>
         </div>
-      )}
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 w-full max-w-md text-center">
+          <p className="text-red-600 mb-4">Error: {error}</p>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-lg shadow-lg overflow-y-auto max-h-[90vh]">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold text-gray-800">Your Account</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-600 hover:text-gray-900 font-bold"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Profile Info */}
+        {profile && (
+          <div className="mb-6">
+            <p className="text-gray-700">
+              <strong>Email:</strong> {profile.email}
+            </p>
+            <p className="text-gray-700">
+              <strong>Hearts:</strong> {profile.hearts}
+            </p>
+          </div>
+        )}
+
+        {/* Tickets */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-2">Your Tickets</h3>
+          {tickets.length === 0 ? (
+            <p className="text-gray-500">No tickets booked yet.</p>
+          ) : (
+            <ul className="space-y-3">
+              {tickets.map((t) => (
+                <li
+                  key={t.id}
+                  className="p-3 border rounded-md shadow-sm bg-gray-50 flex flex-col items-start"
+                >
+                  <p>
+                    <strong>Event:</strong> {t.event_title}
+                  </p>
+                  <p>
+                    <strong>Date:</strong>{' '}
+                    {new Date(t.event_date).toLocaleString()}
+                  </p>
+                  <p>
+                    <strong>Ticket Code:</strong> {t.ticket_code}
+                  </p>
+                  <div className="mt-2">
+                    <QRCode value={t.ticket_code} size={128} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* RSVPs */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-2">
+            Your RSVPs
+          </h3>
+          {rsvps.length === 0 ? (
+            <p className="text-gray-500">No RSVPs yet.</p>
+          ) : (
+            <ul className="space-y-3">
+              {rsvps.map((r) => (
+                <li
+                  key={r.favorite_id}
+                  className="p-3 border rounded-md shadow-sm bg-gray-50 flex flex-col items-start"
+                >
+                  <p>
+                    <strong>Event:</strong> {r.title}
+                  </p>
+                  <p>
+                    <strong>Date:</strong>{' '}
+                    {new Date(r.date).toLocaleString()}
+                  </p>
+                  <p>
+                    <strong>Location:</strong> {r.location}</p>
+                  <button
+                    onClick={() => cancelRsvp(r.event_id)}
+                    className="mt-2 px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                  >
+                    Cancel RSVP
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
