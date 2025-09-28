@@ -1,4 +1,3 @@
-// components/YourAccountModal.js
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -20,7 +19,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         if (!token) throw new Error('Not logged in')
 
         // fetch profile + tickets
-        const res = await fetch('/api/me', {
+        const res = await fetch('/api/user/me', {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (!res.ok) throw new Error('Failed to load profile')
@@ -35,6 +34,9 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         if (resRsvp.ok) {
           const dataRsvp = await resRsvp.json()
           setRsvps(dataRsvp.rsvps || [])
+        } else {
+          console.warn('Failed to load RSVPs')
+          setRsvps([])
         }
       } catch (err) {
         console.error('Error loading account', err)
@@ -111,7 +113,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
               <strong>Email:</strong> {profile.email}
             </p>
             <p className="text-gray-700">
-              <strong>Hearts:</strong> {profile.hearts}
+              <strong>Hearts:</strong> {profile.hearts ?? 0}
             </p>
           </div>
         )}
@@ -125,15 +127,15 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
             <ul className="space-y-3">
               {tickets.map((t) => (
                 <li
-                  key={t.id}
+                  key={t.registration_id}
                   className="p-3 border rounded-md shadow-sm bg-gray-50 flex flex-col items-start"
                 >
                   <p>
-                    <strong>Event:</strong> {t.event_title}
+                    <strong>Event:</strong> {t.event_name}
                   </p>
                   <p>
                     <strong>Date:</strong>{' '}
-                    {new Date(t.event_date).toLocaleString()}
+                    {new Date(t.datetime).toLocaleString()}
                   </p>
                   <p>
                     <strong>Ticket Code:</strong> {t.ticket_code}
@@ -149,9 +151,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
 
         {/* RSVPs */}
         <div className="mb-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-2">
-            Your RSVPs
-          </h3>
+          <h3 className="text-lg font-semibold text-gray-800 mb-2">Your RSVPs</h3>
           {rsvps.length === 0 ? (
             <p className="text-gray-500">No RSVPs yet.</p>
           ) : (
@@ -165,11 +165,11 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                     <strong>Event:</strong> {r.title}
                   </p>
                   <p>
-                    <strong>Date:</strong>{' '}
-                    {new Date(r.date).toLocaleString()}
+                    <strong>Date:</strong> {new Date(r.date).toLocaleString()}
                   </p>
                   <p>
-                    <strong>Location:</strong> {r.location}</p>
+                    <strong>Location:</strong> {r.location}
+                  </p>
                   <button
                     onClick={() => cancelRsvp(r.event_id)}
                     className="mt-2 px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
