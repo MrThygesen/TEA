@@ -11,6 +11,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
+  // --- Auth
   const token = auth.getTokenFromReq(req)
   let decoded = null
   if (token) {
@@ -65,49 +66,44 @@ export default async function handler(req, res) {
       clientSecret = paymentIntent.client_secret
     }
 
-    // --- Insert registrations with ticket_code
-const inserted = []
-for (let i = 0; i < quantity; i++) {
-  // Generate unique ticket_code
-  const ticket_code = `TICKET-${eventId}-${userId || 'guest'}-${Date.now()}-${i}`
+    // --- Insert registrations with unique ticket_codes
+    const inserted = []
+    for (let i = 0; i < quantity; i++) {
+      const ticket_code = `TICKET-${eventId}-${userId || 'guest'}-${Date.now()}-${i}`
+      const { rows } = await pool.query(
+        `INSERT INTO registrations (user_id, event_id, email, stage, has_paid, ticket_code)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
+        [userId, eventId, email || null, price > 0 ? 'prebook' : 'book', price > 0, ticket_code]
+      )
+      inserted.push(rows[0])
+    }
 
-  const { rows } = await pool.query(
-    `INSERT INTO registrations (user_id, event_id, email, stage, has_paid, ticket_code)
-     VALUES ($1, $2, $3, $4, $5, $6)
-     RETURNING *`,
-    [userId, eventId, email || null, price > 0 ? 'prebook' : 'book', price > 0, ticket_code]
-  )
-  inserted.push(rows[0])
-}
+    // --- Fetch user info if logged in
+    let user = { id: userId, email }
+    if (userId) {
+      const { rows: userRows } = await pool.query(
+        'SELECT id, username, email FROM user_profiles WHERE id=$1',
+        [userId]
+      )
+      if (userRows.length) user = userRows[0]
+    }
 
-// --- Send ticket email immediately if free event
-if (price === 0 && user?.email) {
-  try {
-    await sendTicketEmail(user.email, event, user, pool)
-    await pool.query(
-      'UPDATE registrations SET ticket_sent = TRUE WHERE id = ANY($1::int[])',
-      [inserted.map(r => r.id)]
-    )
-    console.log('✅ Ticket emails sent for free event')
-  } catch (err) {
-    console.error('❌ Failed to send ticket email (register.js):', err)
-  }
-}
-
-
-      if (user?.email) {
-        try {
-          await sendTicketEmail(user.email, event, user)
-          await pool.query(
-            'UPDATE registrations SET ticket_sent = TRUE WHERE id = ANY($1::int[])',
-            [inserted.map(r => r.id)]
-          )
-        } catch (err) {
-          console.error('❌ Failed to send ticket email (register.js):', err)
-        }
+    // --- Send ticket email for free event
+    if (price === 0 && user?.email) {
+      try {
+        await sendTicketEmail(user.email, event, user, pool)
+        await pool.query(
+          'UPDATE registrations SET ticket_sent = TRUE WHERE id = ANY($1::int[])',
+          [inserted.map(r => r.id)]
+        )
+        console.log('✅ Ticket emails sent for free event')
+      } catch (err) {
+        console.error('❌ Failed to send ticket email:', err)
       }
     }
 
+    // --- Return response
     return res.status(200).json({
       success: true,
       registrations: inserted,
