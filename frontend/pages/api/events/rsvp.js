@@ -1,6 +1,6 @@
 // pages/api/events/rsvp.js
 import { auth } from '../../../lib/auth'
-import pool from '../../../lib/postgres.js''
+import pool from '../../../lib/postgres.js'
 
 export default async function handler(req, res) {
   try {
