@@ -50,7 +50,6 @@ async function sendVerificationEmail(to, token) {
     throw new Error('Failed to send verification email')
   }
 }
-/*
 // --------------------------
 // Prebook email
 // --------------------------
@@ -107,9 +106,7 @@ async function sendUpgradeToBookEmail(to, event, user) {
   }
 }
 
-*/
-
-// --------------------------
+--------------------------
 // Ticket email
 // --------------------------
 async function sendTicketEmail(to, event, user, pool) {
