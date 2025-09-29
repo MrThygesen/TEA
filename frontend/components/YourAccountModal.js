@@ -1,4 +1,3 @@
-//YourAccountModal.js
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -7,7 +6,8 @@ import Link from 'next/link'
 
 export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [profile, setProfile] = useState(null)
-  const [registrations, setRegistrations] = useState([])
+  const [tickets, setTickets] = useState([])
+  const [rsvps, setRsvps] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeQR, setActiveQR] = useState(null)
   const [error, setError] = useState(null)
@@ -20,22 +20,31 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         const token = localStorage.getItem('token')
         if (!token) throw new Error('Not logged in')
 
-        // --- Fetch user profile + registrations
+        // --- Fetch profile & tickets
         const res = await fetch('/api/user/me', {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (!res.ok) throw new Error('Failed to load profile')
         const data = await res.json()
-        setProfile(data || null)
 
-        // --- Make sure each registration has a ticket_code fallback
-        const regs = Array.isArray(data.registrations) ? data.registrations : []
-        regs.forEach((r) => {
-          if (!r.ticket_code && r.event_id && data.id) {
-            r.ticket_code = `ticket:${r.event_id}:${data.id}`
+        setProfile(data.profile || null)
+        const userTickets = Array.isArray(data.tickets) ? data.tickets : []
+        // fallback ticket_code if missing
+        userTickets.forEach(t => {
+          if (!t.ticket_code && t.event_id && data.profile?.id) {
+            t.ticket_code = `ticket:${t.event_id}:${data.profile.id}`
           }
         })
-        setRegistrations(regs)
+        setTickets(userTickets)
+
+        // --- Fetch RSVPs
+        const rsvpRes = await fetch('/api/user/rsvps', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!rsvpRes.ok) throw new Error('Failed to load RSVPs')
+        const rsvpData = await rsvpRes.json()
+        setRsvps(Array.isArray(rsvpData) ? rsvpData : [])
+
       } catch (err) {
         console.error('❌ Failed to load account:', err)
         setError(err.message)
@@ -70,14 +79,13 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-lg max-w-6xl w-full p-6 text-white relative">
 
-        <button onClick={onClose} className="absolute top-2 right-2 text-gray-400 hover:text-white text-xl">
-          ✕
-        </button>
+        <button onClick={onClose} className="absolute top-2 right-2 text-gray-400 hover:text-white text-xl">✕</button>
 
         <h2 className="text-2xl font-bold mb-6 text-blue-400">Your Account</h2>
 
         {profile && (
           <>
+            {/* Profile Info */}
             <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-zinc-800 p-4 rounded-lg border border-zinc-700">
               <p><span className="font-semibold text-gray-300">Name:</span> {profile.username || '-'}</p>
               <p><span className="font-semibold text-gray-300">Email:</span> {profile.email || '-'}</p>
@@ -87,7 +95,8 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
               <p><span className="font-semibold text-gray-300">Role:</span> {profile.role || '-'}</p>
             </div>
 
-            {registrations.length > 0 ? (
+            {/* Tickets */}
+            {tickets.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="min-w-full border-collapse border border-zinc-700 text-sm">
                   <thead>
@@ -102,9 +111,9 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {registrations.map((r, i) => {
-                      if (!r || !r.event_name || !r.datetime) return null
-                      const dt = new Date(r.datetime)
+                    {tickets.map((t, i) => {
+                      if (!t || !t.event_title || !t.event_date) return null
+                      const dt = new Date(t.event_date)
                       const date = dt.toLocaleDateString()
                       const time = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                       return (
@@ -112,21 +121,13 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                           <td className="px-3 py-2 border border-zinc-700">{date}</td>
                           <td className="px-3 py-2 border border-zinc-700">{time}</td>
                           <td className="px-3 py-2 border border-zinc-700">
-                            <Link href={`/events/${r.event_id}`} className="text-blue-400 hover:underline">
-                              {r.event_name}
-                            </Link>
+                            <Link href={`/events/${t.event_id}`} className="text-blue-400 hover:underline">{t.event_title}</Link>
                           </td>
-                          <td className="px-3 py-2 border border-zinc-700">{r.price ? `${Number(r.price).toFixed(2)} DKK` : 'Free'}</td>
+                          <td className="px-3 py-2 border border-zinc-700">{t.event_price ? `${Number(t.event_price).toFixed(2)} DKK` : 'Free'}</td>
+                          <td className="px-3 py-2 border border-zinc-700">{t.has_paid ? <span className="text-green-400 font-semibold">Yes</span> : <span className="text-red-400 font-semibold">No</span>}</td>
+                          <td className="px-3 py-2 border border-zinc-700">{t.popularity || 0}</td>
                           <td className="px-3 py-2 border border-zinc-700">
-                            {r.has_paid ? <span className="text-green-400 font-semibold">Yes</span> : <span className="text-red-400 font-semibold">No</span>}
-                          </td>
-                          <td className="px-3 py-2 border border-zinc-700">{r.popularity || 0}</td>
-                          <td className="px-3 py-2 border border-zinc-700">
-                            {r.ticket_code ? (
-                              <div className="cursor-pointer" onClick={() => setActiveQR(r.ticket_code)}>
-                                <QRCodeCanvas value={r.ticket_code} size={48} />
-                              </div>
-                            ) : <span className="text-gray-500">No QR</span>}
+                            {t.ticket_code ? <div className="cursor-pointer" onClick={() => setActiveQR(t.ticket_code)}><QRCodeCanvas value={t.ticket_code} size={48} /></div> : <span className="text-gray-500">No QR</span>}
                           </td>
                         </tr>
                       )
@@ -134,13 +135,30 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                   </tbody>
                 </table>
               </div>
-            ) : (
-              <p className="text-gray-400">No tickets found.</p>
-            )}
+            ) : <p className="text-gray-400">No tickets found.</p>}
+
+            {/* RSVPs */}
+            {rsvps.length > 0 ? (
+              <div className="mt-6">
+                <h3 className="text-lg font-semibold mb-2">Your RSVPs</h3>
+                <ul className="space-y-3">
+                  {rsvps.map(r => (
+                    <li key={r.rsvp_id} className="p-3 border rounded-md bg-zinc-800">
+                      <p><span className="font-semibold">Event:</span> {r.title}</p>
+                      <p><span className="font-semibold">Date:</span> {new Date(r.date).toLocaleString()}</p>
+                      <p><span className="font-semibold">Location:</span> {r.location}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : <p className="text-gray-400 mt-6">No RSVPs yet.</p>}
+
           </>
         )}
+
       </div>
 
+      {/* QR Modal */}
       {activeQR && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setActiveQR(null)}>
           <div className="bg-white p-6 rounded-lg shadow-lg">

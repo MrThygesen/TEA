@@ -10,16 +10,16 @@ export default async function handler(req, res) {
     const decoded = auth.verifyToken(token)
     if (!decoded) return res.status(401).json({ error: 'Invalid token' })
 
-    const userId = decoded.userId
+    const userId = decoded.id
     const { eventId } = req.body
 
     if (!eventId) return res.status(400).json({ error: 'Missing eventId' })
 
     if (req.method === 'POST') {
-      // Add RSVP (insert rsvp)
+      // Add RSVP (insert rsvps)
       await pool.query(
         `
-        INSERT INTO rsvp (user_id, event_id)
+        INSERT INTO rsvps (user_id, event_id)
         VALUES ($1, $2)
         ON CONFLICT (user_id, event_id) DO NOTHING
         `,
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
       // Remove RSVP
       const result = await pool.query(
         `
-        DELETE FROM rsvp
+        DELETE FROM rsvps
         WHERE user_id = $1 AND event_id = $2
         RETURNING *
         `,
@@ -40,7 +40,7 @@ export default async function handler(req, res) {
       )
 
       if (result.rowCount === 0) {
-        return res.status(404).json({ error: 'RSVP not found' })
+        return res.status(404).json({ error: 'RSVPS not found' })
       }
 
       return res.status(200).json({ success: true })
@@ -48,7 +48,7 @@ export default async function handler(req, res) {
 
     return res.status(405).json({ error: 'Method not allowed' })
   } catch (err) {
-    console.error('❌ RSVP API error:', err)
+    console.error('❌ RSVPS API error:', err)
     return res.status(500).json({ error: 'Server error' })
   }
 }
