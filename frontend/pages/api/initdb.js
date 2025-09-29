@@ -148,21 +148,64 @@ export default async function handler(req, res) {
     `)
 
     // FAVORITES
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS favorites (
+    id SERIAL PRIMARY KEY,
+    event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES user_profiles(id) ON DELETE CASCADE,
+    telegram_user_id INTEGER REFERENCES telegram_user_profiles(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT favorites_user_check CHECK (
+      user_id IS NOT NULL OR telegram_user_id IS NOT NULL
+    )
+  );
+`);
+
+// Uniqueness: only 1 RSVP per user per event
+await pool.query(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_favorites_event_user
+  ON favorites(event_id, user_id) WHERE user_id IS NOT NULL;
+`);
+
+await pool.query(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_favorites_event_tg
+  ON favorites(event_id, telegram_user_id) WHERE telegram_user_id IS NOT NULL;
+`);
+
+
+    // rsvps (likes)
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS favorites (
+      CREATE TABLE IF NOT EXISTS rsvps (
         id SERIAL PRIMARY KEY,
         event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
         user_id INTEGER REFERENCES user_profiles(id) ON DELETE CASCADE,
         telegram_user_id INTEGER REFERENCES telegram_user_profiles(id) ON DELETE CASCADE,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT favorites_user_check CHECK (
+        CONSTRAINT rsvps_user_check CHECK (
           user_id IS NOT NULL OR telegram_user_id IS NOT NULL
         )
       );
     `)
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_favorites_event ON favorites(event_id);`)
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_favorites_web ON favorites(user_id);`)
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_favorites_tg ON favorites(telegram_user_id);`)
+
+    // Uniqueness: only 1 like per user per event
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_rsvps_event_user
+      ON rsvps(event_id, user_id) WHERE user_id IS NOT NULL;
+    `)
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_rsvps_event_tg
+      ON rsvps(event_id, telegram_user_id) WHERE telegram_user_id IS NOT NULL;
+    `)
+
+    // Indexes for performance
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_rsvps_event ON rsvps(event_id);`)
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_rsvps_web ON rsvps(user_id);`)
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_rsvps_tg ON rsvps(telegram_user_id);`)
+
+// Indexes for performance
+await pool.query(`CREATE INDEX IF NOT EXISTS idx_favorites_event ON favorites(event_id);`);
+await pool.query(`CREATE INDEX IF NOT EXISTS idx_favorites_web ON favorites(user_id);`);
+await pool.query(`CREATE INDEX IF NOT EXISTS idx_favorites_tg ON favorites(telegram_user_id);`);
 
     // updated_at trigger
     await pool.query(`

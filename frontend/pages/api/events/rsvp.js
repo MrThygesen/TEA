@@ -16,10 +16,10 @@ export default async function handler(req, res) {
     if (!eventId) return res.status(400).json({ error: 'Missing eventId' })
 
     if (req.method === 'POST') {
-      // Add RSVP (insert favorite)
+      // Add RSVP (insert rsvp)
       await pool.query(
         `
-        INSERT INTO favorites (user_id, event_id)
+        INSERT INTO rsvp (user_id, event_id)
         VALUES ($1, $2)
         ON CONFLICT (user_id, event_id) DO NOTHING
         `,
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
       // Remove RSVP
       const result = await pool.query(
         `
-        DELETE FROM favorites
+        DELETE FROM rsvp
         WHERE user_id = $1 AND event_id = $2
         RETURNING *
         `,

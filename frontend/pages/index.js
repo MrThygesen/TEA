@@ -26,10 +26,7 @@ function clearAuth() {
   try { localStorage.removeItem('edgy_auth_user') } catch (_) {}
 }
 
-
-
 export function DynamicEventCard({ event, authUser, setShowAccountModal, refreshTrigger, setRefreshTrigger }) {
-
   const [heartCount, setHeartCount] = useState(0)
   const [bookable, setBookable] = useState(event.is_confirmed)
   const [loading, setLoading] = useState(false)
@@ -39,19 +36,14 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
 
   const [quantity, setQuantity] = useState(1)
   const [email, setEmail] = useState(authUser?.email || '')
-
   const [showPolicyModal, setShowPolicyModal] = useState(false)
   const [agreed, setAgreed] = useState(false)
-  //setRefreshTrigger(prev => prev + 1)
-
-
 
   const HEART_THRESHOLD = 0
 
   // --- fetch hearts ---
   useEffect(() => {
-  if (typeof window === 'undefined') return  // <<< SSR guard
-
+    if (typeof window === 'undefined') return
     async function fetchHearts() {
       try {
         const res = await fetch(`/api/events/hearts?eventId=${event.id}`)
@@ -66,90 +58,70 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
     fetchHearts()
   }, [event.id, event.is_confirmed])
 
-// --- fetch user tickets from /api/user/myTickets ---
-useEffect(() => {
-  if (!authUser) return
-  if (typeof window === 'undefined') return  // <<< SSR guard
-
-  async function fetchMyTickets() {
-    try {
-      const token = localStorage.getItem('token')
-      if (!token || token.split('.').length !== 3) return  // <<< sanity check
-
-      const res = await fetch('/api/user/myTickets', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      if (!res.ok) return
-
-      const data = await res.json()
-      // find tickets for this event
-      const myTickets = (data.tickets || []).filter(t => t.event_id === event.id)
-      const total = myTickets.reduce((sum, t) => sum + (t.quantity || 1), 0)
-      setUserTickets(total)
-      setMaxPerUser(event.tag1 === 'group' ? 5 : 1) // keep simple max per user logic
-    } catch (err) {
-      console.error('myTickets error:', err)
+  // --- fetch user tickets ---
+  useEffect(() => {
+    if (!authUser || typeof window === 'undefined') return
+    async function fetchMyTickets() {
+      try {
+        const token = localStorage.getItem('token')
+        if (!token || token.split('.').length !== 3) return
+        const res = await fetch('/api/user/myTickets', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        const myTickets = (data.tickets || []).filter(t => t.event_id === event.id)
+        const total = myTickets.reduce((sum, t) => sum + (t.quantity || 1), 0)
+        setUserTickets(total)
+        setMaxPerUser(event.tag1 === 'group' ? 5 : 1)
+      } catch (err) {
+        console.error('myTickets error:', err)
+      }
     }
-  }
-
-  fetchMyTickets()
-}, [authUser, event.id, event.tag1, refreshTrigger])
+    fetchMyTickets()
+  }, [authUser, event.id, event.tag1, refreshTrigger])
 
   const reachedLimit = userTickets >= maxPerUser
 
-// --- handle booking ---
-async function handleBooking() {
-  if (!authUser) {
-    setShowAccountModal(true)
-    return
-  }
-  if (!bookable || reachedLimit) return
-
-  setLoading(true)
-  setStatusMsg('Processing…')
-
-  try {
-    if (typeof window === 'undefined') throw new Error('Client only')
-    const token = localStorage.getItem('token')
-    if (!token || token.split('.').length !== 3) throw new Error('Invalid token')
-
-    const res = await fetch('/api/events/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ eventId: event.id, quantity, email })
-    })
-
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || 'Registration failed')
-
-    setUserTickets(data.userTickets || userTickets + quantity)
-    setStatusMsg('Booking confirmed!')
-    setRefreshTrigger(prev => prev + 1) // notify index.js
-
-    if (data.clientSecret) {
-      window.location.href = `/api/events/checkout?payment_intent_client_secret=${data.clientSecret}`
+  // --- booking handler ---
+  async function handleBooking() {
+    if (!authUser) return setShowAccountModal(true)
+    if (!bookable || reachedLimit) return
+    setLoading(true)
+    setStatusMsg('Processing…')
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch('/api/events/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ eventId: event.id, quantity, email })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Registration failed')
+      setUserTickets(data.userTickets || userTickets + quantity)
+      setStatusMsg('Booking confirmed!')
+      setRefreshTrigger(prev => prev + 1)
+      if (data.clientSecret) {
+        window.location.href = `/api/events/checkout?payment_intent_client_secret=${data.clientSecret}`
+      }
+    } catch (err) {
+      console.error(err)
+      setStatusMsg('Error registering')
+    } finally {
+      setLoading(false)
+      setTimeout(() => setStatusMsg(''), 2500)
+      setShowPolicyModal(false)
+      setAgreed(false)
     }
-  } catch (err) {
-    console.error(err)
-    setStatusMsg('Error registering')
-  } finally {
-    setLoading(false)
-    setTimeout(() => setStatusMsg(''), 2500)
-    setShowPolicyModal(false)
-    setAgreed(false)
   }
-}
 
-  // --- handle hearts ---
+  // --- heart handler ---
   async function handleHeartClick() {
     try {
       const token = localStorage.getItem('token') || ''
       const res = await fetch('/api/events/favorite', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: token ? `Bearer ${token}` : ''
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
         body: JSON.stringify({ eventId: event.id })
       })
       if (!res.ok) throw new Error('Failed to like')
@@ -163,33 +135,25 @@ async function handleBooking() {
     }
   }
 
-
-async function handleRSVPClick() {
-  if (!authUser) {
-    setShowAccountModal(true)
-    return
+  // --- RSVP handler ---
+  async function handleRSVPClick() {
+    if (!authUser) return setShowAccountModal(true)
+    try {
+      const token = localStorage.getItem('token') || ''
+      const res = await fetch('/api/events/rsvp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
+        body: JSON.stringify({ eventId: event.id })
+      })
+      if (!res.ok) throw new Error('Failed to RSVP')
+      setStatusMsg('📌 RSVP added!')
+      setRefreshTrigger(prev => prev + 1)
+      setTimeout(() => setStatusMsg(''), 1500)
+    } catch (err) {
+      console.error(err)
+      setStatusMsg('Error saving RSVP')
+    }
   }
-  try {
-    const token = localStorage.getItem('token') || ''
-    const res = await fetch('/api/events/rsvp', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: token ? `Bearer ${token}` : ''
-      },
-      body: JSON.stringify({ eventId: event.id })
-    })
-    if (!res.ok) throw new Error('Failed to RSVP')
-
-    setStatusMsg('📌 RSVP added!')
-    setRefreshTrigger(prev => prev + 1) // trigger UI refresh
-    setTimeout(() => setStatusMsg(''), 1500)
-  } catch (err) {
-    console.error(err)
-    setStatusMsg('Error saving RSVP')
-  }
-}
-
 
   function getButtonLabel() {
     if (!authUser) return 'Go to login'
@@ -201,25 +165,20 @@ async function handleRSVPClick() {
   }
 
   return (
-  <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800 shadow flex flex-col justify-between relative">
-    {/* RSVP Button */}
-    <button
-      onClick={handleRSVPClick}
-      className="absolute top-2 left-2 text-yellow-400 text-xl"
-      title="RSVP to this event"
-    >
-      📌
-    </button>   
+    <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800 shadow flex flex-col justify-between relative">
+      {/* Heart counter top right */}
       <button
         onClick={handleHeartClick}
         className="absolute top-2 right-2 text-red-500 text-2xl"
       >
-        ❤️ {heartCount}/{HEART_THRESHOLD}
+        ❤️ {heartCount}
       </button>
 
+      {/* Title + description */}
       <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
       <p className="text-sm mb-2">{event.description}</p>
 
+      {/* Booking button */}
       <div className="flex flex-col gap-2 mt-auto mb-2">
         <button
           onClick={() => {
@@ -236,11 +195,32 @@ async function handleRSVPClick() {
         </button>
       </div>
 
-      <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2">
+      {/* Divider line */}
+      <hr className="border-zinc-600 my-2" />
+
+      {/* RSVP + Like buttons */}
+      <div className="flex justify-between mt-2">
+        <button
+          onClick={handleRSVPClick}
+          className="px-3 py-1 rounded bg-yellow-500 hover:bg-yellow-600 text-black text-sm"
+        >
+          📌 RSVP
+        </button>
+        <button
+          onClick={handleHeartClick}
+          className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm"
+        >
+          ❤️ Like
+        </button>
+      </div>
+
+      {/* Footer info */}
+      <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2 mt-2">
         <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
         <span>👥 Booked: {userTickets} / {event.max_attendees || '∞'}</span>
       </div>
 
+      {/* Booking modal */}
       {showPolicyModal && (
         <div
           className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"

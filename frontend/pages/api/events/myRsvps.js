@@ -18,14 +18,14 @@ export default async function handler(req, res) {
 
     const { rows } = await pool.query(
       `
-      SELECT f.id AS favorite_id,
+      SELECT f.id AS rsvp_id,
              f.event_id,
              f.created_at,
              e.name AS title,
              e.city AS location,
              e.datetime AS date,
              e.price AS price
-      FROM favorites f
+      FROM rsvp f
       JOIN events e ON e.id = f.event_id
       WHERE f.user_id = $1
       ORDER BY f.created_at DESC
