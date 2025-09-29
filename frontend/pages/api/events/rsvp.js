@@ -1,4 +1,4 @@
-//rsvp.js
+//events/rsvp.js
 import { auth } from '../../../lib/auth'
 import { pool } from '../../../lib/postgres.js'
 
@@ -18,13 +18,13 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       // Add RSVP (insert rsvps)
       await pool.query(
-        `
-        INSERT INTO rsvps (user_id, event_id)
-        VALUES ($1, $2)
-        ON CONFLICT (user_id, event_id) DO NOTHING
-        `,
-        [userId, eventId]
-      )
+  `
+  INSERT INTO rsvps (user_id, event_id)
+  VALUES ($1, $2)
+  ON CONFLICT ON CONSTRAINT idx_rsvps_event_user DO NOTHING
+  `,
+  [userId, eventId]
+)
       return res.status(200).json({ success: true })
     }
 
