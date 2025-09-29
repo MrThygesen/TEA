@@ -17,14 +17,17 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
       // Add RSVP (insert rsvps)
-      await pool.query(
+  await pool.query(
   `
   INSERT INTO rsvps (user_id, event_id)
-  VALUES ($1, $2)
-  ON CONFLICT ON CONSTRAINT idx_rsvps_event_user DO NOTHING
+  SELECT $1, $2
+  WHERE NOT EXISTS (
+    SELECT 1 FROM rsvps WHERE user_id = $1 AND event_id = $2
+  )
   `,
   [userId, eventId]
 )
+
       return res.status(200).json({ success: true })
     }
 
