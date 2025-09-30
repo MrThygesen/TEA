@@ -1,5 +1,4 @@
-can you make this api file to show * from user_profiles
- // pages/api/users.js
+// pages/api/users.js
 import { pool } from '../../lib/postgres.js'
 
 export default async function handler(req, res) {
@@ -9,7 +8,13 @@ export default async function handler(req, res) {
 
   try {
     const result = await pool.query(`
-      SELECT *       
+      SELECT 
+        id, 
+        email,
+        role,
+        group_id,
+        created_at,
+        updated_at
       FROM user_profiles
     `)
 
