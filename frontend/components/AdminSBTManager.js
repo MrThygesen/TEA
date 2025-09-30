@@ -380,7 +380,6 @@ function SetRoleForm() {
       if (email) body.email = email // <-- NEW
       if (groupId) body.group_id = parseInt(groupId, 10)
 
-const decoded = auth.verifyToken(token)
 
       const res = await fetch('/api/setRole', {
         method: 'POST',
@@ -389,13 +388,9 @@ const decoded = auth.verifyToken(token)
 },
         body: JSON.stringify(body),
       })
-
-
 if (!decoded || decoded.role !== 'admin') {
   return res.status(403).json({ error: 'Forbidden: only admins can set roles' })
 }
-
-
 
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error setting role')
