@@ -136,7 +136,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
   }
 
   // --- RSVP handler ---
-  async function handleRSVPClick() {
+/*  async function handleRSVPClick() {
     if (!authUser) return setShowAccountModal(true)
     try {
       const token = localStorage.getItem('token') || ''
@@ -153,7 +153,34 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       console.error(err)
       setStatusMsg('Error saving RSVP')
     }
+  } */
+
+const handleRSVPClick = async (eventId) => {
+  try {
+    const res = await fetch('/api/events/rsvp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+      },
+      body: JSON.stringify({ eventId }),
+    })
+
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'RSVP failed')
+
+    // ✅ Show success feedback
+    setStatusMsg('✅ Event added to Dashboard')
+
+    // ✅ Trigger refresh for YourAccountModal
+    setRefreshTrigger((prev) => prev + 1)
+  } catch (err) {
+    console.error('RSVP failed:', err)
+    setStatusMsg(`❌ ${err.message}`)
   }
+}
+
+
 
   function getButtonLabel() {
     if (!authUser) return 'Go to login'
