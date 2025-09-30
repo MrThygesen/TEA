@@ -1,4 +1,9 @@
 // pages/api/setRole.js
+
+
+
+
+/*
 import { pool } from '../../lib/postgres'
 
 export default async function handler(req, res) {
@@ -59,4 +64,4 @@ export default async function handler(req, res) {
       .json({ error: 'Database error', details: err.message })
   }
 }
-
+*/

@@ -360,14 +360,15 @@ function DbDump() {
 function SetRoleForm() {
   const [telegramUsername, setTelegramUsername] = useState('')
   const [telegramUserId, setTelegramUserId] = useState('')
-  const [groupId, setGroupId] = useState('')   // <-- added
+  const [email, setEmail] = useState('')   // <-- NEW
+  const [groupId, setGroupId] = useState('')
   const [role, setRole] = useState('organizer')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
   const handleSetRole = async () => {
-    if (!role || (!telegramUsername && !telegramUserId)) {
-      setMessage('Telegram username or user ID and role are required')
+    if (!role || (!telegramUsername && !telegramUserId && !email)) {
+      setMessage('Email, Telegram username, or user ID and role are required')
       return
     }
 
@@ -376,7 +377,8 @@ function SetRoleForm() {
       const body = { role }
       if (telegramUsername) body.telegram_username = telegramUsername
       if (telegramUserId) body.telegram_user_id = telegramUserId
-      if (groupId) body.group_id = parseInt(groupId, 10)  // <-- added
+      if (email) body.email = email // <-- NEW
+      if (groupId) body.group_id = parseInt(groupId, 10)
 
       const res = await fetch('/api/setRole', {
         method: 'POST',
@@ -387,7 +389,11 @@ function SetRoleForm() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error setting role')
 
-      const target = telegramUserId ? `ID ${telegramUserId}` : `@${telegramUsername}`
+      let target = telegramUserId
+        ? `ID ${telegramUserId}`
+        : telegramUsername
+        ? `@${telegramUsername}`
+        : email
       setMessage(`✅ Role "${role}" assigned to ${target} in group ${groupId}`)
     } catch (err) {
       setMessage('❌ ' + err.message)
@@ -413,6 +419,13 @@ function SetRoleForm() {
         className="w-full p-2 border rounded"
       />
       <input
+        type="email"
+        placeholder="Email (optional)"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        className="w-full p-2 border rounded"
+      />
+      <input
         type="number"
         placeholder="Group ID"
         value={groupId}
@@ -431,7 +444,9 @@ function SetRoleForm() {
       <button
         onClick={handleSetRole}
         disabled={loading}
-        className={`px-4 py-2 rounded text-white ${loading ? 'bg-blue-300' : 'bg-blue-600'}`}
+        className={`px-4 py-2 rounded text-white ${
+          loading ? 'bg-blue-300' : 'bg-blue-600'
+        }`}
       >
         {loading ? 'Assigning...' : 'Assign Role'}
       </button>
