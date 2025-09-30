@@ -1,4 +1,5 @@
-// pages/api/users.js
+can you make this api file to show * from user_profiles
+ // pages/api/users.js
 import { pool } from '../../lib/postgres.js'
 
 export default async function handler(req, res) {
@@ -8,16 +9,8 @@ export default async function handler(req, res) {
 
   try {
     const result = await pool.query(`
-      SELECT 
-        telegram_user_id,
-        telegram_username,
-        email,
-        role,
-        group_id,
-        created_at,
-        updated_at
+      SELECT *       
       FROM user_profiles
-      ORDER BY telegram_user_id ASC
     `)
 
     res.status(200).json({ users: result.rows })
