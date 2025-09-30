@@ -136,34 +136,25 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
   }
 
  
-const handleRSVPClick = async (eventId) => {
-  try {
-    const res = await fetch('/api/events/rsvp', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
-      },
-      body: JSON.stringify({ eventId }),
-    })
-
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || 'RSVP failed')
-
-    // ✅ Show success message
-    setRsvpMessage('✅ RSVP registered – event added to Dashboard')
-
-    // ✅ Auto-hide after 3s
-    setTimeout(() => setRsvpMessage(''), 3000)
-
-    // ✅ Trigger refresh for YourAccountModal
-    setRefreshTrigger((prev) => prev + 1)
-  } catch (err) {
-    console.error('RSVP failed:', err)
-    setRsvpMessage(`❌ ${err.message}`)
-    setTimeout(() => setRsvpMessage(''), 3000)
-  }
-}
+ // --- RSVP handler ---
+ async function handleRSVPClick() {
+    if (!authUser) return setShowAccountModal(true)
+    try {
+      const token = localStorage.getItem('token') || ''
+      const res = await fetch('/api/events/rsvp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
+        body: JSON.stringify({ eventId: event.id })
+      })
+      if (!res.ok) throw new Error('Failed to RSVP')
+      setStatusMsg('📌 RSVP added!')
+      setRefreshTrigger(prev => prev + 1)
+      setTimeout(() => setStatusMsg(''), 1500)
+    } catch (err) {
+      console.error(err)
+      setStatusMsg('Error saving RSVP')
+    }
+  } 
 
 
 
@@ -351,21 +342,6 @@ function VideoHero() {
   );
 }
 
-//rsvp message on added
-
-{rsvpMessage && (
-  <div style={{
-    margin: '1rem 0',
-    padding: '0.75rem',
-    borderRadius: '6px',
-    background: rsvpMessage.startsWith('✅') ? '#e6ffed' : '#fff1f0',
-    border: rsvpMessage.startsWith('✅') ? '1px solid #b7eb8f' : '1px solid #ffa39e',
-    color: rsvpMessage.startsWith('✅') ? '#135200' : '#a8071a',
-    textAlign: 'center'
-  }}>
-    {rsvpMessage}
-  </div>
-)}
 
 
 // ---------------------------
@@ -415,8 +391,7 @@ export default function Home() {
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [showEventModal, setShowEventModal] = useState(false)
   const [refreshTrigger, setRefreshTrigger] = useState(0); 
-  const [rsvpMessage, setRsvpMessage] = useState('')
-
+  
 
   // --- fetch events ---
   useEffect(() => {
