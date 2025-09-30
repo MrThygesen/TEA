@@ -1,3 +1,4 @@
+//loginModal.js
 'use client'
 
 import { useState } from 'react'
@@ -23,7 +24,13 @@ export default function LoginModal({ onClose, onLogin }) {
       const data = await res.json()
       console.log('Login response:', data)
 
-      if (!res.ok) throw new Error(data.error || 'Login failed')
+      if (!res.ok) {
+        // Special handling for unverified accounts
+        if (res.status === 403) {
+          throw new Error('Your account is not verified. Please check your email to verify your account before logging in.')
+        }
+        throw new Error(data.error || 'Login failed')
+      }
 
       // Save JWT token
       localStorage.setItem('auth_token', data.token)
@@ -33,6 +40,8 @@ export default function LoginModal({ onClose, onLogin }) {
     } catch (err) {
       console.error('Login failed:', err)
       setError(err.message)
+      // Make sure we clear any stale/invalid token
+      localStorage.removeItem('auth_token')
     } finally {
       setLoading(false)
     }
