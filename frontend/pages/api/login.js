@@ -1,3 +1,58 @@
+
+// pages/api/login.js
+import { pool } from '../../lib/postgres.js'
+import bcrypt from 'bcrypt'
+import jwt from 'jsonwebtoken'
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' })
+  }
+
+  const { email, password } = req.body
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password required' })
+  }
+
+  try {
+    const result = await pool.query(
+      'SELECT * FROM user_profiles WHERE email = $1',
+      [email]
+    )
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid credentials' })
+    }
+
+    const user = result.rows[0]
+    const match = await bcrypt.compare(password, user.password_hash)
+    if (!match) {
+      return res.status(401).json({ error: 'Invalid credentials' })
+    }
+
+    // ✅ include role in JWT
+    const token = jwt.sign(
+      {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        role: user.role || 'user',
+      },
+      process.env.JWT_SECRET || 'dev_secret',
+      { expiresIn: '8h' }
+    )
+
+    res.status(200).json({ token })
+  } catch (err) {
+    console.error('[login] error:', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
+
+
+/*
+//api/login.js
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { pool } from '../../lib/postgres.js'
@@ -53,4 +108,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Internal server error' })
   }
 }
-
+*/ 
