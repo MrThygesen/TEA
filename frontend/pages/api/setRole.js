@@ -10,11 +10,11 @@ export default async function handler(req, res) {
     if (!token) return res.status(401).json({ error: 'Unauthorized' })
     const decoded = auth.verifyToken(token)
     if (!decoded) return res.status(401).json({ error: 'Unauthorized' })
+}
 
 const decoded = auth.verifyToken(token)
 if (!decoded || decoded.role !== 'admin') {
   return res.status(403).json({ error: 'Forbidden: only admins can set roles' })
-}
 
 
 
