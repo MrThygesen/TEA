@@ -1,3 +1,4 @@
+//pages/scanner.js
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -8,20 +9,42 @@ export default function ScannerPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const [status, setStatus] = useState('') // QR scan result status
+  const [status, setStatus] = useState('')
+  const [scanning, setScanning] = useState(false)
+  const [cameraAllowed, setCameraAllowed] = useState(true) // track camera permission
 
-  // Load token from localStorage
   useEffect(() => {
     const token = localStorage.getItem('scanner_token')
     if (token) setLoggedIn(true)
   }, [])
 
   // React-zxing hook
-  const { ref } = useZxing({
+  const { ref, error: cameraError, startStream } = useZxing({
     onDecodeResult(result) {
-      handleScan(result.getText())
+      if (!scanning) {
+        setScanning(true)
+        handleScan(result.getText())
+      }
     },
+    constraints: { video: { facingMode: 'environment' } },
   })
+
+  // Try to request camera
+  useEffect(() => {
+    if (loggedIn) {
+      navigator.mediaDevices
+        .getUserMedia({ video: { facingMode: 'environment' } })
+        .then((stream) => {
+          setCameraAllowed(true)
+          // start stream with hook
+          if (startStream) startStream()
+        })
+        .catch((err) => {
+          console.error('Camera permission denied:', err)
+          setCameraAllowed(false)
+        })
+    }
+  }, [loggedIn, startStream])
 
   async function handleLogin(e) {
     e.preventDefault()
@@ -58,11 +81,12 @@ export default function ScannerPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Scan failed')
 
-      // Show result from server
-      setStatus(`✅ ${data.message}`)
+      setStatus(`✅ ${data.status}`)
     } catch (err) {
       console.error(err)
       setStatus(`❌ ${err.message}`)
+    } finally {
+      setScanning(false)
     }
   }
 
@@ -71,6 +95,13 @@ export default function ScannerPage() {
     setLoggedIn(false)
     setEmail('')
     setPassword('')
+    setStatus('')
+    setCameraAllowed(true)
+  }
+
+  function retryCamera() {
+    setCameraAllowed(true)
+    if (startStream) startStream()
   }
 
   if (!loggedIn) {
@@ -112,7 +143,31 @@ export default function ScannerPage() {
   return (
     <main className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6">
       <h1 className="text-2xl font-bold mb-4">QR Scanner</h1>
-      <video ref={ref} className="w-full max-w-md rounded border border-zinc-700" />
+
+      {!cameraAllowed && (
+        <div className="mb-4 text-center">
+          <p className="text-red-500 mb-2">
+            Camera access denied. Please allow camera and retry.
+          </p>
+          <button
+            onClick={retryCamera}
+            className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700"
+          >
+            Retry Camera
+          </button>
+        </div>
+      )}
+
+      <video
+        ref={ref}
+        className="w-full max-w-md rounded border border-zinc-700"
+        autoPlay
+        muted
+        playsInline
+      />
+
+      {cameraError && <p className="text-red-500 mt-2">Camera error: {cameraError.message}</p>}
+
       <p className="mt-4 text-lg">{status}</p>
       <button
         onClick={handleLogout}
