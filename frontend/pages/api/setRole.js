@@ -1,4 +1,4 @@
-// pages/api/setRole.js
+// pages/api/setRole.js 
 import { pool } from '../../lib/postgres.js'
 import { auth } from '../../lib/auth.js'
 
