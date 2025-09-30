@@ -357,56 +357,53 @@ function DbDump() {
   )
 }
 
-function SetRoleForm() {
-  const [telegramUsername, setTelegramUsername] = useState('')
-  const [telegramUserId, setTelegramUserId] = useState('')
-  const [email, setEmail] = useState('')   // <-- NEW
-  const [groupId, setGroupId] = useState('')
-  const [role, setRole] = useState('organizer')
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState('')
+const handleSetRole = async () => {
+  if (!role || (!telegramUsername && !telegramUserId && !email)) {
+    setMessage('Email, Telegram username, or user ID and role are required')
+    return
+  }
 
-  const handleSetRole = async () => {
-    if (!role || (!telegramUsername && !telegramUserId && !email)) {
-      setMessage('Email, Telegram username, or user ID and role are required')
+  setLoading(true)
+  try {
+    const body = { role }
+    if (telegramUsername) body.telegram_username = telegramUsername
+    if (telegramUserId) body.telegram_user_id = telegramUserId
+    if (email) body.email = email
+    if (groupId) body.group_id = parseInt(groupId, 10)
+
+    // 🔑 Get token from localStorage (or however you store it after login)
+    const token = localStorage.getItem('token')
+    if (!token) {
+      setMessage('❌ You must be logged in as admin to set roles')
+      setLoading(false)
       return
     }
 
-    setLoading(true)
-    try {
-      const body = { role }
-      if (telegramUsername) body.telegram_username = telegramUsername
-      if (telegramUserId) body.telegram_user_id = telegramUserId
-      if (email) body.email = email // <-- NEW
-      if (groupId) body.group_id = parseInt(groupId, 10)
+    const res = await fetch('/api/setRole', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    })
 
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Error setting role')
 
-      const res = await fetch('/api/setRole', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 
- Authorization: `Bearer ${token}`,
-},
-        body: JSON.stringify(body),
-      })
-if (!decoded || decoded.role !== 'admin') {
-  return res.status(403).json({ error: 'Forbidden: only admins can set roles' })
-}
+    let target = telegramUserId
+      ? `ID ${telegramUserId}`
+      : telegramUsername
+      ? `@${telegramUsername}`
+      : email
 
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Error setting role')
-
-      let target = telegramUserId
-        ? `ID ${telegramUserId}`
-        : telegramUsername
-        ? `@${telegramUsername}`
-        : email
-      setMessage(`✅ Role "${role}" assigned to ${target} in group ${groupId}`)
-    } catch (err) {
-      setMessage('❌ ' + err.message)
-    } finally {
-      setLoading(false)
-    }
+    setMessage(`✅ Role "${role}" assigned to ${target} in group ${groupId}`)
+  } catch (err) {
+    setMessage('❌ ' + err.message)
+  } finally {
+    setLoading(false)
   }
+}
 
   return (
     <div className="space-y-2">
