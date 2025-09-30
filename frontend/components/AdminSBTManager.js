@@ -374,18 +374,20 @@ function SetRoleForm() {
 
     setLoading(true)
     try {
+      // 🔑 get token from localStorage
+      const token = localStorage.getItem('token')
+      if (!token) {
+        setMessage('❌ No token found. Please log in again.')
+        setLoading(false)
+        return
+      }
+
+      // build request body
       const body = { role }
       if (telegramUsername) body.telegram_username = telegramUsername
       if (telegramUserId) body.telegram_user_id = telegramUserId
       if (email) body.email = email
       if (groupId) body.group_id = parseInt(groupId, 10)
-
-      const token = localStorage.getItem('token')
-      if (!token) {
-        setMessage('❌ You must be logged in as admin to set roles')
-        setLoading(false)
-        return
-      }
 
       const res = await fetch('/api/setRole', {
         method: 'POST',

@@ -17,6 +17,8 @@ export default async function handler(req, res) {
     const { telegram_username, telegram_user_id, email, group_id, role } = req.body
     if (!role) return res.status(400).json({ error: 'Role is required' })
 
+console.log('[setRole] body:', req.body)
+
     const result = await pool.query(
       `INSERT INTO roles (telegram_username, telegram_user_id, email, group_id, role)
        VALUES ($1, $2, $3, $4, $5)
