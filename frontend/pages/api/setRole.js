@@ -13,21 +13,44 @@ export default async function handler(req, res) {
     const decoded = auth.verifyToken(token)
     if (!decoded) return res.status(401).json({ error: 'Unauthorized' })
 
-    // 🔹 remove role check – trust that only admins can access the UI
-    const { telegram_username, telegram_user_id, email, group_id, role } = req.body
+    const { email, telegram_username, telegram_user_id, role, group_id } = req.body
     if (!role) return res.status(400).json({ error: 'Role is required' })
+    if (!email && !telegram_username && !telegram_user_id)
+      return res.status(400).json({ error: 'Provide email, Telegram username, or user ID' })
 
-console.log('[setRole] body:', req.body)
+    // Build WHERE clause dynamically
+    const whereClauses = []
+    const values = [role]
+    let i = 2
+
+    if (email) {
+      whereClauses.push(`email = $${i}`)
+      values.push(email)
+      i++
+    }
+    if (telegram_username) {
+      whereClauses.push(`username = $${i}`)
+      values.push(telegram_username)
+      i++
+    }
+    if (telegram_user_id) {
+      whereClauses.push(`id = $${i}`)
+      values.push(telegram_user_id)
+      i++
+    }
+
+    const setClause = group_id ? `role = $1, group_id = ${group_id}` : `role = $1`
+    const whereClause = whereClauses.join(' OR ')
 
     const result = await pool.query(
-      `INSERT INTO roles (telegram_username, telegram_user_id, email, group_id, role)
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (email, group_id) DO UPDATE SET role = EXCLUDED.role
-       RETURNING *`,
-      [telegram_username || null, telegram_user_id || null, email || null, group_id || null, role]
+      `UPDATE user_profiles SET ${setClause} WHERE ${whereClause} RETURNING *`,
+      values
     )
 
-    return res.status(200).json({ success: true, role: result.rows[0] })
+    if (result.rowCount === 0)
+      return res.status(404).json({ error: 'No user found with provided identifier(s)' })
+
+    return res.status(200).json({ success: true, updated: result.rows })
   } catch (err) {
     console.error('[setRole] error:', err)
     return res.status(500).json({ error: 'Internal server error' })
