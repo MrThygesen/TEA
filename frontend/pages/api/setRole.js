@@ -11,6 +11,13 @@ export default async function handler(req, res) {
     const decoded = auth.verifyToken(token)
     if (!decoded) return res.status(401).json({ error: 'Unauthorized' })
 
+const decoded = auth.verifyToken(token)
+if (!decoded || decoded.role !== 'admin') {
+  return res.status(403).json({ error: 'Forbidden: only admins can set roles' })
+}
+
+
+
     const { telegram_username, telegram_user_id, email, group_id, role } = req.body
     if (!role) return res.status(400).json({ error: 'Role is required' })
 
