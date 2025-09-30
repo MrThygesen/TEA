@@ -644,7 +644,7 @@ useEffect(() => {
                   setShowAccountModal={setShowAccountModal}
             refreshTrigger={refreshTrigger}
 setRefreshTrigger={setRefreshTrigger}    
- setRsvpMessage={setRsvpMessage}        
+   
      />
               ))}
             </div>
