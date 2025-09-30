@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useZxing } from 'react-zxing'
 
 export default function ScannerPage() {
@@ -9,44 +9,23 @@ export default function ScannerPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [status, setStatus] = useState('')
-  const [cameraAllowed, setCameraAllowed] = useState(true)
-  const [scanCooldown, setScanCooldown] = useState(false) // debounce scans
+  const [scanCooldown, setScanCooldown] = useState(false)
 
-  const videoRef = useRef(null)
-
+  // Load token from localStorage
   useEffect(() => {
     const token = localStorage.getItem('scanner_token')
     if (token) setLoggedIn(true)
   }, [])
 
-  // Initialize react-zxing hook
-  const { startStream, error: cameraError } = useZxing({
-    onDecodeResult(result) {
+  const { ref: videoRef } = useZxing({
+    onDecodeResult: async (result) => {
       if (!scanCooldown) {
         setScanCooldown(true)
-        handleScan(result.getText())
+        await handleScan(result.getText())
       }
     },
     constraints: { video: { facingMode: 'environment' } },
   })
-
-  // Start camera manually once logged in
-  useEffect(() => {
-    if (!loggedIn || !videoRef.current) return
-
-    navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: 'environment' } })
-      .then((stream) => {
-        setCameraAllowed(true)
-        videoRef.current.srcObject = stream
-        videoRef.current.play()
-        if (startStream) startStream(videoRef.current)
-      })
-      .catch((err) => {
-        console.error('Camera permission denied or not found:', err)
-        setCameraAllowed(false)
-      })
-  }, [loggedIn, startStream])
 
   async function handleLogin(e) {
     e.preventDefault()
@@ -72,23 +51,38 @@ export default function ScannerPage() {
       const token = localStorage.getItem('scanner_token')
       if (!token) throw new Error('Not authenticated')
 
-      const res = await fetch('/api/scan', {
+      // Mark arrival
+      let res = await fetch('/api/scan', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ ticket_code: ticketCode }),
+        body: JSON.stringify({ ticket_code: ticketCode, action: 'arrive' }),
       })
-      const data = await res.json()
+      let data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Scan failed')
 
-      setStatus(`✅ ${data.status}`)
+      setStatus(`Arrival: ${data.status}`)
+
+      // Apply perk
+      res = await fetch('/api/scan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ ticket_code: ticketCode, action: 'perk' }),
+      })
+      data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Perk failed')
+
+      setStatus((prev) => prev + ` | Perk: ${data.status}`)
     } catch (err) {
       console.error(err)
       setStatus(`❌ ${err.message}`)
     } finally {
-      // Pause scanning for 2 seconds to avoid multiple triggers
+      // wait 2s before scanning next QR
       setTimeout(() => setScanCooldown(false), 2000)
     }
   }
@@ -99,12 +93,6 @@ export default function ScannerPage() {
     setEmail('')
     setPassword('')
     setStatus('')
-    setCameraAllowed(true)
-  }
-
-  function retryCamera() {
-    setCameraAllowed(true)
-    if (videoRef.current && startStream) startStream(videoRef.current)
   }
 
   if (!loggedIn) {
@@ -146,21 +134,6 @@ export default function ScannerPage() {
   return (
     <main className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6">
       <h1 className="text-2xl font-bold mb-4">QR Scanner</h1>
-
-      {!cameraAllowed && (
-        <div className="mb-4 text-center">
-          <p className="text-red-500 mb-2">
-            Camera access denied. Please allow camera and retry.
-          </p>
-          <button
-            onClick={retryCamera}
-            className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700"
-          >
-            Retry Camera
-          </button>
-        </div>
-      )}
-
       <video
         ref={videoRef}
         className="w-full max-w-md rounded border border-zinc-700"
@@ -168,11 +141,7 @@ export default function ScannerPage() {
         muted
         playsInline
       />
-
-      {cameraError && <p className="text-red-500 mt-2">Camera error: {cameraError.message}</p>}
-
       <p className="mt-4 text-lg">{status}</p>
-
       <button
         onClick={handleLogout}
         className="mt-6 px-4 py-2 rounded bg-zinc-700 hover:bg-zinc-600"
@@ -182,4 +151,3 @@ export default function ScannerPage() {
     </main>
   )
 }
-
