@@ -1,7 +1,7 @@
+//pages/scanner.js
 'use client'
-
-import { useState, useEffect } from 'react'
-import { useZxing } from 'react-zxing'
+import { useState, useEffect, useRef } from 'react'
+import { BrowserMultiFormatReader } from '@zxing/library'
 
 export default function ScannerPage() {
   const [loggedIn, setLoggedIn] = useState(false)
@@ -11,21 +11,37 @@ export default function ScannerPage() {
   const [status, setStatus] = useState('')
   const [scanCooldown, setScanCooldown] = useState(false)
 
-  // Load token from localStorage
+  const videoRef = useRef(null)
+  const codeReaderRef = useRef(null)
+
+  // Load token
   useEffect(() => {
     const token = localStorage.getItem('scanner_token')
     if (token) setLoggedIn(true)
   }, [])
 
-  const { ref: videoRef } = useZxing({
-    onDecodeResult: async (result) => {
-      if (!scanCooldown) {
-        setScanCooldown(true)
-        await handleScan(result.getText())
-      }
-    },
-    constraints: { video: { facingMode: 'environment' } },
-  })
+  // Initialize scanner after mount
+  useEffect(() => {
+    if (!loggedIn || !videoRef.current) return
+
+    codeReaderRef.current = new BrowserMultiFormatReader()
+    codeReaderRef.current
+      .decodeFromVideoDevice(
+        null, // use default camera
+        videoRef.current,
+        async (result, err) => {
+          if (result && !scanCooldown) {
+            setScanCooldown(true)
+            await handleScan(result.getText())
+          }
+        }
+      )
+      .catch((err) => console.error('Camera error:', err))
+
+    return () => {
+      codeReaderRef.current?.reset()
+    }
+  }, [loggedIn])
 
   async function handleLogin(e) {
     e.preventDefault()
@@ -51,7 +67,7 @@ export default function ScannerPage() {
       const token = localStorage.getItem('scanner_token')
       if (!token) throw new Error('Not authenticated')
 
-      // Mark arrival
+      // Arrival
       let res = await fetch('/api/scan', {
         method: 'POST',
         headers: {
@@ -65,7 +81,7 @@ export default function ScannerPage() {
 
       setStatus(`Arrival: ${data.status}`)
 
-      // Apply perk
+      // Perk
       res = await fetch('/api/scan', {
         method: 'POST',
         headers: {
@@ -82,7 +98,6 @@ export default function ScannerPage() {
       console.error(err)
       setStatus(`❌ ${err.message}`)
     } finally {
-      // wait 2s before scanning next QR
       setTimeout(() => setScanCooldown(false), 2000)
     }
   }
@@ -151,3 +166,4 @@ export default function ScannerPage() {
     </main>
   )
 }
+
