@@ -1,7 +1,6 @@
-//pages/scanner.js
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useZxing } from 'react-zxing'
 
 export default function ScannerPage() {
@@ -10,40 +9,43 @@ export default function ScannerPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [status, setStatus] = useState('')
-  const [scanning, setScanning] = useState(false)
-  const [cameraAllowed, setCameraAllowed] = useState(true) // track camera permission
+  const [cameraAllowed, setCameraAllowed] = useState(true)
+  const [scanCooldown, setScanCooldown] = useState(false) // debounce scans
+
+  const videoRef = useRef(null)
 
   useEffect(() => {
     const token = localStorage.getItem('scanner_token')
     if (token) setLoggedIn(true)
   }, [])
 
-  // React-zxing hook
-  const { ref, error: cameraError, startStream } = useZxing({
+  // Initialize react-zxing hook
+  const { startStream, error: cameraError } = useZxing({
     onDecodeResult(result) {
-      if (!scanning) {
-        setScanning(true)
+      if (!scanCooldown) {
+        setScanCooldown(true)
         handleScan(result.getText())
       }
     },
     constraints: { video: { facingMode: 'environment' } },
   })
 
-  // Try to request camera
+  // Start camera manually once logged in
   useEffect(() => {
-    if (loggedIn) {
-      navigator.mediaDevices
-        .getUserMedia({ video: { facingMode: 'environment' } })
-        .then((stream) => {
-          setCameraAllowed(true)
-          // start stream with hook
-          if (startStream) startStream()
-        })
-        .catch((err) => {
-          console.error('Camera permission denied:', err)
-          setCameraAllowed(false)
-        })
-    }
+    if (!loggedIn || !videoRef.current) return
+
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: 'environment' } })
+      .then((stream) => {
+        setCameraAllowed(true)
+        videoRef.current.srcObject = stream
+        videoRef.current.play()
+        if (startStream) startStream(videoRef.current)
+      })
+      .catch((err) => {
+        console.error('Camera permission denied or not found:', err)
+        setCameraAllowed(false)
+      })
   }, [loggedIn, startStream])
 
   async function handleLogin(e) {
@@ -86,7 +88,8 @@ export default function ScannerPage() {
       console.error(err)
       setStatus(`❌ ${err.message}`)
     } finally {
-      setScanning(false)
+      // Pause scanning for 2 seconds to avoid multiple triggers
+      setTimeout(() => setScanCooldown(false), 2000)
     }
   }
 
@@ -101,7 +104,7 @@ export default function ScannerPage() {
 
   function retryCamera() {
     setCameraAllowed(true)
-    if (startStream) startStream()
+    if (videoRef.current && startStream) startStream(videoRef.current)
   }
 
   if (!loggedIn) {
@@ -159,7 +162,7 @@ export default function ScannerPage() {
       )}
 
       <video
-        ref={ref}
+        ref={videoRef}
         className="w-full max-w-md rounded border border-zinc-700"
         autoPlay
         muted
@@ -169,6 +172,7 @@ export default function ScannerPage() {
       {cameraError && <p className="text-red-500 mt-2">Camera error: {cameraError.message}</p>}
 
       <p className="mt-4 text-lg">{status}</p>
+
       <button
         onClick={handleLogout}
         className="mt-6 px-4 py-2 rounded bg-zinc-700 hover:bg-zinc-600"
