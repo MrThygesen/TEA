@@ -34,6 +34,8 @@
     "react-dom": "^18.3.1",
     "react-hot-toast": "^2.5.2",
     "react-qr-code": "^2.0.18",
+    "react-qr-scanner": "^1.0.0-alpha.11",
+    "react-zxing": "^2.1.0",
     "sib-api-v3-sdk": "^8.5.0",
     "stripe": "^18.4.0",
     "three": "^0.152.2",
