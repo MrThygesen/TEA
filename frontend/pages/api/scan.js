@@ -16,9 +16,11 @@ export default async function handler(req, res) {
       const eventsRes = await pool.query(
         `SELECT * FROM events 
          WHERE group_id = $1 AND datetime >= NOW()
+  AND datetime < NOW() + INTERVAL '2 days'
          ORDER BY datetime ASC`,
         [decoded.group_id]
       )
+
 
       if (!eventsRes.rows.length) {
         return res.json({ events: [] })
