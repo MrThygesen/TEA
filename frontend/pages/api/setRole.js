@@ -11,9 +11,11 @@ export default async function handler(req, res) {
     if (!wallet) {
       return res.status(401).json({ error: 'Wallet not provided' })
     }
-    if (wallet !== process.env.ADMIN_WALLET?.toLowerCase()) {
+    if (wallet !== process.env.NEXT_PUBLIC_ADMIN?.toLowerCase()) {
       return res.status(403).json({ error: 'Not authorized' })
     }
+
+
 
     const { email, role, event_id } = req.body
     if (!email || !role) {
