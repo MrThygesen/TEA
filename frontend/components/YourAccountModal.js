@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
+import { toast } from 'react-hot-toast'
 import Link from 'next/link'
 
 export default function YourAccountModal({ onClose, refreshTrigger }) {

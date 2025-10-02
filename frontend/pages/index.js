@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react'
 import { useAccount } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
+import { toast } from 'react-hot-toast'
 import AdminSBTManager from '../components/AdminSBTManager'
 import YourAccountModal from '../components/YourAccountModal'
 
