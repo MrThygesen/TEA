@@ -43,7 +43,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
 
   // --- fetch hearts ---
   useEffect(() => {
-    if (typeof window === 'undefined') return
     async function fetchHearts() {
       try {
         const res = await fetch(`/api/events/hearts?eventId=${event.id}`)
@@ -60,7 +59,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
 
   // --- fetch user tickets ---
   useEffect(() => {
-    if (!authUser || typeof window === 'undefined') return
+    if (!authUser) return
     async function fetchMyTickets() {
       try {
         const token = localStorage.getItem('token')
@@ -85,8 +84,12 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
 
   // --- booking handler ---
   async function handleBooking() {
-    if (!authUser) return setShowAccountModal(true)
-    if (!bookable || reachedLimit) return
+    if (!authUser) {
+      setShowAccountModal(true)
+      setStatusMsg('⚠️ Please login to buy a ticket.')
+      return
+    }
+
     setLoading(true)
     setStatusMsg('Processing…')
     try {
@@ -98,18 +101,27 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Registration failed')
+
       setUserTickets(data.userTickets || userTickets + quantity)
-      setStatusMsg('Booking confirmed!')
       setRefreshTrigger(prev => prev + 1)
-      if (data.clientSecret) {
-        window.location.href = `/api/events/checkout?payment_intent_client_secret=${data.clientSecret}`
+
+      if (event.price && Number(event.price) > 0) {
+        // --- Paid ticket: Stripe checkout
+        if (data.clientSecret) {
+          window.location.href = `/api/events/checkout?payment_intent_client_secret=${data.clientSecret}`
+        } else {
+          setStatusMsg('⚠️ Payment could not be initiated')
+        }
+      } else {
+        // --- Free ticket
+        setStatusMsg('✅ Ticket booked! Confirmation email sent.')
       }
     } catch (err) {
       console.error(err)
-      setStatusMsg('Error registering')
+      setStatusMsg('❌ Error registering')
     } finally {
       setLoading(false)
-      setTimeout(() => setStatusMsg(''), 2500)
+      setTimeout(() => setStatusMsg(''), 3000)
       setShowPolicyModal(false)
       setAgreed(false)
     }
@@ -135,9 +147,8 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
     }
   }
 
- 
- // --- RSVP handler ---
- async function handleRSVPClick() {
+  // --- RSVP handler ---
+  async function handleRSVPClick() {
     if (!authUser) return setShowAccountModal(true)
     try {
       const token = localStorage.getItem('token') || ''
@@ -154,74 +165,68 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       console.error(err)
       setStatusMsg('Error saving RSVP')
     }
-  } 
-
-
-
-
-  function getButtonLabel() {
-    if (!authUser) return 'Go to login'
-    if (reachedLimit) return `Max ${maxPerUser} tickets`
-    if (!bookable) return `Needs ${HEART_THRESHOLD} hearts (${heartCount}/${HEART_THRESHOLD})`
-    if (loading) return statusMsg || 'Processing…'
-    if (event.price && Number(event.price) > 0) return 'Pay Now'
-    return 'Book Free'
   }
 
   return (
-    <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800 shadow flex flex-col justify-between relative">
+    <div className="border border-zinc-700 rounded-xl p-5 bg-gradient-to-b from-zinc-900 to-zinc-800 shadow-lg flex flex-col justify-between relative transition hover:shadow-2xl hover:border-zinc-500">
       {/* Heart counter top right */}
       <button
         onClick={handleHeartClick}
-        className="absolute top-2 right-2 text-red-500 text-2xl"
+        className="absolute top-3 right-3 text-red-500 text-2xl hover:scale-110 transition"
       >
         ❤️ {heartCount}
       </button>
 
       {/* Title + description */}
-      <h3 className="text-lg font-semibold mb-1">{event.name}</h3>
-      <p className="text-sm mb-2">{event.description}</p>
+      <h3 className="text-xl font-bold mb-2">{event.name}</h3>
+      <p className="text-sm mb-3 text-gray-300">{event.description}</p>
 
-      {/* Booking button */}
+      {/* Tags */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {[event.tag1, event.tag2, event.tag3].filter(Boolean).map((tag, idx) => (
+          <span
+            key={idx}
+            className="px-2 py-1 text-xs rounded-full bg-zinc-700 text-gray-200 border border-zinc-600"
+          >
+            #{tag}
+          </span>
+        ))}
+      </div>
+
+      {/* Pay Now button */}
       <div className="flex flex-col gap-2 mt-auto mb-2">
         <button
-          onClick={() => {
-            if (!authUser) return setShowAccountModal(true)
-            if (!bookable || reachedLimit) return
-            setShowPolicyModal(true)
-          }}
-          disabled={!bookable || loading || reachedLimit}
-          className={`w-full px-3 py-1 rounded ${
-            !authUser ? 'bg-zinc-600 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
-          } text-white text-sm disabled:opacity-50`}
+          onClick={() => setShowPolicyModal(true)}
+          disabled={loading || reachedLimit}
+          className="w-full px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm disabled:opacity-50 transition"
         >
-          {getButtonLabel()}
+          {loading ? 'Processing…' : 'Pay Now'}
         </button>
       </div>
 
       {/* Divider line */}
-      <hr className="border-zinc-600 my-2" />
+      <hr className="border-zinc-700 my-2" />
 
       {/* RSVP + Like buttons */}
       <div className="flex justify-between mt-2">
         <button
           onClick={handleRSVPClick}
-          className="px-3 py-1 rounded bg-yellow-500 hover:bg-yellow-600 text-black text-sm"
+          className="px-3 py-1 rounded bg-yellow-500 hover:bg-yellow-600 text-black text-sm transition"
         >
           📌 RSVP
         </button>
         <button
           onClick={handleHeartClick}
-          className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm"
+          className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm transition"
         >
           ❤️ Like
         </button>
       </div>
 
       {/* Footer info */}
-      <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-600 pt-2 mt-2">
+      <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-700 pt-2 mt-2">
         <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
-        <span>👥 Booked: {userTickets} / {event.max_attendees || '∞'}</span>
+        <span>👥 {userTickets} / {event.max_attendees || '∞'} booked</span>
       </div>
 
       {/* Booking modal */}
@@ -231,10 +236,11 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
           onClick={() => setShowPolicyModal(false)}
         >
           <div
-            className="bg-zinc-900 rounded-lg max-w-lg w-full p-6 overflow-auto max-h-[90vh] text-white"
+            className="bg-zinc-900 rounded-xl max-w-lg w-full p-6 overflow-auto max-h-[90vh] text-white shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-xl font-bold mb-2">{event.name}</h2>
+            <h2 className="text-xl font-bold mb-4">{event.name}</h2>
+
             <label className="block mb-3 text-sm">
               Email for ticket:
               <input
@@ -246,6 +252,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
                 required
               />
             </label>
+
             <label className="block mb-4 text-sm">
               Quantity:
               <input
@@ -257,6 +264,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
                 className="w-full mt-1 p-2 rounded bg-zinc-800 border border-zinc-600 text-white text-sm"
               />
             </label>
+
             <label className="flex items-center gap-2 mb-4">
               <input
                 type="checkbox"
@@ -266,8 +274,11 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
               />
               <span className="text-sm">I agree to the event guidelines</span>
             </label>
+
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setShowPolicyModal(false)} className="px-4 py-2 bg-zinc-700 rounded hover:bg-zinc-600">Cancel</button>
+              <button onClick={() => setShowPolicyModal(false)} className="px-4 py-2 bg-zinc-700 rounded hover:bg-zinc-600">
+                Cancel
+              </button>
               <button
                 onClick={handleBooking}
                 disabled={!agreed || loading || !email}
@@ -276,6 +287,8 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
                 {loading ? 'Processing…' : 'Confirm & Book'}
               </button>
             </div>
+
+            {statusMsg && <p className="mt-3 text-sm text-center text-gray-400">{statusMsg}</p>}
           </div>
         </div>
       )}
