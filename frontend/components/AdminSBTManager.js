@@ -362,6 +362,26 @@ function SetRoleForm() {
   const [role, setRole] = useState('user')
   const [eventId, setEventId] = useState('')
   const [status, setStatus] = useState('')
+  const [events, setEvents] = useState([])
+
+  // Fetch events from DB for dropdown
+  useEffect(() => {
+    if (role !== 'organizer') return
+    async function loadEvents() {
+      try {
+        const res = await fetch('/api/events') // assumes you have GET /api/events
+        const data = await res.json()
+        if (res.ok) {
+          setEvents(data.events || [])
+        } else {
+          console.error('Event fetch failed', data)
+        }
+      } catch (err) {
+        console.error('Error fetching events:', err)
+      }
+    }
+    loadEvents()
+  }, [role])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -375,7 +395,7 @@ function SetRoleForm() {
       }
 
       const body = { email, role }
-      if (eventId) body.event_id = Number(eventId)
+      if (eventId && role === 'organizer') body.event_id = Number(eventId)
 
       const res = await fetch('/api/setRole', {
         method: 'POST',
@@ -389,7 +409,7 @@ function SetRoleForm() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to set role')
 
-      setStatus(`✅ ${data.updated.email} → ${data.updated.role} (event ${eventId || '—'})`)
+      setStatus(`✅ ${data.updated.email} → ${data.updated.role}${eventId ? ` (event ${eventId})` : ''}`)
       setEmail('')
       setRole('user')
       setEventId('')
@@ -423,15 +443,21 @@ function SetRoleForm() {
         <option value="admin">Admin</option>
       </select>
 
-      {/* Only relevant when assigning organizer */}
+      {/* Only show when assigning organizer */}
       {role === 'organizer' && (
-        <input
-          type="number"
-          placeholder="Event ID"
+        <select
           value={eventId}
           onChange={(e) => setEventId(e.target.value)}
           className="p-2 rounded bg-zinc-800 text-white"
-        />
+          required
+        >
+          <option value="">Select Event</option>
+          {events.map(ev => (
+            <option key={ev.id} value={ev.id}>
+              {ev.name} ({new Date(ev.datetime).toLocaleString()})
+            </option>
+          ))}
+        </select>
       )}
 
       <button
