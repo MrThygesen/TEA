@@ -149,84 +149,88 @@ export default function ScannerPage() {
         </button>
       </div>
 
-      {/* Event selector */}
-      <div className="mb-4">
-        <label className="mr-2">Select Event:</label>
-        <select
-          className="bg-zinc-800 text-white p-2 rounded"
-          value={selectedEvent || ''}
-          onChange={e => setSelectedEvent(Number(e.target.value))}
-        >
-          <option value="">-- Choose Event --</option>
-          {events.map(ev => (
-            <option key={ev.id} value={ev.id}>
-              {ev.name} ({new Date(ev.datetime).toLocaleString()})
-            </option>
+{/* Event selector */}
+<div className="mb-4">
+  <label className="mr-2">Select Event:</label>
+  <select
+    className="bg-zinc-800 text-white p-2 rounded w-full"
+    value={selectedEvent || ''}
+    onChange={e => setSelectedEvent(Number(e.target.value))}
+  >
+    <option value="">-- Choose Event --</option>
+    {events.map(ev => (
+      <option key={ev.id} value={ev.id}>
+        {ev.name} ({new Date(ev.datetime).toLocaleString()})
+      </option>
+    ))}
+  </select>
+</div>
+
+{selectedEvent && (
+  <>
+    {/* QR Scanner video full width */}
+    <div className="relative w-full h-[60vh] bg-black mb-4">
+      <video
+        ref={videoRef}
+        className="absolute inset-0 w-full h-full object-cover"
+        autoPlay
+        muted
+        playsInline
+      />
+      <p className="absolute bottom-2 left-2 bg-zinc-900/70 px-3 py-1 rounded text-sm">
+        {status}
+      </p>
+    </div>
+
+    {/* Action buttons full width, 33% each */}
+    <div className="grid grid-cols-3 gap-2 mb-6">
+      <button
+        onClick={() => handleAction(lastTicket, 'arrive')}
+        className="bg-green-600 py-4 rounded text-lg font-bold"
+      >
+        Arrival
+      </button>
+      <button
+        onClick={() => handleAction(lastTicket, 'perk1')}
+        className="bg-blue-600 py-4 rounded text-lg font-bold"
+      >
+        Perk1
+      </button>
+      <button
+        onClick={() => handleAction(lastTicket, 'perk2')}
+        className="bg-purple-600 py-4 rounded text-lg font-bold"
+      >
+        Perk2
+      </button>
+    </div>
+
+    {/* Guest list */}
+    <div className="overflow-x-auto">
+      <table className="w-full text-left border-collapse">
+        <thead>
+          <tr className="border-b border-zinc-700">
+            <th className="p-2">Name</th>
+            <th className="p-2">Email</th>
+            <th className="p-2">Arrival</th>
+            <th className="p-2">Perk1</th>
+            <th className="p-2">Perk2</th>
+          </tr>
+        </thead>
+        <tbody>
+          {eventRegistrations.map(reg => (
+            <tr key={reg.id} className="border-b border-zinc-700">
+              <td className="p-2">{reg.username || '—'}</td>
+              <td className="p-2">{reg.email || '—'}</td>
+              <td className="p-2">{reg.has_arrived ? '✔' : '❌'}</td>
+              <td className="p-2">{reg.basic_perk_applied ? '✔' : '❌'}</td>
+              <td className="p-2">{reg.advanced_perk_applied ? '✔' : '❌'}</td>
+            </tr>
           ))}
-        </select>
-      </div>
-
-      {selectedEvent && (
-        <>
-          {/* QR Scanner */}
-          <div className="mb-4">
-            <video ref={videoRef} className="w-full max-w-md rounded border border-zinc-700" autoPlay muted playsInline />
-            <p className="mt-2">{status}</p>
-          </div>
-
-          {/* Action buttons for last scanned ticket */}
-          <div className="flex gap-4 mb-6">
-            <button
-              onClick={() => handleAction(lastTicket, 'arrive')}
-              className="flex-1 bg-green-600 py-3 rounded text-xl"
-            >
-              Arrival
-            </button>
-            <button
-              onClick={() => handleAction(lastTicket, 'perk1')}
-              className="flex-1 bg-blue-600 py-3 rounded text-xl"
-            >
-              Perk1
-            </button>
-            <button
-              onClick={() => handleAction(lastTicket, 'perk2')}
-              className="flex-1 bg-purple-600 py-3 rounded text-xl"
-            >
-              Perk2
-            </button>
-          </div>
-
-          {/* Guest list */}
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-zinc-700">
-                <th className="p-2">Name</th>
-                <th className="p-2">Email</th>
-                <th className="p-2">Arrival</th>
-                <th className="p-2">Perk1</th>
-                <th className="p-2">Perk2</th>
-                <th className="p-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {eventRegistrations.map(reg => (
-                <tr key={reg.id} className="border-b border-zinc-700">
-                  <td className="p-2">{reg.username || '—'}</td>
-                  <td className="p-2">{reg.email || '—'}</td>
-                  <td className="p-2">{reg.has_arrived ? '✔' : '❌'}</td>
-                  <td className="p-2">{reg.basic_perk_applied ? '✔' : '❌'}</td>
-                  <td className="p-2">{reg.advanced_perk_applied ? '✔' : '❌'}</td>
-                  <td className="p-2 flex gap-2">
-                    <button onClick={() => handleAction(reg.ticket_code, 'arrive')} className="bg-green-600 px-2 py-1 rounded">Arrival</button>
-                    <button onClick={() => handleAction(reg.ticket_code, 'perk1')} className="bg-blue-600 px-2 py-1 rounded">Perk1</button>
-                    <button onClick={() => handleAction(reg.ticket_code, 'perk2')} className="bg-purple-600 px-2 py-1 rounded">Perk2</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
-      )}
+        </tbody>
+      </table>
+    </div>
+  </>
+)}
     </main>
   )
 }
