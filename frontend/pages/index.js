@@ -41,6 +41,15 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
 
   const HEART_THRESHOLD = 0
 
+
+const handleRsvpSuccess = () => {
+    // bump trigger so modal sees update
+    setRefreshTrigger(prev => prev + 1)
+    // also toast feedback in index
+    alert("✅ RSVP added to Your Account") // or replace with react-hot-toast
+  }
+
+
   // --- fetch hearts ---
   useEffect(() => {
     async function fetchHearts() {
@@ -207,7 +216,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
           {loading ? 'Processing…' : 'Pay Now'}
         </button>
       </div>
-
       {/* Divider line */}
       <hr className="border-zinc-700 my-2" />
 
