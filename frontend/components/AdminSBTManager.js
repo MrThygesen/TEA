@@ -365,17 +365,12 @@ function SetRoleForm() {
   const [events, setEvents] = useState([])
 
   // Fetch events from DB for dropdown
-  useEffect(() => {
-    if (role !== 'organizer') return
-    async function loadEvents() {
-      try {
-        const res = await fetch('/api/events?upcomingOnly=true') // assumes you have GET /api/events
-        const data = await res.json()
-        if (res.ok) {
-          setEvents(data.events || [])
-        } else {
-          console.error('Event fetch failed', data)
-        }
+  if (res.ok) {
+         // API returns an array directly, not { events: [...] }   
+       setEvents(Array.isArray(data) ? data : [])
+       } else {
+         console.error('Event fetch failed', data)
+       }
       } catch (err) {
         console.error('Error fetching events:', err)
       }
