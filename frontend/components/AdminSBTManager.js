@@ -369,7 +369,7 @@ function SetRoleForm() {
     if (role !== 'organizer') return
     async function loadEvents() {
       try {
-        const res = await fetch('/api/events') // assumes you have GET /api/events
+        const res = await fetch('/api/events?upcomingOnly=true') // assumes you have GET /api/events
         const data = await res.json()
         if (res.ok) {
           setEvents(data.events || [])

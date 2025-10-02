@@ -144,33 +144,33 @@ export default async function handler(req, res) {
       return res.status(200).json(result.rows[0])
     }
 
-    // ======================
-    // GET EVENTS (ALL or APPROVED)
-    // ======================
-    if (method === 'GET') {
-      const approvedOnly = query.approvedOnly === 'true'
+// ======================
+// GET EVENTS (ALL / APPROVED / UPCOMING)
+// ======================
+if (method === 'GET') {
+  const approvedOnly = query.approvedOnly === 'true'
+  const upcomingOnly = query.upcomingOnly === 'true'
 
-      const result = await pool.query(
-        approvedOnly
-          ? `
-            SELECT e.*, COUNT(r.id) AS registered_users
-            FROM events e
-            LEFT JOIN registrations r ON r.event_id = e.id
-            WHERE e.is_confirmed = TRUE
-            GROUP BY e.id
-            ORDER BY e.datetime ASC
-          `
-          : `
-            SELECT e.*, COUNT(r.id) AS registered_users
-            FROM events e
-            LEFT JOIN registrations r ON r.event_id = e.id
-            GROUP BY e.id
-            ORDER BY e.datetime ASC
-          `
-      )
+  // dynamically build WHERE clause
+  let whereClauses = []
+  if (approvedOnly) whereClauses.push('e.is_confirmed = TRUE')
+  if (upcomingOnly) whereClauses.push('e.datetime > NOW()')
 
-      return res.status(200).json(result.rows)
-    }
+  const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : ''
+
+  const result = await pool.query(
+    `
+      SELECT e.*, COUNT(r.id) AS registered_users
+      FROM events e
+      LEFT JOIN registrations r ON r.event_id = e.id
+      ${whereSQL}
+      GROUP BY e.id
+      ORDER BY e.datetime ASC
+    `
+  )
+
+  return res.status(200).json(result.rows)
+}
 
     // ======================
     // METHOD NOT ALLOWED
