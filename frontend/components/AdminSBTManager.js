@@ -363,7 +363,8 @@ function SetRoleForm() {
   const [eventId, setEventId] = useState('')
   const [status, setStatus] = useState('')
   const [events, setEvents] = useState([])
-
+  const { address } = useAccount()
+ 
   // Fetch events from DB for dropdown
  useEffect(() => {
     if (role !== 'organizer') return
@@ -406,6 +407,9 @@ function SetRoleForm() {
           'Content-Type': 'application/json',
   //        Authorization: `Bearer ${token}`,
  'x-wallet': address, // pass connected wallet 
+
+
+  'x-wallet': address,
 
        },
         body: JSON.stringify(body),
