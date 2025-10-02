@@ -26,11 +26,11 @@ function clearAuth() {
   try { localStorage.removeItem('edgy_auth_user') } catch (_) {}
 }
 
+
 export function DynamicEventCard({ event, authUser, setShowAccountModal, refreshTrigger, setRefreshTrigger }) {
   const [heartCount, setHeartCount] = useState(0)
   const [bookable, setBookable] = useState(event.is_confirmed)
   const [loading, setLoading] = useState(false)
-  const [statusMsg, setStatusMsg] = useState('')
   const [userTickets, setUserTickets] = useState(0)
   const [maxPerUser, setMaxPerUser] = useState(event.tag1 === 'group' ? 5 : 1)
 
@@ -40,15 +40,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
   const [agreed, setAgreed] = useState(false)
 
   const HEART_THRESHOLD = 0
-
-
-const handleRsvpSuccess = () => {
-    // bump trigger so modal sees update
-    setRefreshTrigger(prev => prev + 1)
-    // also toast feedback in index
-    alert("✅ RSVP added to Your Account") // or replace with react-hot-toast
-  }
-
 
   // --- fetch hearts ---
   useEffect(() => {
@@ -95,12 +86,11 @@ const handleRsvpSuccess = () => {
   async function handleBooking() {
     if (!authUser) {
       setShowAccountModal(true)
-      setStatusMsg('⚠️ Please login to buy a ticket.')
+      toast.error('⚠️ Please login to buy a ticket.')
       return
     }
 
     setLoading(true)
-    setStatusMsg('Processing…')
     try {
       const token = localStorage.getItem('token')
       const res = await fetch('/api/events/register', {
@@ -119,18 +109,17 @@ const handleRsvpSuccess = () => {
         if (data.clientSecret) {
           window.location.href = `/api/events/checkout?payment_intent_client_secret=${data.clientSecret}`
         } else {
-          setStatusMsg('⚠️ Payment could not be initiated')
+          toast.error('⚠️ Payment could not be initiated')
         }
       } else {
         // --- Free ticket
-        setStatusMsg('✅ Ticket booked! Confirmation email sent.')
+        toast.success('✅ Ticket booked! Confirmation email sent.')
       }
     } catch (err) {
       console.error(err)
-      setStatusMsg('❌ Error registering')
+      toast.error('❌ Error registering')
     } finally {
       setLoading(false)
-      setTimeout(() => setStatusMsg(''), 3000)
       setShowPolicyModal(false)
       setAgreed(false)
     }
@@ -149,36 +138,33 @@ const handleRsvpSuccess = () => {
       const data = await res.json()
       setHeartCount(data.count)
       if (data.count >= HEART_THRESHOLD) setBookable(true)
-      setStatusMsg('❤️ Liked!')
-      setTimeout(() => setStatusMsg(''), 1500)
+      toast.success('❤️ Liked!')
     } catch (err) {
       console.error(err)
+      toast.error('❌ Error liking event')
     }
   }
 
   // --- RSVP handler ---
- async function handleRSVPClick() {
-  if (!authUser) return setShowAccountModal(true)
-  try {
-    const token = localStorage.getItem('token') || ''
-    const res = await fetch('/api/events/rsvp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
-      body: JSON.stringify({ eventId: event.id })
-    })
-    if (!res.ok) throw new Error('Failed to RSVP')
-    const data = await res.json()
+  async function handleRSVPClick() {
+    if (!authUser) return setShowAccountModal(true)
+    try {
+      const token = localStorage.getItem('token') || ''
+      const res = await fetch('/api/events/rsvp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
+        body: JSON.stringify({ eventId: event.id })
+      })
+      if (!res.ok) throw new Error('Failed to RSVP')
+      await res.json()
 
-    setStatusMsg('✅ RSVP added!')
-    setRefreshTrigger(prev => prev + 1) // triggers YourAccountModal refresh
-    setTimeout(() => setStatusMsg(''), 2000)
-  } catch (err) {
-    console.error(err)
-    setStatusMsg('❌ Error saving RSVP')
-    setTimeout(() => setStatusMsg(''), 2000)
+      setRefreshTrigger(prev => prev + 1) // refresh YourAccountModal
+      toast.success('🎉 RSVP added to Your Account!')
+    } catch (err) {
+      console.error(err)
+      toast.error('❌ Error saving RSVP')
+    }
   }
-}
-
 
   return (
     <div className="border border-zinc-700 rounded-xl p-5 bg-gradient-to-b from-zinc-900 to-zinc-800 shadow-lg flex flex-col justify-between relative transition hover:shadow-2xl hover:border-zinc-500">
@@ -216,6 +202,7 @@ const handleRsvpSuccess = () => {
           {loading ? 'Processing…' : 'Pay Now'}
         </button>
       </div>
+
       {/* Divider line */}
       <hr className="border-zinc-700 my-2" />
 
@@ -299,16 +286,12 @@ const handleRsvpSuccess = () => {
                 {loading ? 'Processing…' : 'Confirm & Book'}
               </button>
             </div>
-
-            {statusMsg && <p className="mt-3 text-sm text-center text-gray-400">{statusMsg}</p>}
           </div>
         </div>
       )}
     </div>
   )
 }
-
-
 function VideoHero() {
   const [open, setOpen] = useState(false);
 
