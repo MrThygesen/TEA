@@ -147,25 +147,35 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
   }
 
   // --- RSVP handler ---
-  async function handleRSVPClick() {
-    if (!authUser) return setShowAccountModal(true)
-    try {
-      const token = localStorage.getItem('token') || ''
-      const res = await fetch('/api/events/rsvp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
-        body: JSON.stringify({ eventId: event.id })
-      })
-      if (!res.ok) throw new Error('Failed to RSVP')
-      await res.json()
-
-      setRefreshTrigger(prev => prev + 1) // refresh YourAccountModal
-      toast.success('🎉 RSVP added to Your Account!')
-    } catch (err) {
-      console.error(err)
-      toast.error('❌ Error saving RSVP')
-    }
+ // --- RSVP handler ---
+async function handleRSVPClick() {
+  if (!authUser) {
+    setShowAccountModal(true)
+    toast.error('⚠️ Please log in to RSVP.')
+    return
   }
+
+  try {
+    const token = localStorage.getItem('token') || ''
+    const res = await fetch('/api/events/rsvp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
+      body: JSON.stringify({ eventId: event.id })
+    })
+    const data = await res.json()
+
+    if (!res.ok) throw new Error(data.error || 'Failed to RSVP')
+
+    // Always show success feedback
+    toast.success('🎉 RSVP confirmed and added to Your Account!')
+
+    // Refresh account modal or ticket count
+    setRefreshTrigger(prev => prev + 1)
+  } catch (err) {
+    console.error(err)
+    toast.error('❌ Could not save RSVP. Maybe you already RSVPed?')
+  }
+}
 
   return (
     <div className="border border-zinc-700 rounded-xl p-5 bg-gradient-to-b from-zinc-900 to-zinc-800 shadow-lg flex flex-col justify-between relative transition hover:shadow-2xl hover:border-zinc-500">
