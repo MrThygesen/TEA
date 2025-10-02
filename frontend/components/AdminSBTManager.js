@@ -391,11 +391,11 @@ function SetRoleForm() {
     setStatus('')
 
     try {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        setStatus('❌ Not logged in')
-        return
-      }
+//      const token = localStorage.getItem('token')
+//      if (!token) {
+//        setStatus('❌ Not logged in')
+//        return
+//      }
 
       const body = { email, role }
       if (eventId && role === 'organizer') body.event_id = Number(eventId)
@@ -404,8 +404,10 @@ function SetRoleForm() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+  //        Authorization: `Bearer ${token}`,
+ 'x-wallet': address, // pass connected wallet 
+
+       },
         body: JSON.stringify(body),
       })
 
