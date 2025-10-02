@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { useAccount } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { toast } from 'react-hot-toast'
-import AdminSBTManager from '../components/AdminSBTManager'
+//import AdminSBTManager from '../components/AdminSBTManager'
 import YourAccountModal from '../components/YourAccountModal'
 
  // ---------------------------
@@ -374,10 +374,10 @@ function EventListRow({ event, onPreview }) {
 
 
 export default function Home() {
-  const { address } = useAccount()
-  const [adminAddr, setAdminAddr] = useState(null)
-  useEffect(() => { setAdminAddr(process.env.NEXT_PUBLIC_ADMIN?.toLowerCase?.() || null) }, [])
-  const isAdmin = !!(address && adminAddr && address.toLowerCase() === adminAddr)
+//  const { address } = useAccount()
+//  const [adminAddr, setAdminAddr] = useState(null)
+//  useEffect(() => { setAdminAddr(process.env.NEXT_PUBLIC_ADMIN?.toLowerCase?.() || null) }, [])
+//  const isAdmin = !!(address && adminAddr && address.toLowerCase() === adminAddr)
 
   const [profilePasswordInput, setProfilePasswordInput] = useState('')
   const [profilePassword, setProfilePassword] = useState(null)
@@ -591,27 +591,7 @@ useEffect(() => {
 {/* Three Images Section */} <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg mt-10"> <h2 className="text-2xl font-semibold mb-6 text-center text-blue-400">Our Network Highlights</h2> <div className="grid md:grid-cols-3 gap-6"> <div className="flex flex-col items-center"> <img src="/images/image1.jpg" alt="Perks" className="w-full h-48 object-cover rounded-lg mb-2" /> <h3 className="text-lg font-semibold">Perks & Benefits</h3> <p className="text-gray-300 text-sm text-center">Enjoy curated perks at every event you join.</p> </div> <div className="flex flex-col items-center"> <img src="/images/image2.jpg" alt="Venues" className="w-full h-48 object-cover rounded-lg mb-2" /> <h3 className="text-lg font-semibold">Venue Partners</h3> <p className="text-gray-300 text-sm text-center">We collaborate with the best cafés, pubs, and event spaces.</p> </div> <div className="flex flex-col items-center"> <img src="/images/image3.jpg" alt="Organizers" className="w-full h-48 object-cover rounded-lg mb-2" /> <h3 className="text-lg font-semibold">Event Organizers</h3> <p className="text-gray-300 text-sm text-center">Connect with organizers who craft unique experiences.</p> </div> </div> </section>
 
 
-        {/* Admin SBT Manager */}
-        {isAdmin && <AdminSBTManager darkMode={true} />}
 
-        {/* How it works */}
-        <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg">
-          <h2 className="text-2xl font-semibold mb-6 text-center text-blue-400">How It Works</h2>
-          <div className="grid md:grid-cols-3 gap-6 text-left">
-            <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow">
-              <h3 className="text-lg font-bold mb-2 text-yellow-400">1. Prebook</h3>
-              <p className="text-gray-300 text-sm">Show your interest in the event and sign up to hear when events are confirmed and open for coupon purchase.</p>
-            </div>
-            <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow">
-              <h3 className="text-lg font-bold mb-2 text-green-400">2. Book</h3>
-              <p className="text-gray-300 text-sm">Purchase your coupon for the venue to meet your network and get your perks. Buy coupons early.</p>
-            </div>
-            <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 shadow">
-              <h3 className="text-lg font-bold mb-2 text-blue-400">3. Show Up</h3>
-              <p className="text-gray-300 text-sm">Get registered on the digital guestlist, meet new people, place your order, and enjoy the mystery perk served on the side.</p>
-            </div>
-          </div>
-        </section>
 
         {/* Event Grid/List Section */}
         <section className="bg-zinc-900 border-zinc-700 text-white rounded-3xl p-8 border shadow-lg">
