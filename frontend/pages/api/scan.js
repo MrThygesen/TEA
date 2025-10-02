@@ -12,18 +12,30 @@ export default async function handler(req, res) {
         return res.status(403).json({ error: 'Not allowed' })
       }
 
-      // Fetch upcoming events for this organizer's group
-      const eventsRes = await pool.query(
-        `SELECT * FROM events 
-         WHERE group_id = $1 AND datetime >= NOW()
-  AND datetime < NOW() + INTERVAL '2 days'
-         ORDER BY datetime ASC`,
-        [decoded.group_id]
-      )
-
+      // 🔹 Fetch events where this user is organizer OR (if admin) all events
+      let eventsRes
+      if (decoded.role === 'admin') {
+        eventsRes = await pool.query(
+          `SELECT * FROM events
+           WHERE datetime >= NOW()
+           AND datetime < NOW() + INTERVAL '2 days'
+           ORDER BY datetime ASC`
+        )
+      } else {
+        eventsRes = await pool.query(
+          `SELECT e.* 
+           FROM events e
+           INNER JOIN event_organizers eo ON eo.event_id = e.id
+           WHERE eo.user_id = $1
+           AND e.datetime >= NOW()
+           AND e.datetime < NOW() + INTERVAL '2 days'
+           ORDER BY e.datetime ASC`,
+          [decoded.id]
+        )
+      }
 
       if (!eventsRes.rows.length) {
-        return res.json({ events: [] })
+        return res.json({ events: [], registrations: [] })
       }
 
       // Fetch all registrations for those events

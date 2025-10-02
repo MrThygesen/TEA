@@ -360,6 +360,7 @@ function DbDump() {
 function SetRoleForm() {
   const [email, setEmail] = useState('')
   const [role, setRole] = useState('user')
+  const [eventId, setEventId] = useState('')
   const [status, setStatus] = useState('')
 
   async function handleSubmit(e) {
@@ -373,21 +374,25 @@ function SetRoleForm() {
         return
       }
 
+      const body = { email, role }
+      if (eventId) body.event_id = Number(eventId)
+
       const res = await fetch('/api/setRole', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ email, role }),
+        body: JSON.stringify(body),
       })
 
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to set role')
 
-      setStatus(`✅ Updated ${data.updated[0].email} → ${data.updated[0].role}`)
+      setStatus(`✅ ${data.updated.email} → ${data.updated.role} (event ${eventId || '—'})`)
       setEmail('')
       setRole('user')
+      setEventId('')
     } catch (err) {
       console.error('[SetRoleForm] error:', err)
       setStatus(`❌ ${err.message}`)
@@ -417,6 +422,18 @@ function SetRoleForm() {
         <option value="organizer">Organizer</option>
         <option value="admin">Admin</option>
       </select>
+
+      {/* Only relevant when assigning organizer */}
+      {role === 'organizer' && (
+        <input
+          type="number"
+          placeholder="Event ID"
+          value={eventId}
+          onChange={(e) => setEventId(e.target.value)}
+          className="p-2 rounded bg-zinc-800 text-white"
+        />
+      )}
+
       <button
         type="submit"
         className="bg-blue-600 hover:bg-blue-700 p-2 rounded text-white"

@@ -12,6 +12,7 @@ export default function ScannerPage() {
   const [events, setEvents] = useState([])
   const [registrations, setRegistrations] = useState([])
   const [selectedEvent, setSelectedEvent] = useState(null)
+  const [lastTicket, setLastTicket] = useState(null)
   const [scanCooldown, setScanCooldown] = useState(false)
 
   const videoRef = useRef(null)
@@ -43,10 +44,12 @@ export default function ScannerPage() {
     if (!loggedIn || !videoRef.current) return
     codeReaderRef.current = new BrowserMultiFormatReader()
     codeReaderRef.current
-      .decodeFromVideoDevice(null, videoRef.current, async (result, err) => {
+      .decodeFromVideoDevice(null, videoRef.current, async (result) => {
         if (result && !scanCooldown) {
           setScanCooldown(true)
-          await handleScan(result.getText())
+          const code = result.getText()
+          setLastTicket(code)
+          await handleScan(code)
         }
       })
       .catch(err => console.error('Camera error:', err))
@@ -74,6 +77,11 @@ export default function ScannerPage() {
   async function handleAction(ticketCode, action) {
     try {
       const token = localStorage.getItem('scanner_token')
+      if (!ticketCode) {
+        setStatus('❌ No ticket selected or scanned yet')
+        return
+      }
+
       const res = await fetch('/api/scan', {
         method: 'POST',
         headers: {
@@ -108,6 +116,7 @@ export default function ScannerPage() {
     setEmail('')
     setPassword('')
     setStatus('')
+    setLastTicket(null)
   }
 
   if (!loggedIn) {
@@ -165,11 +174,26 @@ export default function ScannerPage() {
             <p className="mt-2">{status}</p>
           </div>
 
-          {/* Action buttons */}
+          {/* Action buttons for last scanned ticket */}
           <div className="flex gap-4 mb-6">
-            <button onClick={() => handleAction(null, 'arrive')} className="flex-1 bg-green-600 py-3 rounded text-xl">Arrival</button>
-            <button onClick={() => handleAction(null, 'perk1')} className="flex-1 bg-blue-600 py-3 rounded text-xl">Perk1</button>
-            <button onClick={() => handleAction(null, 'perk2')} className="flex-1 bg-purple-600 py-3 rounded text-xl">Perk2</button>
+            <button
+              onClick={() => handleAction(lastTicket, 'arrive')}
+              className="flex-1 bg-green-600 py-3 rounded text-xl"
+            >
+              Arrival
+            </button>
+            <button
+              onClick={() => handleAction(lastTicket, 'perk1')}
+              className="flex-1 bg-blue-600 py-3 rounded text-xl"
+            >
+              Perk1
+            </button>
+            <button
+              onClick={() => handleAction(lastTicket, 'perk2')}
+              className="flex-1 bg-purple-600 py-3 rounded text-xl"
+            >
+              Perk2
+            </button>
           </div>
 
           {/* Guest list */}
