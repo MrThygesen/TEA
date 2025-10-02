@@ -57,6 +57,19 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     loadAccount()
   }, [refreshTrigger])
 
+
+
+const [rsvpNotice, setRsvpNotice] = useState('')
+
+useEffect(() => {
+  if (refreshTrigger > 0) {
+    setRsvpNotice('Your RSVPs have been updated 🎉')
+    setTimeout(() => setRsvpNotice(''), 3000)
+  }
+}, [refreshTrigger])
+
+
+
   if (loading) return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 w-full max-w-md text-center">
@@ -64,6 +77,9 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
       </div>
     </div>
   )
+
+
+
 
   if (error) return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
@@ -83,6 +99,14 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         <button onClick={onClose} className="absolute top-2 right-2 text-gray-400 hover:text-white text-xl">✕</button>
 
         <h2 className="text-2xl font-bold mb-6 text-blue-400">Your Account</h2>
+
+
+{rsvpNotice && (
+  <div className="mb-4 p-2 bg-green-600 text-white rounded">
+    {rsvpNotice}
+  </div>
+)}
+
 
         {profile && (
           <>

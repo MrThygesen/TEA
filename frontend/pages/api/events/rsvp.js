@@ -15,21 +15,19 @@ export default async function handler(req, res) {
 
     if (!eventId) return res.status(400).json({ error: 'Missing eventId' })
 
-    if (req.method === 'POST') {
-      // Add RSVP (insert rsvps)
-  await pool.query(
-  `
-  INSERT INTO rsvps (user_id, event_id)
-  SELECT $1, $2
-  WHERE NOT EXISTS (
-    SELECT 1 FROM rsvps WHERE user_id = $1 AND event_id = $2
+if (req.method === 'POST') {
+  const result = await pool.query(
+    `INSERT INTO rsvps (user_id, event_id)
+     SELECT $1, $2
+     WHERE NOT EXISTS (
+       SELECT 1 FROM rsvps WHERE user_id = $1 AND event_id = $2
+     )
+     RETURNING *`,
+    [userId, eventId]
   )
-  `,
-  [userId, eventId]
-)
 
-      return res.status(200).json({ success: true })
-    }
+  return res.status(200).json({ success: true, rsvp: result.rows[0] })
+}
 
     if (req.method === 'DELETE') {
       // Remove RSVP

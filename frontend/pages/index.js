@@ -148,24 +148,28 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
   }
 
   // --- RSVP handler ---
-  async function handleRSVPClick() {
-    if (!authUser) return setShowAccountModal(true)
-    try {
-      const token = localStorage.getItem('token') || ''
-      const res = await fetch('/api/events/rsvp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
-        body: JSON.stringify({ eventId: event.id })
-      })
-      if (!res.ok) throw new Error('Failed to RSVP')
-      setStatusMsg('📌 RSVP added!')
-      setRefreshTrigger(prev => prev + 1)
-      setTimeout(() => setStatusMsg(''), 1500)
-    } catch (err) {
-      console.error(err)
-      setStatusMsg('Error saving RSVP')
-    }
+ async function handleRSVPClick() {
+  if (!authUser) return setShowAccountModal(true)
+  try {
+    const token = localStorage.getItem('token') || ''
+    const res = await fetch('/api/events/rsvp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
+      body: JSON.stringify({ eventId: event.id })
+    })
+    if (!res.ok) throw new Error('Failed to RSVP')
+    const data = await res.json()
+
+    setStatusMsg('✅ RSVP added!')
+    setRefreshTrigger(prev => prev + 1) // triggers YourAccountModal refresh
+    setTimeout(() => setStatusMsg(''), 2000)
+  } catch (err) {
+    console.error(err)
+    setStatusMsg('❌ Error saving RSVP')
+    setTimeout(() => setStatusMsg(''), 2000)
   }
+}
+
 
   return (
     <div className="border border-zinc-700 rounded-xl p-5 bg-gradient-to-b from-zinc-900 to-zinc-800 shadow-lg flex flex-col justify-between relative transition hover:shadow-2xl hover:border-zinc-500">
