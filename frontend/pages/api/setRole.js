@@ -1,6 +1,4 @@
-// pages/api/setRole.js 
-import { pool } from '../../lib/postgres.js'
-import { auth } from '../../lib/auth.js'
+import { pool } from '../../lib/postgres'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -8,51 +6,53 @@ export default async function handler(req, res) {
   }
 
   try {
-    const token = auth.getTokenFromReq(req)
-    if (!token) return res.status(401).json({ error: 'Unauthorized' })
-    const decoded = auth.verifyToken(token)
-    if (!decoded) return res.status(401).json({ error: 'Unauthorized' })
-
-    const { email, telegram_username, telegram_user_id, role, group_id } = req.body
-    if (!role) return res.status(400).json({ error: 'Role is required' })
-    if (!email && !telegram_username && !telegram_user_id)
-      return res.status(400).json({ error: 'Provide email, Telegram username, or user ID' })
-
-    // Build WHERE clause dynamically
-    const whereClauses = []
-    const values = [role]
-    let i = 2
-
-    if (email) {
-      whereClauses.push(`email = $${i}`)
-      values.push(email)
-      i++
+    // Wallet admin check
+    const wallet = req.headers['x-wallet']?.toLowerCase()
+    if (!wallet) {
+      return res.status(401).json({ error: 'Wallet not provided' })
     }
-    if (telegram_username) {
-      whereClauses.push(`username = $${i}`)
-      values.push(telegram_username)
-      i++
-    }
-    if (telegram_user_id) {
-      whereClauses.push(`id = $${i}`)
-      values.push(telegram_user_id)
-      i++
+    if (wallet !== process.env.ADMIN_WALLET?.toLowerCase()) {
+      return res.status(403).json({ error: 'Not authorized' })
     }
 
-    const setClause = group_id ? `role = $1, group_id = ${group_id}` : `role = $1`
-    const whereClause = whereClauses.join(' OR ')
+    const { email, role, event_id } = req.body
+    if (!email || !role) {
+      return res.status(400).json({ error: 'Missing email or role' })
+    }
 
-    const result = await pool.query(
-      `UPDATE user_profiles SET ${setClause} WHERE ${whereClause} RETURNING *`,
-      values
+    // --- Upsert user profile ---
+    const userRes = await pool.query(
+      `UPDATE user_profiles 
+       SET role = $2, updated_at = NOW()
+       WHERE email = $1
+       RETURNING *`,
+      [email, role]
     )
 
-    if (result.rowCount === 0)
-      return res.status(404).json({ error: 'No user found with provided identifier(s)' })
+    let updated = userRes.rows[0]
+    if (!updated) {
+      const insertRes = await pool.query(
+        `INSERT INTO user_profiles (email, role, created_at, updated_at)
+         VALUES ($1, $2, NOW(), NOW())
+         RETURNING *`,
+        [email, role]
+      )
+      updated = insertRes.rows[0]
+    }
 
-    return res.status(200).json({ success: true, updated: result.rows })
+    // --- Organizer assignment ---
+    if (role === 'organizer' && event_id) {
+      await pool.query(
+        `INSERT INTO event_organizers (event_id, user_id)
+         VALUES ($1, $2)
+         ON CONFLICT (event_id, user_id) DO NOTHING`,
+        [event_id, updated.id]
+      )
+    }
+
+    return res.json({ success: true, updated })
   } catch (err) {
-    console.error('[setRole] error:', err)
+    console.error('[setRole] error', err)
     return res.status(500).json({ error: 'Internal server error' })
   }
 }
