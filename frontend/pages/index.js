@@ -79,7 +79,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       } catch (err) {
         console.error('myTickets error:', err)
       }
-    }
+    }hea
     fetchMyTickets()
   }, [authUser, event.id, event.tag1, refreshTrigger])
 
@@ -126,24 +126,32 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
     }
   }
 
-  async function handleHeartClick() {
-    try {
-      const token = localStorage.getItem('token') || ''
-      const res = await fetch('/api/events/favorite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
-        body: JSON.stringify({ eventId: event.id })
-      })
-      if (!res.ok) throw new Error('Failed to like')
-      const data = await res.json()
-      setHeartCount(data.count)
-      if (data.count >= HEART_THRESHOLD) setBookable(true)
-      toast.success('❤️ Liked!')
-    } catch (err) {
-      console.error(err)
-      toast.error('❌ Error liking event')
-    }
+async function handleHeartClick() {
+  try {
+    const token = localStorage.getItem('token') || ''
+    const res = await fetch('/api/events/favorite', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` })
+      },
+      body: JSON.stringify({ eventId: event.id })
+    })
+
+    if (!res.ok) throw new Error('Failed to like')
+    const data = await res.json()
+
+    // Immediately update heart count locally
+    setHeartCount(data.count)
+    if (data.count >= HEART_THRESHOLD) setBookable(true)
+
+    toast.success('❤️ Liked!')
+
+  } catch (err) {
+    console.error(err)
+    toast.error('❌ Error liking event')
   }
+}
 
   async function handleRSVPClick() {
     if (!authUser) {
