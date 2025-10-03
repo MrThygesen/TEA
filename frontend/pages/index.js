@@ -224,86 +224,114 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
         </div>
       </div>
 
-      {/* Policy / Details Modal */}
-      {showPolicyModal && (
-        <div
-          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowPolicyModal(false)}
-        >
-          <div
-            className="bg-zinc-900 rounded-xl max-w-lg w-full p-6 overflow-auto max-h-[90vh] text-white shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-xl font-bold mb-2">{event.name}</h2>
-            {event.image && (
-              <img src={event.image} alt={event.name} className="w-full h-40 object-cover rounded mb-4" />
-            )}
+  {/* Policy / Details Modal */}
+{showPolicyModal && (
+  <div
+    className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+    onClick={() => setShowPolicyModal(false)}
+  >
+    <div
+      className="bg-zinc-900 rounded-xl max-w-lg w-full p-6 overflow-auto max-h-[90vh] text-white shadow-xl relative"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Close button */}
+      <button
+        onClick={() => setShowPolicyModal(false)}
+        className="absolute top-3 right-3 text-gray-400 hover:text-white"
+      >
+        ✕
+      </button>
 
-            <p className="text-sm text-gray-300 mb-2">
-              📅 {new Date(event.datetime).toLocaleString()} · 📍 {event.city}, {event.venue_location}
-            </p>
-            <p className="text-gray-200 mb-4">{event.description}</p>
+      {/* Title */}
+      <h2 className="text-xl font-bold mb-2">{event.name}</h2>
 
-            <div className="flex gap-2 mb-4">
-              {[event.tag1, event.tag2, event.tag3].filter(Boolean).map((tag, idx) => (
-                <span key={idx} className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-600 text-white">
-                  {tag}
-                </span>
-              ))}
-            </div>
+      {/* Date, Time, Place, Venue */}
+      <p className="text-sm text-gray-400 mb-3">
+        📅 {new Date(event.datetime).toLocaleDateString()} · 🕒{" "}
+        {new Date(event.datetime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} <br />
+        📍 {event.city}{event.venue_location ? `, ${event.venue_location}` : ""}
+      </p>
 
-            {/* Email + Quantity */}
-            <label className="block mb-3 text-sm">
-              Email for ticket:
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                className="w-full mt-1 p-2 rounded bg-zinc-800 border border-zinc-600 text-white text-sm"
-                placeholder="you@example.com"
-              />
-            </label>
-
-            <label className="block mb-3 text-sm">
-              Quantity:
-              <input
-                type="number"
-                value={quantity}
-                onChange={e => setQuantity(Number(e.target.value))}
-                min={1}
-                max={maxPerUser - userTickets}
-                className="w-full mt-1 p-2 rounded bg-zinc-800 border border-zinc-600 text-white text-sm"
-              />
-            </label>
-
-            <label className="flex items-center gap-2 mb-4 text-sm">
-              <input
-                type="checkbox"
-                checked={agreed}
-                onChange={(e) => setAgreed(e.target.checked)}
-                className="form-checkbox"
-              />
-              I follow the guidelines for the event and network
-            </label>
-
-            <div className="flex gap-3 justify-end">
-              <button onClick={() => setShowPolicyModal(false)} className="px-4 py-2 bg-zinc-700 rounded hover:bg-zinc-600">
-                Cancel
-              </button>
-              <button
-                onClick={handleBooking}
-                disabled={!agreed || loading || !email}
-                className="px-4 py-2 bg-green-600 rounded hover:bg-green-700 disabled:opacity-50"
-              >
-                {event.price && Number(event.price) > 0 ? 'Pay Now' : 'Get Ticket'}
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Image */}
+      {event.image && (
+        <img
+          src={event.image}
+          alt={event.name}
+          className="w-full h-40 object-cover rounded mb-4"
+        />
       )}
+
+      {/* Text */}
+      <p className="text-gray-200 mb-4">{event.description}</p>
+
+      {/* Tags */}
+      <div className="flex gap-2 mb-6">
+        {[event.tag2, event.tag3].filter(Boolean).map((tag, idx) => (
+          <span
+            key={idx}
+            className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-600 text-white"
+          >
+            {tag}
+          </span>
+        ))}
+      </div>
+
+      {/* Price, Quantity, Total */}
+      <div className="mb-6 space-y-2 text-sm">
+        <div className="flex justify-between">
+          <span>Price per ticket:</span>
+          <span>
+            {event.price && Number(event.price) > 0
+              ? `${Number(event.price).toFixed(2)} DKK`
+              : "Free"}
+          </span>
+        </div>
+        <div className="flex justify-between items-center">
+          <label htmlFor="quantity">Quantity:</label>
+          <input
+            id="quantity"
+            type="number"
+            value={quantity}
+            onChange={(e) => setQuantity(Number(e.target.value))}
+            min={1}
+            max={maxPerUser - userTickets}
+            className="w-16 p-1 rounded bg-zinc-800 border border-zinc-600 text-white text-center"
+          />
+        </div>
+        <div className="flex justify-between font-semibold">
+          <span>Total:</span>
+          <span>
+            {event.price && Number(event.price) > 0
+              ? `${(Number(event.price) * quantity).toFixed(2)} DKK`
+              : "Free"}
+          </span>
+        </div>
+      </div>
+
+      {/* Checkbox */}
+      <label className="flex items-center gap-2 mb-6 text-sm">
+        <input
+          type="checkbox"
+          checked={agreed}
+          onChange={(e) => setAgreed(e.target.checked)}
+          className="form-checkbox"
+        />
+        I follow the guidelines of the event.
+      </label>
+
+      {/* Button */}
+      <div className="flex justify-end">
+        <button
+          onClick={handleBooking}
+          disabled={!agreed || loading}
+          className="px-4 py-2 bg-green-600 rounded hover:bg-green-700 disabled:opacity-50"
+        >
+          {event.price && Number(event.price) > 0 ? "Get Ticket" : "Get Ticket"}
+        </button>
+      </div>
     </div>
-  )
-}
+  </div>
+)}
 
 /////////////////////////////// VIDEO ///////
 function VideoHero() {
