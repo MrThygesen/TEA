@@ -161,7 +161,7 @@ await pool.query(`
       );
     `)
 
-    // FAVORITES
+// FAVORITES
 await pool.query(`
   CREATE TABLE IF NOT EXISTS favorites (
     id SERIAL PRIMARY KEY,
@@ -171,9 +171,12 @@ await pool.query(`
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT favorites_user_check CHECK (
       user_id IS NOT NULL OR telegram_user_id IS NOT NULL
-    )
+    ),
+    CONSTRAINT favorites_event_user_unique UNIQUE (event_id, user_id),
+    CONSTRAINT favorites_event_telegram_unique UNIQUE (event_id, telegram_user_id)
   );
 `);
+
 
 // Uniqueness: only 1 RSVP per user per event
 await pool.query(`
