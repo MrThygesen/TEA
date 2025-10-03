@@ -1,5 +1,4 @@
 // YourAccountModal.js
-
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -13,7 +12,6 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [loading, setLoading] = useState(true)
   const [activeQR, setActiveQR] = useState(null)
   const [error, setError] = useState(null)
-  const [rsvpNotice, setRsvpNotice] = useState('')
 
   useEffect(() => {
     async function loadAccount() {
@@ -47,8 +45,21 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         })
         if (!rsvpRes.ok) throw new Error('Failed to load RSVPs')
         const rsvpData = await rsvpRes.json()
-        setRsvps(Array.isArray(rsvpData) ? rsvpData : [])
 
+        // filter RSVPs:
+        // 1. Remove RSVPs for events the user already has a ticket for
+        const ticketEventIds = new Set(userTickets.map(t => t.event_id))
+        // 2. Remove RSVPs for events older than yesterday
+        const cutoff = new Date()
+        cutoff.setDate(cutoff.getDate() - 1)
+
+        const filteredRsvps = (Array.isArray(rsvpData) ? rsvpData : []).filter(r => {
+          if (ticketEventIds.has(r.event_id)) return false
+          const eventDate = new Date(r.date)
+          return eventDate >= cutoff
+        })
+
+        setRsvps(filteredRsvps)
       } catch (err) {
         console.error('❌ Failed to load account:', err)
         setError(err.message)
@@ -58,13 +69,6 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     }
 
     loadAccount()
-  }, [refreshTrigger])
-
-  useEffect(() => {
-    if (refreshTrigger > 0) {
-      setRsvpNotice('Your RSVPs have been updated 🎉')
-      setTimeout(() => setRsvpNotice(''), 3000)
-    }
   }, [refreshTrigger])
 
   if (loading) return (
@@ -90,13 +94,8 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-lg max-w-6xl w-full p-6 text-white relative">
         <button onClick={onClose} className="absolute top-2 right-2 text-gray-400 hover:text-white text-xl">✕</button>
-        <h2 className="text-2xl font-bold mb-6 text-blue-400">Your Account</h2>
 
-        {rsvpNotice && (
-          <div className="mb-4 p-2 bg-green-600 text-white rounded text-center">
-            {rsvpNotice}
-          </div>
-        )}
+        <h2 className="text-2xl font-bold mb-6 text-blue-400">Your Account</h2>
 
         {profile && (
           <>
@@ -110,16 +109,17 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
               <p><span className="font-semibold text-gray-300">Role:</span> {profile.role || '-'}</p>
             </div>
 
-            {/* Tickets */}
-            <h3 className="text-lg font-semibold mb-3">Your Tickets</h3>
+            {/* Tickets Table */}
+            <h3 className="text-lg font-semibold mb-2">Your Tickets</h3>
             {tickets.length > 0 ? (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto mb-8">
                 <table className="min-w-full border-collapse border border-zinc-700 text-sm">
                   <thead>
                     <tr className="bg-zinc-800 text-gray-300">
                       <th className="px-3 py-2 border border-zinc-700 text-left">Date</th>
                       <th className="px-3 py-2 border border-zinc-700 text-left">Time</th>
                       <th className="px-3 py-2 border border-zinc-700 text-left">Event</th>
+                      <th className="px-3 py-2 border border-zinc-700 text-left">Location</th>
                       <th className="px-3 py-2 border border-zinc-700 text-left">Price</th>
                       <th className="px-3 py-2 border border-zinc-700 text-left">Paid</th>
                       <th className="px-3 py-2 border border-zinc-700 text-left">Popularity</th>
@@ -133,31 +133,22 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                       const date = dt.toLocaleDateString()
                       const time = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                       return (
-                        <tr key={i} className="bg-zinc-800 hover:bg-zinc-700 transition-colors">
+                        <tr key={i} className="bg-zinc-800 hover:bg-zinc-700">
                           <td className="px-3 py-2 border border-zinc-700">{date}</td>
                           <td className="px-3 py-2 border border-zinc-700">{time}</td>
                           <td className="px-3 py-2 border border-zinc-700">
-                            <Link href={`/events/${t.event_id}`} className="text-blue-400 hover:underline">
-                              {t.event_title}
-                            </Link>
+                            <Link href={`/events/${t.event_id}`} className="text-blue-400 hover:underline">{t.event_title}</Link>
                           </td>
-                          <td className="px-3 py-2 border border-zinc-700">
-                            {t.event_price && Number(t.event_price) > 0
-                              ? `${Number(t.event_price).toFixed(2)} DKK`
-                              : 'Free'}
-                          </td>
-                          <td className="px-3 py-2 border border-zinc-700">
-                            {t.has_paid
-                              ? <span className="text-green-400 font-semibold">Yes</span>
-                              : <span className="text-blue-400 font-semibold">Free</span>}
-                          </td>
+                          <td className="px-3 py-2 border border-zinc-700">{t.location || '-'}</td>
+                          <td className="px-3 py-2 border border-zinc-700">{t.event_price ? `${Number(t.event_price).toFixed(2)} DKK` : 'Free'}</td>
+                          <td className="px-3 py-2 border border-zinc-700">{t.has_paid ? <span className="text-green-400 font-semibold">Yes</span> : <span className="text-yellow-400 font-semibold">Free</span>}</td>
                           <td className="px-3 py-2 border border-zinc-700">{t.popularity || 0}</td>
                           <td className="px-3 py-2 border border-zinc-700">
-                            {t.ticket_code
-                              ? <div className="cursor-pointer" onClick={() => setActiveQR(t.ticket_code)}>
-                                  <QRCodeCanvas value={t.ticket_code} size={40} bgColor="#1e1e1e" fgColor="#00bfff" />
-                                </div>
-                              : <span className="text-gray-500">No QR</span>}
+                            {t.ticket_code ? (
+                              <div className="cursor-pointer" onClick={() => setActiveQR(t.ticket_code)}>
+                                <QRCodeCanvas value={t.ticket_code} size={48} />
+                              </div>
+                            ) : <span className="text-gray-500">No QR</span>}
                           </td>
                         </tr>
                       )
@@ -165,10 +156,10 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                   </tbody>
                 </table>
               </div>
-            ) : <p className="text-gray-400">No tickets found.</p>}
+            ) : <p className="text-gray-400 mb-8">No tickets found.</p>}
 
-            {/* RSVPs */}
-            <h3 className="text-lg font-semibold mt-8 mb-3">Your RSVPs</h3>
+            {/* RSVPs Table */}
+            <h3 className="text-lg font-semibold mb-2">Your RSVPs</h3>
             {rsvps.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="min-w-full border-collapse border border-zinc-700 text-sm">
@@ -178,21 +169,24 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                       <th className="px-3 py-2 border border-zinc-700 text-left">Time</th>
                       <th className="px-3 py-2 border border-zinc-700 text-left">Event</th>
                       <th className="px-3 py-2 border border-zinc-700 text-left">Location</th>
+                      <th className="px-3 py-2 border border-zinc-700 text-left">Price</th>
                       <th className="px-3 py-2 border border-zinc-700 text-left">Popularity</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rsvps.map((r, i) => {
-                      if (!r || !r.title || !r.date) return null
                       const dt = new Date(r.date)
                       const date = dt.toLocaleDateString()
                       const time = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                       return (
-                        <tr key={i} className="bg-zinc-800 hover:bg-zinc-700 transition-colors">
+                        <tr key={i} className="bg-zinc-800 hover:bg-zinc-700">
                           <td className="px-3 py-2 border border-zinc-700">{date}</td>
                           <td className="px-3 py-2 border border-zinc-700">{time}</td>
-                          <td className="px-3 py-2 border border-zinc-700">{r.title}</td>
+                          <td className="px-3 py-2 border border-zinc-700">
+                            <Link href={`/events/${r.event_id}`} className="text-blue-400 hover:underline">{r.title}</Link>
+                          </td>
                           <td className="px-3 py-2 border border-zinc-700">{r.location || '-'}</td>
+                          <td className="px-3 py-2 border border-zinc-700">{r.price ? `${Number(r.price).toFixed(2)} DKK` : 'Free'}</td>
                           <td className="px-3 py-2 border border-zinc-700">{r.popularity || 0}</td>
                         </tr>
                       )
@@ -200,7 +194,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                   </tbody>
                 </table>
               </div>
-            ) : <p className="text-gray-400">No RSVPs yet.</p>}
+            ) : <p className="text-gray-400">No RSVPs found.</p>}
           </>
         )}
       </div>
@@ -217,4 +211,5 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     </div>
   )
 }
+
 
