@@ -30,19 +30,22 @@ function clearAuth() {
 }
 
 
+import { useState, useEffect } from 'react'
+import { toast } from 'react-hot-toast'
+
 export function DynamicEventCard({ event, authUser, setShowAccountModal, refreshTrigger, setRefreshTrigger }) {
   const [heartCount, setHeartCount] = useState(0)
   const [bookable, setBookable] = useState(event.is_confirmed)
   const [loading, setLoading] = useState(false)
   const [userTickets, setUserTickets] = useState(0)
   const [maxPerUser, setMaxPerUser] = useState(event.tag1 === 'group' ? 5 : 1)
-
   const [quantity, setQuantity] = useState(1)
   const [email, setEmail] = useState(authUser?.email || '')
   const [showPolicyModal, setShowPolicyModal] = useState(false)
   const [agreed, setAgreed] = useState(false)
 
   const HEART_THRESHOLD = 0
+  const reachedLimit = userTickets >= maxPerUser
 
   // --- fetch hearts ---
   useEffect(() => {
@@ -82,8 +85,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
     }
     fetchMyTickets()
   }, [authUser, event.id, event.tag1, refreshTrigger])
-
-  const reachedLimit = userTickets >= maxPerUser
 
   // --- booking handler ---
   async function handleBooking() {
@@ -126,34 +127,34 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
     }
   }
 
-async function handleHeartClick() {
-  try {
-    const token = localStorage.getItem('token') || ''
-    const headers = { 'Content-Type': 'application/json' }
-    if (token) headers.Authorization = `Bearer ${token}`
+  // --- like handler ---
+  async function handleHeartClick() {
+    try {
+      const token = localStorage.getItem('token') || ''
+      const headers = { 'Content-Type': 'application/json' }
+      if (token) headers.Authorization = `Bearer ${token}`
 
-    const res = await fetch('/api/events/favorites', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ eventId: event.id })
-    })
+      const res = await fetch('/api/events/favorites', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ eventId: event.id })
+      })
 
-    if (!res.ok) throw new Error('Failed to like')
+      if (!res.ok) throw new Error('Failed to like')
+      const data = await res.json()
+      if (data && typeof data.count === 'number') {
+        setHeartCount(data.count)
+        if (data.count >= HEART_THRESHOLD) setBookable(true)
+      }
 
-    // ✅ use count returned directly from favorites API
-    const data = await res.json()
-    if (data && typeof data.count === 'number') {
-      setHeartCount(data.count)
-      if (data.count >= HEART_THRESHOLD) setBookable(true)
+      toast.success('❤️ Liked!')
+    } catch (err) {
+      console.error('Like error:', err)
+      toast.error('❌ Error liking event (try again later)')
     }
-
-    toast.success('❤️ Liked!')
-  } catch (err) {
-    console.error('Like error:', err)
-    toast.error('❌ Error liking event (try again later)')
   }
-}
 
+  // --- RSVP handler ---
   async function handleRSVPClick() {
     if (!authUser) {
       setShowAccountModal(true)
@@ -169,7 +170,6 @@ async function handleHeartClick() {
         body: JSON.stringify({ eventId: event.id })
       })
       const data = await res.json()
-
       if (!res.ok) throw new Error(data.error || 'Failed to RSVP')
 
       toast.success('🎉 RSVP confirmed and added to Your Account!')
@@ -181,67 +181,68 @@ async function handleHeartClick() {
   }
 
   return (
-    <div className="border border-zinc-700 rounded-xl p-5 bg-gradient-to-b from-zinc-900 to-zinc-800 shadow-lg relative transition hover:shadow-2xl hover:border-blue-500 flex flex-col">
-      {/* Heart counter top right */}
-      <button
-        onClick={handleHeartClick}
-        className="absolute top-3 right-3 text-red-500 text-xl hover:scale-110 transition"
-      >
-        ❤️ {heartCount}
-      </button>
-
-      {/* Title + Date/City */}
-      <h3 className="text-lg font-bold mb-1">{event.name}</h3>
-      <p className="text-xs text-gray-400 mb-3">
-        📅 {new Date(event.datetime).toLocaleDateString()} · 📍 {event.city}
-      </p>
-
-      {/* Short text */}
-      <p className="text-sm text-gray-300 mb-3 truncate">{event.description?.split(" ").slice(0,10).join(" ")}...</p>
-
-      {/* Tags */}
-      <div className="flex gap-2 mb-4">
-        {[event.tag1, event.tag2, event.tag3].filter(Boolean).map((tag, idx) => (
-          <span key={idx} className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-600 text-white">
-            {tag}
-          </span>
-        ))}
-      </div>
-
-      {/* Actions */}
-      <div className="flex flex-col gap-2 mt-auto">
+    <>
+      <div className="border border-zinc-700 rounded-xl p-5 bg-gradient-to-b from-zinc-900 to-zinc-800 shadow-lg relative transition hover:shadow-2xl hover:border-blue-500 flex flex-col">
+        {/* Heart counter top right */}
         <button
-          onClick={() => setShowPolicyModal(true)}
-          className="w-full px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm transition"
+          onClick={handleHeartClick}
+          className="absolute top-3 right-3 text-red-500 text-xl hover:scale-110 transition"
         >
-          More Info
+          ❤️ {heartCount}
         </button>
 
-        <div className="flex justify-between mt-2">
-          <button
-            onClick={handleRSVPClick}
-            className="px-3 py-1 rounded bg-yellow-500 hover:bg-yellow-600 text-black text-sm"
-          >
-            📌 RSVP
-          </button>
-          <button
-            onClick={handleHeartClick}
-            className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm"
-          >
-            ❤️ Like
-          </button>
-        </div>
-     </div>
-      </div>
+        {/* Title + Date/City */}
+        <h3 className="text-lg font-bold mb-1">{event.name}</h3>
+        <p className="text-xs text-gray-400 mb-3">
+          📅 {new Date(event.datetime).toLocaleDateString()} · 📍 {event.city}
+        </p>
 
-      {/* Footer info */}
-      <div className="mt-3 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
-        <span>
-          💰 {event.price && Number(event.price) > 0 ? `${Number(event.price).toFixed(2)} USD` : 'Free'}
-        </span>
-        <span>
-          👥 {userTickets} / {event.max_attendees || '∞'} booked
-        </span>
+        {/* Short text */}
+        <p className="text-sm text-gray-300 mb-3 truncate">{event.description?.split(" ").slice(0,10).join(" ")}...</p>
+
+        {/* Tags */}
+        <div className="flex gap-2 mb-4">
+          {[event.tag1, event.tag2, event.tag3].filter(Boolean).map((tag, idx) => (
+            <span key={idx} className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-600 text-white">
+              {tag}
+            </span>
+          ))}
+        </div>
+
+        {/* Actions */}
+        <div className="flex flex-col gap-2 mt-auto">
+          <button
+            onClick={() => setShowPolicyModal(true)}
+            className="w-full px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm transition"
+          >
+            More Info
+          </button>
+
+          <div className="flex justify-between mt-2">
+            <button
+              onClick={handleRSVPClick}
+              className="px-3 py-1 rounded bg-yellow-500 hover:bg-yellow-600 text-black text-sm"
+            >
+              📌 RSVP
+            </button>
+            <button
+              onClick={handleHeartClick}
+              className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm"
+            >
+              ❤️ Like
+            </button>
+          </div>
+        </div>
+
+        {/* Footer info */}
+        <div className="mt-3 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
+          <span>
+            💰 {event.price && Number(event.price) > 0 ? `${Number(event.price).toFixed(2)} USD` : 'Free'}
+          </span>
+          <span>
+            👥 {userTickets} / {event.max_attendees || '∞'} booked
+          </span>
+        </div>
       </div>
 
       {/* Policy / Details Modal */}
@@ -254,7 +255,6 @@ async function handleHeartClick() {
             className="bg-zinc-900 rounded-xl max-w-lg w-full p-6 overflow-auto max-h-[90vh] text-white shadow-xl relative"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Close button */}
             <button
               onClick={() => setShowPolicyModal(false)}
               className="absolute top-3 right-3 text-gray-400 hover:text-white"
@@ -262,17 +262,13 @@ async function handleHeartClick() {
               ✕
             </button>
 
-            {/* Title */}
             <h2 className="text-xl font-bold mb-2">{event.name}</h2>
-
-            {/* Date, Time, Place, Venue */}
             <p className="text-sm text-gray-400 mb-3">
               📅 {new Date(event.datetime).toLocaleDateString()} · 🕒{" "}
               {new Date(event.datetime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} <br />
               📍 {event.city}{event.venue_location ? `, ${event.venue_location}` : ""}
             </p>
 
-            {/* Image */}
             {event.image && (
               <img
                 src={event.image}
@@ -281,18 +277,13 @@ async function handleHeartClick() {
               />
             )}
 
-            {/* Description */}
             <p className="text-gray-200 mb-4">{event.description}</p>
 
             {/* Price, Quantity, Total */}
             <div className="mb-6 space-y-2 text-sm">
               <div className="flex justify-between">
                 <span>Price per ticket:</span>
-                <span>
-                  {event.price && Number(event.price) > 0
-                    ? `${Number(event.price).toFixed(2)} USD`
-                    : "Free"}
-                </span>
+                <span>{event.price && Number(event.price) > 0 ? `${Number(event.price).toFixed(2)} USD` : "Free"}</span>
               </div>
               <div className="flex justify-between items-center">
                 <label htmlFor="quantity">Quantity:</label>
@@ -308,11 +299,7 @@ async function handleHeartClick() {
               </div>
               <div className="flex justify-between font-semibold">
                 <span>Total:</span>
-                <span>
-                  {event.price && Number(event.price) > 0
-                    ? `${(Number(event.price) * quantity).toFixed(2)} USD`
-                    : "Free"}
-                </span>
+                <span>{event.price && Number(event.price) > 0 ? `${(Number(event.price) * quantity).toFixed(2)} USD` : "Free"}</span>
               </div>
             </div>
 
@@ -340,6 +327,10 @@ async function handleHeartClick() {
           </div>
         </div>
       )}
+    </>
+  )
+}
+
 /////////////////////////////// VIDEO ///////
 function VideoHero() {
   const [open, setOpen] = useState(false);
