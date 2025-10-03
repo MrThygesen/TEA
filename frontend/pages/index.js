@@ -132,31 +132,28 @@ async function handleHeartClick() {
     const headers = { 'Content-Type': 'application/json' }
     if (token) headers.Authorization = `Bearer ${token}`
 
-    const res = await fetch('/api/events/favorites', {
+    const res = await fetch('/api/events/favorite', {
       method: 'POST',
       headers,
       body: JSON.stringify({ eventId: event.id })
     })
 
     if (!res.ok) throw new Error('Failed to like')
-    const data = await res.json()
 
-    // If backend gives back updated count, use it.
-    // Otherwise, just increment locally.
-    if (data && typeof data.count === 'number') {
-      setHeartCount(data.count)
-    } else {
-      setHeartCount(prev => prev + 1)
+    // ✅ Immediately refresh global count from backend
+    const heartsRes = await fetch(`/api/events/hearts?eventId=${event.id}`)
+    if (heartsRes.ok) {
+      const heartsData = await heartsRes.json()
+      if (heartsData && typeof heartsData.count === 'number') {
+        setHeartCount(heartsData.count)
+        if (heartsData.count >= HEART_THRESHOLD) setBookable(true)
+      }
     }
-
-    if (heartCount + 1 >= HEART_THRESHOLD) setBookable(true)
 
     toast.success('❤️ Liked!')
   } catch (err) {
     console.error('Like error:', err)
-    // fallback: still increment locally so UI feels responsive
-    setHeartCount(prev => prev + 1)
-    toast.error('❌ Error liking event (counted locally)')
+    toast.error('❌ Error liking event (try again later)')
   }
 }
 
