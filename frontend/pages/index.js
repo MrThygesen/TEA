@@ -132,7 +132,7 @@ async function handleHeartClick() {
     const headers = { 'Content-Type': 'application/json' }
     if (token) headers.Authorization = `Bearer ${token}`
 
-    const res = await fetch('/api/events/favorite', {
+    const res = await fetch('/api/events/favorites', {
       method: 'POST',
       headers,
       body: JSON.stringify({ eventId: event.id })
