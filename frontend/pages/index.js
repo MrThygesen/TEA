@@ -126,24 +126,39 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
     }
   }
 
-  async function handleHeartClick() {
-    try {
-      const token = localStorage.getItem('token') || ''
-      const res = await fetch('/api/events/favorite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
-        body: JSON.stringify({ eventId: event.id })
-      })
-      if (!res.ok) throw new Error('Failed to like')
-      const data = await res.json()
+async function handleHeartClick() {
+  try {
+    const token = localStorage.getItem('token') || ''
+    const headers = { 'Content-Type': 'application/json' }
+    if (token) headers.Authorization = `Bearer ${token}`
+
+    const res = await fetch('/api/events/favorite', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ eventId: event.id })
+    })
+
+    if (!res.ok) throw new Error('Failed to like')
+    const data = await res.json()
+
+    // If backend gives back updated count, use it.
+    // Otherwise, just increment locally.
+    if (data && typeof data.count === 'number') {
       setHeartCount(data.count)
-      if (data.count >= HEART_THRESHOLD) setBookable(true)
-      toast.success('❤️ Liked!')
-    } catch (err) {
-      console.error(err)
-      toast.error('❌ Error liking event')
+    } else {
+      setHeartCount(prev => prev + 1)
     }
+
+    if (heartCount + 1 >= HEART_THRESHOLD) setBookable(true)
+
+    toast.success('❤️ Liked!')
+  } catch (err) {
+    console.error('Like error:', err)
+    // fallback: still increment locally so UI feels responsive
+    setHeartCount(prev => prev + 1)
+    toast.error('❌ Error liking event (counted locally)')
   }
+}
 
   async function handleRSVPClick() {
     if (!authUser) {
