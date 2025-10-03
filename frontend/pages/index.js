@@ -338,12 +338,32 @@ async function handleHeartClick() {
      {event.price && Number(event.price) > 0 ? "Get Ticket" : "Get Ticket"}
         </button>
       </div>
+
+{/* Footer info */}
+<div className="mt-3 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
+  <div>
+    <span className="font-medium text-gray-300">
+      {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}
+    </span>
+  </div>
+  <div>
+    👥 {userTickets} / {event.max_attendees || '∞'} booked
+  </div>
+</div>
+
+
     </div>
   </div>
 )}
 </div>
   )
 }
+
+
+
+
+
+
 /////////////////////////////// VIDEO ///////
 function VideoHero() {
   const [open, setOpen] = useState(false);
