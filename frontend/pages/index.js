@@ -326,13 +326,15 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
           disabled={!agreed || loading}
           className="px-4 py-2 bg-green-600 rounded hover:bg-green-700 disabled:opacity-50"
         >
-          {event.price && Number(event.price) > 0 ? "Get Ticket" : "Get Ticket"}
+     {event.price && Number(event.price) > 0 ? "Get Ticket" : "Get Ticket"}
         </button>
       </div>
     </div>
   </div>
 )}
-
+</div>
+  )
+}
 /////////////////////////////// VIDEO ///////
 function VideoHero() {
   const [open, setOpen] = useState(false);
