@@ -129,24 +129,22 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
 async function handleHeartClick() {
   try {
     const token = localStorage.getItem('token') || ''
+    const headers = { 'Content-Type': 'application/json' }
+    if (token) headers.Authorization = `Bearer ${token}`
+
     const res = await fetch('/api/events/favorite', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` })
-      },
+      headers,
       body: JSON.stringify({ eventId: event.id })
     })
 
     if (!res.ok) throw new Error('Failed to like')
     const data = await res.json()
 
-    // Immediately update heart count locally
-    setHeartCount(data.count)
+    setHeartCount(data.count)       // update global counter
     if (data.count >= HEART_THRESHOLD) setBookable(true)
 
     toast.success('❤️ Liked!')
-
   } catch (err) {
     console.error(err)
     toast.error('❌ Error liking event')
