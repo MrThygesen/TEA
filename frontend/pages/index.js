@@ -108,14 +108,12 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       setRefreshTrigger(prev => prev + 1)
 
       if (event.price && Number(event.price) > 0) {
-        // --- Paid ticket: Stripe checkout
         if (data.clientSecret) {
           window.location.href = `/api/events/checkout?payment_intent_client_secret=${data.clientSecret}`
         } else {
           toast.error('⚠️ Payment could not be initiated')
         }
       } else {
-        // --- Free ticket
         toast.success('✅ Ticket booked! Confirmation email sent.')
       }
     } catch (err) {
@@ -128,7 +126,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
     }
   }
 
-  // --- heart handler ---
   async function handleHeartClick() {
     try {
       const token = localStorage.getItem('token') || ''
@@ -148,111 +145,114 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
     }
   }
 
-  // --- RSVP handler ---
- // --- RSVP handler ---
-async function handleRSVPClick() {
-  if (!authUser) {
-    setShowAccountModal(true)
-    toast.error('⚠️ Please log in to RSVP.')
-    return
+  async function handleRSVPClick() {
+    if (!authUser) {
+      setShowAccountModal(true)
+      toast.error('⚠️ Please log in to RSVP.')
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('token') || ''
+      const res = await fetch('/api/events/rsvp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
+        body: JSON.stringify({ eventId: event.id })
+      })
+      const data = await res.json()
+
+      if (!res.ok) throw new Error(data.error || 'Failed to RSVP')
+
+      toast.success('🎉 RSVP confirmed and added to Your Account!')
+      setRefreshTrigger(prev => prev + 1)
+    } catch (err) {
+      console.error(err)
+      toast.error('❌ Could not save RSVP. Maybe you already RSVPed?')
+    }
   }
-
-  try {
-    const token = localStorage.getItem('token') || ''
-    const res = await fetch('/api/events/rsvp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
-      body: JSON.stringify({ eventId: event.id })
-    })
-    const data = await res.json()
-
-    if (!res.ok) throw new Error(data.error || 'Failed to RSVP')
-
-    // Always show success feedback
-    toast.success('🎉 RSVP confirmed and added to Your Account!')
-
-    // Refresh account modal or ticket count
-    setRefreshTrigger(prev => prev + 1)
-  } catch (err) {
-    console.error(err)
-    toast.error('❌ Could not save RSVP. Maybe you already RSVPed?')
-  }
-}
 
   return (
-    <div className="border border-zinc-700 rounded-xl p-5 bg-gradient-to-b from-zinc-900 to-zinc-800 shadow-lg flex flex-col justify-between relative transition hover:shadow-2xl hover:border-zinc-500">
+    <div className="border border-zinc-700 rounded-xl p-5 bg-gradient-to-b from-zinc-900 to-zinc-800 shadow-lg relative transition hover:shadow-2xl hover:border-blue-500 flex flex-col">
       {/* Heart counter top right */}
       <button
         onClick={handleHeartClick}
-        className="absolute top-3 right-3 text-red-500 text-2xl hover:scale-110 transition"
+        className="absolute top-3 right-3 text-red-500 text-xl hover:scale-110 transition"
       >
         ❤️ {heartCount}
       </button>
 
-      {/* Title + description */}
-      <h3 className="text-xl font-bold mb-2">{event.name}</h3>
-      <p className="text-sm mb-3 text-gray-300">{event.description}</p>
+      {/* Title + Date/City */}
+      <h3 className="text-lg font-bold mb-1">{event.name}</h3>
+      <p className="text-xs text-gray-400 mb-3">
+        📅 {new Date(event.datetime).toLocaleDateString()} · 📍 {event.city}
+      </p>
+
+      {/* Short text */}
+      <p className="text-sm text-gray-300 mb-3 truncate">{event.description?.split(" ").slice(0,10).join(" ")}...</p>
 
       {/* Tags */}
-      <div className="flex flex-wrap gap-2 mb-4">
+      <div className="flex gap-2 mb-4">
         {[event.tag1, event.tag2, event.tag3].filter(Boolean).map((tag, idx) => (
-          <span
-            key={idx}
-            className="px-2 py-1 text-xs rounded-full bg-zinc-700 text-gray-200 border border-zinc-600"
-          >
-            #{tag}
+          <span key={idx} className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-600 text-white">
+            {tag}
           </span>
         ))}
       </div>
 
-      {/* Pay Now button */}
-      <div className="flex flex-col gap-2 mt-auto mb-2">
+      {/* Actions */}
+      <div className="flex flex-col gap-2 mt-auto">
         <button
           onClick={() => setShowPolicyModal(true)}
-          disabled={loading || reachedLimit}
-          className="w-full px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm disabled:opacity-50 transition"
+          className="w-full px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm transition"
         >
-          {loading ? 'Processing…' : 'Pay Now'}
+          More Info
         </button>
+
+        <div className="flex justify-between mt-2">
+          <button
+            onClick={handleRSVPClick}
+            className="px-3 py-1 rounded bg-yellow-500 hover:bg-yellow-600 text-black text-sm"
+          >
+            📌 RSVP
+          </button>
+          <button
+            onClick={handleHeartClick}
+            className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm"
+          >
+            ❤️ Like
+          </button>
+        </div>
       </div>
 
-      {/* Divider line */}
-      <hr className="border-zinc-700 my-2" />
-
-      {/* RSVP + Like buttons */}
-      <div className="flex justify-between mt-2">
-        <button
-          onClick={handleRSVPClick}
-          className="px-3 py-1 rounded bg-yellow-500 hover:bg-yellow-600 text-black text-sm transition"
-        >
-          📌 RSVP
-        </button>
-        <button
-          onClick={handleHeartClick}
-          className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm transition"
-        >
-          ❤️ Like
-        </button>
-      </div>
-
-      {/* Footer info */}
-      <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-700 pt-2 mt-2">
-        <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
-        <span>👥 {userTickets} / {event.max_attendees || '∞'} booked</span>
-      </div>
-
-      {/* Booking modal */}
+      {/* Policy / Details Modal */}
       {showPolicyModal && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
           onClick={() => setShowPolicyModal(false)}
         >
           <div
             className="bg-zinc-900 rounded-xl max-w-lg w-full p-6 overflow-auto max-h-[90vh] text-white shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-xl font-bold mb-4">{event.name}</h2>
+            <h2 className="text-xl font-bold mb-2">{event.name}</h2>
+            {event.image && (
+              <img src={event.image} alt={event.name} className="w-full h-40 object-cover rounded mb-4" />
+            )}
 
+            <p className="text-sm text-gray-300 mb-2">
+              📅 {new Date(event.datetime).toLocaleString()} · 📍 {event.city}, {event.venue_location}
+            </p>
+            <p className="text-gray-200 mb-4">{event.description}</p>
+
+            <div className="flex gap-2 mb-4">
+              {[event.tag1, event.tag2, event.tag3].filter(Boolean).map((tag, idx) => (
+                <span key={idx} className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-600 text-white">
+                  {tag}
+                </span>
+              ))}
+            </div>
+
+            {/* Email + Quantity */}
             <label className="block mb-3 text-sm">
               Email for ticket:
               <input
@@ -261,11 +261,10 @@ async function handleRSVPClick() {
                 onChange={e => setEmail(e.target.value)}
                 className="w-full mt-1 p-2 rounded bg-zinc-800 border border-zinc-600 text-white text-sm"
                 placeholder="you@example.com"
-                required
               />
             </label>
 
-            <label className="block mb-4 text-sm">
+            <label className="block mb-3 text-sm">
               Quantity:
               <input
                 type="number"
@@ -277,14 +276,14 @@ async function handleRSVPClick() {
               />
             </label>
 
-            <label className="flex items-center gap-2 mb-4">
+            <label className="flex items-center gap-2 mb-4 text-sm">
               <input
                 type="checkbox"
                 checked={agreed}
                 onChange={(e) => setAgreed(e.target.checked)}
                 className="form-checkbox"
               />
-              <span className="text-sm">I agree to the event guidelines</span>
+              I follow the guidelines for the event and network
             </label>
 
             <div className="flex gap-3 justify-end">
@@ -294,9 +293,9 @@ async function handleRSVPClick() {
               <button
                 onClick={handleBooking}
                 disabled={!agreed || loading || !email}
-                className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 bg-green-600 rounded hover:bg-green-700 disabled:opacity-50"
               >
-                {loading ? 'Processing…' : 'Confirm & Book'}
+                {event.price && Number(event.price) > 0 ? 'Pay Now' : 'Get Ticket'}
               </button>
             </div>
           </div>
