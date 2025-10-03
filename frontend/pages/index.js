@@ -30,9 +30,6 @@ function clearAuth() {
 }
 
 
-import { useState, useEffect } from 'react'
-import { toast } from 'react-hot-toast'
-
 export function DynamicEventCard({ event, authUser, setShowAccountModal, refreshTrigger, setRefreshTrigger }) {
   const [heartCount, setHeartCount] = useState(0)
   const [bookable, setBookable] = useState(event.is_confirmed)
