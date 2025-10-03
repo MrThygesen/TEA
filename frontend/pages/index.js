@@ -140,14 +140,11 @@ async function handleHeartClick() {
 
     if (!res.ok) throw new Error('Failed to like')
 
-    // ✅ Immediately refresh global count from backend
-    const heartsRes = await fetch(`/api/events/hearts?eventId=${event.id}`)
-    if (heartsRes.ok) {
-      const heartsData = await heartsRes.json()
-      if (heartsData && typeof heartsData.count === 'number') {
-        setHeartCount(heartsData.count)
-        if (heartsData.count >= HEART_THRESHOLD) setBookable(true)
-      }
+    // ✅ use count returned directly from favorites API
+    const data = await res.json()
+    if (data && typeof data.count === 'number') {
+      setHeartCount(data.count)
+      if (data.count >= HEART_THRESHOLD) setBookable(true)
     }
 
     toast.success('❤️ Liked!')
