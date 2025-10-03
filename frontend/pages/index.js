@@ -126,6 +126,12 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
 
   // --- like handler ---
   async function handleHeartClick() {
+    if (!authUser) {
+      setShowAccountModal(true)
+      toast.error('⚠️ Please login to like this event.')
+      return
+    }
+
     try {
       const token = localStorage.getItem('token') || ''
       const headers = { 'Content-Type': 'application/json' }
@@ -139,15 +145,11 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
 
       if (!res.ok) throw new Error('Failed to like')
       const data = await res.json()
-      if (data && typeof data.count === 'number') {
-        setHeartCount(data.count)
-        if (data.count >= HEART_THRESHOLD) setBookable(true)
-      }
+      if (data && typeof data.count === 'number') setHeartCount(data.count)
 
-      toast.success('❤️ Liked!')
     } catch (err) {
       console.error('Like error:', err)
-      toast.error('❌ Error liking event (try again later)')
+      toast.error('❌ Could not like event (try again later)')
     }
   }
 
@@ -169,70 +171,65 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to RSVP')
 
-      toast.success('🎉 RSVP confirmed and added to Your Account!')
+      toast.success('🎉 RSVP confirmed!')
       setRefreshTrigger(prev => prev + 1)
     } catch (err) {
       console.error(err)
-      toast.error('❌ Could not save RSVP. Maybe you already RSVPed?')
+      toast.error('❌ Could not save RSVP.')
     }
   }
 
   return (
-    <>
-      <div className="border border-zinc-700 rounded-xl p-5 bg-gradient-to-b from-zinc-900 to-zinc-800 shadow-lg relative transition hover:shadow-2xl hover:border-blue-500 flex flex-col">
-                {/* Title + Date/City */}
-        <h3 className="text-lg font-bold mb-1">{event.name}</h3>
-        <p className="text-xs text-gray-400 mb-3">
-          📅 {new Date(event.datetime).toLocaleDateString()} · 📍 {event.city}
-        </p>
+    <div className="border border-zinc-700 rounded-xl p-5 bg-gradient-to-b from-zinc-900 to-zinc-800 shadow-lg relative transition hover:shadow-2xl hover:border-blue-500 flex flex-col">
+      {/* Title + Date/City */}
+      <h3 className="text-lg font-bold mb-1">{event.name}</h3>
+      <p className="text-xs text-gray-400 mb-3">
+        📅 {new Date(event.datetime).toLocaleDateString()} · 📍 {event.city}
+      </p>
 
-        {/* Short text */}
-        <p className="text-sm text-gray-300 mb-3 truncate">{event.description?.split(" ").slice(0,10).join(" ")}...</p>
+      {/* Short text */}
+      <p className="text-sm text-gray-300 mb-3 truncate">{event.description?.split(" ").slice(0,10).join(" ")}...</p>
 
-        {/* Tags */}
-        <div className="flex gap-2 mb-4">
-          {[event.tag1, event.tag2, event.tag3].filter(Boolean).map((tag, idx) => (
-            <span key={idx} className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-600 text-white">
-              {tag}
-            </span>
-          ))}
-        </div>
+      {/* Tags */}
+      <div className="flex gap-2 mb-4">
+        {[event.tag1, event.tag2, event.tag3].filter(Boolean).map((tag, idx) => (
+          <span key={idx} className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-600 text-white">
+            {tag}
+          </span>
+        ))}
+      </div>
 
-        {/* Actions */}
-        <div className="flex flex-col gap-2 mt-auto">
+      {/* Actions (single bottom row) */}
+      <div className="flex flex-col gap-2 mt-auto">
+        <button
+          onClick={() => setShowPolicyModal(true)}
+          className="w-full px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm transition"
+        >
+          More Info
+        </button>
+
+        <div className="flex justify-between mt-2">
           <button
-            onClick={() => setShowPolicyModal(true)}
-            className="w-full px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm transition"
+            onClick={handleRSVPClick}
+            className="px-3 py-1 rounded bg-yellow-500 hover:bg-yellow-600 text-black text-sm"
           >
-            More Info
+            📌 RSVP
           </button>
-
-          <div className="flex justify-between mt-2">
-            <button
-              onClick={handleRSVPClick}
-              className="px-3 py-1 rounded bg-yellow-500 hover:bg-yellow-600 text-black text-sm"
-            >
-              📌 RSVP
-            </button>
-            <button
-              onClick={handleHeartClick}
-              className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm"
-            >
-              ❤️ Like
-            </button>
-          </div>
-        </div>
-
-        {/* Footer info */}
-        <div className="mt-3 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
-          <span>
-            💰 {event.price && Number(event.price) > 0 ? `${Number(event.price).toFixed(2)} USD` : 'Free'}
-          </span>
-          <span>
-            👥 {userTickets} / {event.max_attendees || '∞'} booked
-          </span>
+          <button
+            onClick={handleHeartClick}
+            className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm flex items-center gap-1"
+          >
+            ❤️ Like ({heartCount})
+          </button>
         </div>
       </div>
+
+      {/* Footer info */}
+      <div className="mt-3 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
+        <span>💰 {event.price && Number(event.price) > 0 ? `${Number(event.price).toFixed(2)} USD` : 'Free'}</span>
+        <span>👥 {userTickets} / {event.max_attendees || '∞'} booked</span>
+      </div>
+    </div>
 
       {/* Policy / Details Modal */}
       {showPolicyModal && (
