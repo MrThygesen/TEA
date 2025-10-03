@@ -180,15 +180,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
   return (
     <>
       <div className="border border-zinc-700 rounded-xl p-5 bg-gradient-to-b from-zinc-900 to-zinc-800 shadow-lg relative transition hover:shadow-2xl hover:border-blue-500 flex flex-col">
-        {/* Heart counter top right */}
-        <button
-          onClick={handleHeartClick}
-          className="absolute top-3 right-3 text-red-500 text-xl hover:scale-110 transition"
-        >
-          ❤️ {heartCount}
-        </button>
-
-        {/* Title + Date/City */}
+                {/* Title + Date/City */}
         <h3 className="text-lg font-bold mb-1">{event.name}</h3>
         <p className="text-xs text-gray-400 mb-3">
           📅 {new Date(event.datetime).toLocaleDateString()} · 📍 {event.city}
