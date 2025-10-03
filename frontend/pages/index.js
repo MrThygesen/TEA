@@ -5,8 +5,10 @@ import { useState, useEffect } from 'react'
 import { useAccount } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { toast } from 'react-hot-toast'
-//import AdminSBTManager from '../components/AdminSBTManager'
 import YourAccountModal from '../components/YourAccountModal'
+import Image from 'next/image'
+//import AdminSBTManager from '../components/AdminSBTManager'
+
 
  // ---------------------------
 // Helpers: Auth persistence Test
@@ -87,7 +89,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
   async function handleBooking() {
     if (!authUser) {
       setShowAccountModal(true)
-      toast.error('⚠️ Please login to buy a ticket.')
+      toast.error('⚠️ Please login to continue.')
       return
     }
 
@@ -106,14 +108,12 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       setRefreshTrigger(prev => prev + 1)
 
       if (event.price && Number(event.price) > 0) {
-        // --- Paid ticket: Stripe checkout
         if (data.clientSecret) {
           window.location.href = `/api/events/checkout?payment_intent_client_secret=${data.clientSecret}`
         } else {
           toast.error('⚠️ Payment could not be initiated')
         }
       } else {
-        // --- Free ticket
         toast.success('✅ Ticket booked! Confirmation email sent.')
       }
     } catch (err) {
@@ -126,74 +126,30 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
     }
   }
 
-  // --- heart handler ---
-  async function handleHeartClick() {
-    try {
-      const token = localStorage.getItem('token') || ''
-      const res = await fetch('/api/events/favorite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
-        body: JSON.stringify({ eventId: event.id })
-      })
-      if (!res.ok) throw new Error('Failed to like')
-      const data = await res.json()
-      setHeartCount(data.count)
-      if (data.count >= HEART_THRESHOLD) setBookable(true)
-      toast.success('❤️ Liked!')
-    } catch (err) {
-      console.error(err)
-      toast.error('❌ Error liking event')
-    }
-  }
-
-  // --- RSVP handler ---
- // --- RSVP handler ---
-async function handleRSVPClick() {
-  if (!authUser) {
-    setShowAccountModal(true)
-    toast.error('⚠️ Please log in to RSVP.')
-    return
-  }
-
-  try {
-    const token = localStorage.getItem('token') || ''
-    const res = await fetch('/api/events/rsvp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
-      body: JSON.stringify({ eventId: event.id })
-    })
-    const data = await res.json()
-
-    if (!res.ok) throw new Error(data.error || 'Failed to RSVP')
-
-    // Always show success feedback
-    toast.success('🎉 RSVP confirmed and added to Your Account!')
-
-    // Refresh account modal or ticket count
-    setRefreshTrigger(prev => prev + 1)
-  } catch (err) {
-    console.error(err)
-    toast.error('❌ Could not save RSVP. Maybe you already RSVPed?')
-  }
-}
-
   return (
-    <div className="border border-zinc-700 rounded-xl p-5 bg-gradient-to-b from-zinc-900 to-zinc-800 shadow-lg flex flex-col justify-between relative transition hover:shadow-2xl hover:border-zinc-500">
-      {/* Heart counter top right */}
+    <div className="border border-zinc-700 rounded-xl p-5 bg-gradient-to-b from-zinc-900 to-zinc-800 shadow-lg flex flex-col relative transition hover:shadow-2xl hover:border-zinc-500">
+      {/* Heart counter */}
       <button
-        onClick={handleHeartClick}
+        onClick={() => toast('❤️ Like feature kept')}
         className="absolute top-3 right-3 text-red-500 text-2xl hover:scale-110 transition"
       >
         ❤️ {heartCount}
       </button>
 
+      {/* Event Image */}
+      {event.image_url && (
+        <div className="mb-3">
+          <Image src={event.image_url} alt={event.name} width={400} height={200} className="rounded-lg object-cover w-full h-48" />
+        </div>
+      )}
+
       {/* Title + description */}
-      <h3 className="text-xl font-bold mb-2">{event.name}</h3>
-      <p className="text-sm mb-3 text-gray-300">{event.description}</p>
+      <h3 className="text-xl font-bold mb-2">{event.title || event.name}</h3>
+      <p className="text-sm mb-3 text-gray-300">{event.details || event.description}</p>
 
       {/* Tags */}
       <div className="flex flex-wrap gap-2 mb-4">
-        {[event.tag1, event.tag2, event.tag3].filter(Boolean).map((tag, idx) => (
+        {[event.tag2, event.tag3].filter(Boolean).map((tag, idx) => (
           <span
             key={idx}
             className="px-2 py-1 text-xs rounded-full bg-zinc-700 text-gray-200 border border-zinc-600"
@@ -214,45 +170,22 @@ async function handleRSVPClick() {
         </button>
       </div>
 
-      {/* Divider line */}
-      <hr className="border-zinc-700 my-2" />
-
-      {/* RSVP + Like buttons */}
-      <div className="flex justify-between mt-2">
-        <button
-          onClick={handleRSVPClick}
-          className="px-3 py-1 rounded bg-yellow-500 hover:bg-yellow-600 text-black text-sm transition"
-        >
-          📌 RSVP
-        </button>
-        <button
-          onClick={handleHeartClick}
-          className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm transition"
-        >
-          ❤️ Like
-        </button>
-      </div>
-
-      {/* Footer info */}
-      <div className="flex justify-between text-xs text-gray-400 border-t border-zinc-700 pt-2 mt-2">
-        <span>💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}</span>
-        <span>👥 {userTickets} / {event.max_attendees || '∞'} booked</span>
-      </div>
-
-      {/* Booking modal */}
+      {/* Booking Modal with policy */}
       {showPolicyModal && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowPolicyModal(false)}
-        >
-          <div
-            className="bg-zinc-900 rounded-xl max-w-lg w-full p-6 overflow-auto max-h-[90vh] text-white shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-xl font-bold mb-4">{event.name}</h2>
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setShowPolicyModal(false)}>
+          <div className="bg-zinc-900 rounded-xl max-w-lg w-full p-6 text-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+            
+            <h2 className="text-xl font-bold mb-4">{event.title}</h2>
+            
+            {event.image_url && (
+              <Image src={event.image_url} alt={event.title} width={500} height={250} className="rounded mb-4 w-full h-40 object-cover" />
+            )}
 
+            <p className="text-gray-300 mb-4">{event.details}</p>
+
+            {/* Email */}
             <label className="block mb-3 text-sm">
-              Email for ticket:
+              Email:
               <input
                 type="email"
                 value={email}
@@ -263,6 +196,7 @@ async function handleRSVPClick() {
               />
             </label>
 
+            {/* Quantity */}
             <label className="block mb-4 text-sm">
               Quantity:
               <input
@@ -275,6 +209,7 @@ async function handleRSVPClick() {
               />
             </label>
 
+            {/* Agreement */}
             <label className="flex items-center gap-2 mb-4">
               <input
                 type="checkbox"
@@ -282,7 +217,7 @@ async function handleRSVPClick() {
                 onChange={(e) => setAgreed(e.target.checked)}
                 className="form-checkbox"
               />
-              <span className="text-sm">I agree to the event guidelines</span>
+              <span className="text-sm">I agree to the event policies and refund rules</span>
             </label>
 
             <div className="flex gap-3 justify-end">
@@ -294,7 +229,7 @@ async function handleRSVPClick() {
                 disabled={!agreed || loading || !email}
                 className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
               >
-                {loading ? 'Processing…' : 'Confirm & Book'}
+                {loading ? 'Processing…' : 'Confirm & Pay'}
               </button>
             </div>
           </div>
@@ -303,6 +238,7 @@ async function handleRSVPClick() {
     </div>
   )
 }
+/////////////////////////////// VIDEO ///////
 function VideoHero() {
   const [open, setOpen] = useState(false);
 
