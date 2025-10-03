@@ -48,6 +48,7 @@ export default async function handler(req, res) {
         r.timestamp,
         e.name AS event_title,
         e.datetime AS event_date,
+        e.venue AS location,    
         e.price AS event_price,
         COALESCE(reg_count.count, 0) AS popularity
       FROM registrations r
