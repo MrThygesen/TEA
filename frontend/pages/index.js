@@ -231,7 +231,25 @@ async function handleHeartClick() {
             ❤️ Like
           </button>
         </div>
+     </div>
       </div>
+
+      {/* Footer info */}
+      <div className="mt-3 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
+        <span>
+          💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}
+        </span>
+        <span>
+          👥 {userTickets} / {event.max_attendees || '∞'} booked
+        </span>
+      </div>
+    </div>
+  )
+}
+
+
+
+
 
   {/* Policy / Details Modal */}
 {showPolicyModal && (
@@ -338,26 +356,12 @@ async function handleHeartClick() {
      {event.price && Number(event.price) > 0 ? "Get Ticket" : "Get Ticket"}
         </button>
       </div>
-
-      {/* Footer info */}
-      <div className="mt-3 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
-        <span>
-          💰 {event.price && Number(event.price) > 0 ? `${event.price} USD` : 'Free'}
-        </span>
-        <span>
-          👥 {userTickets} / {event.max_attendees || '∞'} booked
-        </span>
-      </div>
     </div>
+  </div>
+)}
+</div>
   )
 }
-
-
-
-
-
-
-
 /////////////////////////////// VIDEO ///////
 function VideoHero() {
   const [open, setOpen] = useState(false);
