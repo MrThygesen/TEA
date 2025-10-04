@@ -199,7 +199,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
         </div>
 
         {/* Actions */}
-        
+<div className="flex flex-col gap-2 mt-auto">        
 <a
   href={`/event/${event.id}`}
   className="w-full px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm text-center transition"
@@ -207,16 +207,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
   More Info
 </a>
 
-
-/* 
-<div className="flex flex-col gap-2 mt-auto">
-          <button
-            onClick={() => setShowPolicyModal(true)}
-            className="w-full px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm transition"
-          >
-            More Info
-          </button> 
-*/
 
           <div className="flex justify-between mt-2">
             <button
@@ -389,7 +379,6 @@ function VideoHero() {
     </section>
   );
 }
-
 
 // ---------------------------
 // Event List Row
