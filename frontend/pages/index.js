@@ -7,8 +7,9 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { toast } from 'react-hot-toast'
 import YourAccountModal from '../components/YourAccountModal'
 import Image from 'next/image'
-//import AdminSBTManager from '../components/AdminSBTManager'
+import EventPolicy from '../components/EventPolicy'
 
+//import AdminSBTManager from '../components/AdminSBTManager'
 
  // ---------------------------
 // Helpers: Auth persistence Test
@@ -236,90 +237,21 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       </div>
 
       {/* Policy / Details Modal */}
-      {showPolicyModal && (
-        <div
-          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowPolicyModal(false)}
-        >
-          <div
-            className="bg-zinc-900 rounded-xl max-w-lg w-full p-6 overflow-auto max-h-[90vh] text-white shadow-xl relative"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setShowPolicyModal(false)}
-              className="absolute top-3 right-3 text-gray-400 hover:text-white"
-            >
-              ✕
-            </button>
-
-            <h2 className="text-xl font-bold mb-2">{event.name}</h2>
-            <p className="text-sm text-gray-400 mb-3">
-              📅 {new Date(event.datetime).toLocaleDateString()} · 🕒{" "}
-              {new Date(event.datetime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} <br />
-              📍 {event.city}{event.venue_location ? `, ${event.venue_location}` : ""}
-            </p>
-
-            {event.image && (
-              <img
-                src={event.image}
-                alt={event.name}
-                className="w-full h-40 object-cover rounded mb-4"
-              />
-            )}
-
-            <p className="text-gray-200 mb-4">{event.description}</p>
-
-            {/* Price, Quantity, Total */}
-            <div className="mb-6 space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span>Price per ticket:</span>
-                <span>{event.price && Number(event.price) > 0 ? `${Number(event.price).toFixed(2)} USD` : "Free"}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <label htmlFor="quantity">Quantity:</label>
-                <input
-                  id="quantity"
-                  type="number"
-                  value={quantity}
-                  onChange={(e) => setQuantity(Number(e.target.value))}
-                  min={1}
-                  max={maxPerUser - userTickets}
-                  className="w-16 p-1 rounded bg-zinc-800 border border-zinc-600 text-white text-center"
-                />
-              </div>
-              <div className="flex justify-between font-semibold">
-                <span>Total:</span>
-                <span>{event.price && Number(event.price) > 0 ? `${(Number(event.price) * quantity).toFixed(2)} USD` : "Free"}</span>
-              </div>
-            </div>
-
-            {/* Agreement */}
-            <label className="flex items-center gap-2 mb-6 text-sm">
-              <input
-                type="checkbox"
-                checked={agreed}
-                onChange={(e) => setAgreed(e.target.checked)}
-                className="form-checkbox"
-              />
-              I follow the guidelines of the event.
-            </label>
-
-            {/* Confirm button */}
-            <div className="flex justify-end">
-              <button
-                onClick={handleBooking}
-                disabled={!agreed || loading}
-                className="px-4 py-2 bg-green-600 rounded hover:bg-green-700 disabled:opacity-50"
-              >
-                {event.price && Number(event.price) > 0 ? "Get Ticket" : "Get Ticket"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  )
-}
+      // inside DynamicEventCard
+{showPolicyModal && (
+  <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setShowPolicyModal(false)}>
+    <div onClick={(e) => e.stopPropagation()}>
+      <EventPolicy
+        event={event}
+        onBookingSuccess={(data) => {
+          setUserTickets((prev) => prev + (data?.quantity || 1))
+          setRefreshTrigger((prev) => prev + 1)
+        }}
+        onClose={() => setShowPolicyModal(false)}
+      />
+    </div>
+  </div>
+)}
 
 /////////////////////////////// VIDEO ///////
 function VideoHero() {
