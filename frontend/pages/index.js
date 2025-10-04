@@ -199,13 +199,24 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
         </div>
 
         {/* Actions */}
-        <div className="flex flex-col gap-2 mt-auto">
+        
+<a
+  href={`/event/${event.id}`}
+  className="w-full px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm text-center transition"
+>
+  More Info
+</a>
+
+
+/* 
+<div className="flex flex-col gap-2 mt-auto">
           <button
             onClick={() => setShowPolicyModal(true)}
             className="w-full px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm transition"
           >
             More Info
-          </button>
+          </button> 
+*/
 
           <div className="flex justify-between mt-2">
             <button
@@ -391,10 +402,22 @@ function EventListRow({ event, onPreview }) {
       <span className="truncate">{new Date(event.datetime).toLocaleDateString()}</span>
       <span className="truncate">{event.name}</span>
       <span className="truncate">{event.city}</span>
-      <button onClick={() => onPreview && onPreview(event)} className="justify-self-end text-blue-400 hover:underline">Preview</button>
-    </div>
+
+<a href={`/event/${event.id}`} className="justify-self-end text-blue-400 hover:underline">
+  Preview
+</a>
+
+//  remove after test    <button onClick={() => onPreview && onPreview(event)} className="justify-self-end text-blue-400 hover:underline">Preview</button>
+</div>
+
   )
 }
+
+<a href={`/event/${event.id}`} className="justify-self-end text-blue-400 hover:underline">
+  Preview
+</a>
+
+
 
 // ---------------------------
 // Main Home Component
