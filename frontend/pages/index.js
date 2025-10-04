@@ -34,16 +34,11 @@ function clearAuth() {
 export function DynamicEventCard({ event, authUser, setShowAccountModal, refreshTrigger, setRefreshTrigger }) {
   const [heartCount, setHeartCount] = useState(0)
   const [bookable, setBookable] = useState(event.is_confirmed)
-  const [loading, setLoading] = useState(false)
   const [userTickets, setUserTickets] = useState(0)
-  const [maxPerUser, setMaxPerUser] = useState(event.tag1 === 'group' ? 5 : 1)
-  const [quantity, setQuantity] = useState(1)
-  const [email, setEmail] = useState(authUser?.email || '')
   const [showPolicyModal, setShowPolicyModal] = useState(false)
-  const [agreed, setAgreed] = useState(false)
 
   const HEART_THRESHOLD = 0
-  const reachedLimit = userTickets >= maxPerUser
+  const reachedLimit = userTickets >= (event.tag1 === 'group' ? 5 : 1)
 
   // --- fetch hearts ---
   useEffect(() => {
@@ -76,54 +71,12 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
         const myTickets = (data.tickets || []).filter(t => t.event_id === event.id)
         const total = myTickets.reduce((sum, t) => sum + (t.quantity || 1), 0)
         setUserTickets(total)
-        setMaxPerUser(event.tag1 === 'group' ? 5 : 1)
       } catch (err) {
         console.error('myTickets error:', err)
       }
     }
     fetchMyTickets()
-  }, [authUser, event.id, event.tag1, refreshTrigger])
-
-  // --- booking handler ---
-  async function handleBooking() {
-    if (!authUser) {
-      setShowAccountModal(true)
-      toast.error('⚠️ Please login to buy a ticket.')
-      return
-    }
-
-    setLoading(true)
-    try {
-      const token = localStorage.getItem('token')
-      const res = await fetch('/api/events/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ eventId: event.id, quantity, email })
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Registration failed')
-
-      setUserTickets(data.userTickets || userTickets + quantity)
-      setRefreshTrigger(prev => prev + 1)
-
-      if (event.price && Number(event.price) > 0) {
-        if (data.clientSecret) {
-          window.location.href = `/api/events/checkout?payment_intent_client_secret=${data.clientSecret}`
-        } else {
-          toast.error('⚠️ Payment could not be initiated')
-        }
-      } else {
-        toast.success('✅ Ticket booked! Confirmation email sent.')
-      }
-    } catch (err) {
-      console.error(err)
-      toast.error('❌ Error registering')
-    } finally {
-      setLoading(false)
-      setShowPolicyModal(false)
-      setAgreed(false)
-    }
-  }
+  }, [authUser, event.id, refreshTrigger])
 
   // --- like handler ---
   async function handleHeartClick() {
@@ -140,14 +93,10 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
 
       if (!res.ok) throw new Error('Failed to like')
       const data = await res.json()
-      if (data && typeof data.count === 'number') {
-        setHeartCount(data.count)
-        if (data.count >= HEART_THRESHOLD) setBookable(true)
-      }
-
+      if (data && typeof data.count === 'number') setHeartCount(data.count)
       toast.success('❤️ Liked!')
     } catch (err) {
-      console.error('Like error:', err)
+      console.error(err)
       toast.error('❌ Error liking event (try again later)')
     }
   }
@@ -169,8 +118,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to RSVP')
-
-      toast.success('🎉 RSVP confirmed and added to Your Account!')
+      toast.success('🎉 RSVP confirmed!')
       setRefreshTrigger(prev => prev + 1)
     } catch (err) {
       console.error(err)
@@ -181,84 +129,84 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
   return (
     <>
       <div className="border border-zinc-700 rounded-xl p-5 bg-gradient-to-b from-zinc-900 to-zinc-800 shadow-lg relative transition hover:shadow-2xl hover:border-blue-500 flex flex-col">
-                {/* Title + Date/City */}
+
+        {/* Title + Date/City */}
         <h3 className="text-lg font-bold mb-1">{event.name}</h3>
         <p className="text-xs text-gray-400 mb-3">
           📅 {new Date(event.datetime).toLocaleDateString()} · 📍 {event.city}
         </p>
 
-        {/* Short text */}
         <p className="text-sm text-gray-300 mb-3 truncate">{event.description?.split(" ").slice(0,10).join(" ")}...</p>
 
-        {/* Tags */}
         <div className="flex gap-2 mb-4">
           {[event.tag1, event.tag2, event.tag3].filter(Boolean).map((tag, idx) => (
-            <span key={idx} className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-600 text-white">
-              {tag}
-            </span>
+            <span key={idx} className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-600 text-white">{tag}</span>
           ))}
         </div>
 
-        {/* Actions */}
-<div className="flex flex-col gap-2 mt-auto">        
-<a
-  href={`/event/${event.id}`}
-  className="w-full px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm text-center transition"
->
-  More Info
-</a>
-
+        <div className="flex flex-col gap-2 mt-auto">
+          <a
+            href={`/event/${event.id}`}
+            className="w-full px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm text-center transition"
+          >
+            More Info
+          </a>
 
           <div className="flex justify-between mt-2">
+            <button
+              onClick={() => authUser ? setShowPolicyModal(true) : setShowAccountModal(true)}
+              className="px-3 py-1 rounded bg-green-600 hover:bg-green-700 text-white text-sm"
+            >
+              🎟️ Book
+            </button>
+
             <button
               onClick={handleRSVPClick}
               className="px-3 py-1 rounded bg-yellow-500 hover:bg-yellow-600 text-black text-sm"
             >
               📌 RSVP
             </button>
-             <button
-    onClick={handleHeartClick}
-    className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm flex items-center gap-1"
-  >
-    ❤️ {heartCount}
-  </button>
+
+            <button
+              onClick={handleHeartClick}
+              className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm flex items-center gap-1"
+            >
+              ❤️ {heartCount}
+            </button>
           </div>
         </div>
 
-        {/* Footer info */}
         <div className="mt-3 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
-          <span>
-            💰 {event.price && Number(event.price) > 0 ? `${Number(event.price).toFixed(2)} USD` : 'Free'}
-          </span>
-          <span>
-            👥 {userTickets} / {event.max_attendees || '∞'} booked
-          </span>
+          <span>💰 {event.price && Number(event.price) > 0 ? `${Number(event.price).toFixed(2)} USD` : 'Free'}</span>
+          <span>👥 {userTickets} / {event.max_attendees || '∞'} booked</span>
         </div>
       </div>
 
-{/* Policy / Details Modal */}
-{showPolicyModal && (
-  <div
-    className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-    onClick={() => setShowPolicyModal(false)}
-  >
-    <div
-      className="bg-zinc-900 rounded-lg p-6 max-w-lg w-full"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <EventPolicy
-        event={event}
-        onBookingSuccess={(data) => {
-          setUserTickets((prev) => prev + (data?.quantity || 1))
-          setRefreshTrigger((prev) => prev + 1)
-          setShowPolicyModal(false)
-          setAgreed(false)
-        }}
-        onClose={() => setShowPolicyModal(false)}
-      />
-    </div>
-  </div>
-)}
+      {/* Inline Policy Modal */}
+      {showPolicyModal && (
+        <div
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowPolicyModal(false)}
+        >
+          <div
+            className="bg-zinc-900 rounded-lg p-6 max-w-lg w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <EventPolicy
+              event={event}
+              onBookingSuccess={(data) => {
+                setUserTickets(prev => prev + (data?.quantity || 1))
+                setRefreshTrigger(prev => prev + 1)
+                setShowPolicyModal(false)
+              }}
+              onClose={() => setShowPolicyModal(false)}
+            />
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
 
 function VideoHero() {
   const [open, setOpen] = useState(false);

@@ -26,8 +26,7 @@ export default function EventPolicy({ event, onBookingSuccess, onClose }) {
       alert(err.message)
     } finally {
       setLoading(false)
-      onClose?.()
-    }
+      }
   }
 
   return (
