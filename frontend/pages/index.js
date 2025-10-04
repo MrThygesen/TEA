@@ -236,29 +236,24 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
         </div>
       </div>
 
+// Policy / Details Modal
+// inside DynamicEventCard
     {/* Policy / Details Modal */}
 {showPolicyModal && (
-  <div
-    className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-    onClick={() => setShowPolicyModal(false)}
-  >
-    <div
-      className="bg-zinc-900 rounded-lg p-6 max-w-lg w-full"
-      onClick={(e) => e.stopPropagation()}
-    >
+  <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setShowPolicyModal(false)}>
+    <div onClick={(e) => e.stopPropagation()}>
       <EventPolicy
         event={event}
         onBookingSuccess={(data) => {
           setUserTickets((prev) => prev + (data?.quantity || 1))
           setRefreshTrigger((prev) => prev + 1)
-          setShowPolicyModal(false)
-          setAgreed(false)
         }}
         onClose={() => setShowPolicyModal(false)}
       />
     </div>
   </div>
 )}
+
 
 
 /////////////////////////////// VIDEO ///////
