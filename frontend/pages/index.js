@@ -391,7 +391,6 @@ function VideoHero() {
 }
 
 
-
 // ---------------------------
 // Event List Row
 // ---------------------------
@@ -406,17 +405,10 @@ function EventListRow({ event, onPreview }) {
 <a href={`/event/${event.id}`} className="justify-self-end text-blue-400 hover:underline">
   Preview
 </a>
-
-//  remove after test    <button onClick={() => onPreview && onPreview(event)} className="justify-self-end text-blue-400 hover:underline">Preview</button>
 </div>
 
   )
 }
-
-<a href={`/event/${event.id}`} className="justify-self-end text-blue-400 hover:underline">
-  Preview
-</a>
-
 
 
 // ---------------------------
