@@ -7,29 +7,37 @@ export default function EventPolicy({ event, onBookingSuccess, onClose }) {
   const [agreed, setAgreed] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  async function handleBooking() {
-    if (!agreed) return
-    setLoading(true)
-    try {
-      const token = localStorage.getItem('token')
-      const res = await fetch('/api/events/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: token ? `Bearer ${token}` : '',
-        },
-        body: JSON.stringify({ eventId: event.id, quantity }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Booking failed')
+async function handleBooking() {
+  if (!agreed) return
+  setLoading(true)
+  try {
+    const token = localStorage.getItem('token')
+    const res = await fetch('/api/events/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: token ? `Bearer ${token}` : '',
+      },
+      body: JSON.stringify({ eventId: event.id, quantity }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Booking failed')
+
+    if (data.checkoutUrl) {
+      // Paid ticket → redirect to Stripe checkout
+      window.location.href = data.checkoutUrl
+    } else {
+      // Free ticket → already booked
+      alert('✅ Ticket booked! Check your email for the ticket.')
       onBookingSuccess?.(data)
-    } catch (err) {
-      console.error(err)
-      alert(err.message)
-    } finally {
-      setLoading(false)
     }
+  } catch (err) {
+    console.error(err)
+    alert(err.message)
+  } finally {
+    setLoading(false)
   }
+}
 
   const tags = [event.tag1, event.tag2, event.tag3].filter(Boolean)
 

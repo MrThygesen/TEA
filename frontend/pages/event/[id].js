@@ -20,29 +20,37 @@ export default function EventPage() {
       .catch(err => console.error('Failed to load event:', err))
   }, [id])
 
-  async function handleBooking() {
-    if (!agreed) return
-    setLoading(true)
-    try {
-      const token = localStorage.getItem('token')
-      const res = await fetch('/api/events/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: token ? `Bearer ${token}` : '',
-        },
-        body: JSON.stringify({ eventId: event.id, quantity }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Booking failed')
-      alert('✅ Ticket booked!')
-    } catch (err) {
-      console.error(err)
-      alert(err.message)
-    } finally {
-      setLoading(false)
+async function handleBooking() {
+  if (!agreed) return
+  setLoading(true)
+  try {
+    const token = localStorage.getItem('token')
+    const res = await fetch('/api/events/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: token ? `Bearer ${token}` : '',
+      },
+      body: JSON.stringify({ eventId: event.id, quantity }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Booking failed')
+
+    if (data.checkoutUrl) {
+      // Paid ticket → redirect to Stripe checkout
+      window.location.href = data.checkoutUrl
+    } else {
+      // Free ticket → already booked
+      alert('✅ Ticket booked! Check your email for the ticket.')
+      onBookingSuccess?.(data)
     }
+  } catch (err) {
+    console.error(err)
+    alert(err.message)
+  } finally {
+    setLoading(false)
   }
+}
 
   if (!event) return <p className="text-white p-6">Loading event...</p>
 
