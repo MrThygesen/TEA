@@ -1,8 +1,8 @@
 //pages/api/stripe-webhook.js
 
 import Stripe from 'stripe'
-import { pool } from '../../../lib/postgres.js'
-import { sendTicketEmail } from '../../../lib/email.js'
+import { pool } from '../../lib/postgres.js'
+import { sendTicketEmail } from '../../lib/email.js'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
