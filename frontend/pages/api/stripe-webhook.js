@@ -1,3 +1,5 @@
+//pages/api/stripe-webhook.js
+
 import Stripe from 'stripe'
 import { buffer } from 'micro'
 import { pool } from '../../lib/postgres.js'
@@ -15,122 +17,66 @@ export default async function handler(req, res) {
 
   let event
   try {
-    event = stripe.webhooks.constructEvent(
-      buf,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    )
+    event = stripe.webhooks.constructEvent(buf, sig, process.env.STRIPE_WEBHOOK_SECRET)
   } catch (err) {
     console.error('❌ Webhook signature verification failed:', err.message)
     return res.status(400).send(`Webhook Error: ${err.message}`)
   }
 
   try {
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object
-      const eventId = session.metadata?.eventId
-      const userId = session.metadata?.userId // web user
-      const telegramUserId = session.metadata?.telegramId // telegram user
+    if (event.type === 'payment_intent.succeeded') {
+      const paymentIntent = event.data.object
+      const metadata = paymentIntent.metadata || {}
+      const ticketIds = metadata.ticketIds?.split(',') || []
 
-      if (!eventId || (!userId && !telegramUserId)) {
-        console.warn('⚠ Missing metadata:', session.id, session.metadata)
-        return res.status(400).send('Missing metadata')
+      if (ticketIds.length === 0) {
+        console.warn('⚠ No ticket IDs in metadata')
+        return res.status(400).send('Missing ticket IDs')
       }
 
-      // --- WEB USER FLOW ---
-      if (userId) {
-        await pool.query(
-          `INSERT INTO registrations (event_id, user_id, email, status)
-           VALUES ($1, $2, $3, 'pending')
-           ON CONFLICT (event_id, user_id) DO NOTHING`,
-          [eventId, userId, session.customer_details?.email || null]
-        )
-
+      // Update each ticket individually
+      for (const ticketId of ticketIds) {
         const { rows: regRows } = await pool.query(
           `UPDATE registrations
            SET has_paid = TRUE,
                paid_at = NOW(),
-               status = 'confirmed'
-           WHERE event_id = $1 AND user_id = $2
-           RETURNING id, ticket_sent`,
-          [eventId, userId]
+               stage = 'book'
+           WHERE id=$1
+           RETURNING id, ticket_sent, email, user_id`,
+          [ticketId]
         )
 
         if (regRows.length > 0) {
           const reg = regRows[0]
-          console.log(`✅ Payment recorded (WEB) for event ${eventId}, user ${userId}`)
-
-          if (!reg.ticket_sent) {
+          if (!reg.ticket_sent && reg.email) {
+            // Fetch user and event info
             const { rows: userRows } = await pool.query(
               'SELECT id, username, email FROM user_profiles WHERE id=$1',
-              [userId]
+              [reg.user_id]
             )
             const user = userRows[0]
 
             const { rows: eventRows } = await pool.query(
-              'SELECT * FROM events WHERE id=$1',
-              [eventId]
+              `SELECT e.*
+               FROM registrations r
+               JOIN events e ON e.id = r.event_id
+               WHERE r.id=$1`,
+              [ticketId]
             )
             const eventObj = eventRows[0]
 
-            if (user && eventObj && user.email) {
-              try {
-                const eventWithDetails = {
-                  ...eventObj,
-                  detailsBlock: `
-                    <h2 style="margin-top:20px;">Event Details</h2>
-                    <p>${eventObj.details || 'No details provided.'}</p>
-                    <p style="margin-top:20px;">
-                      <label style="display:flex;align-items:center;gap:8px;">
-                        <input type="checkbox" disabled checked />
-                        I declare to have a relevance for the network event according to the description above
-                      </label>
-                    </p>
-                  `,
-                }
-
-                await sendTicketEmail(user.email, eventWithDetails, user)
-
-                await pool.query(
-                  'UPDATE registrations SET ticket_sent = TRUE WHERE id = $1',
-                  [reg.id]
-                )
-                console.log(`🎟 Ticket email sent → ${user.email}`)
-              } catch (err) {
-                console.error('❌ Failed to send ticket email:', err)
-              }
+            try {
+              await sendTicketEmail(reg.email, eventObj, user, pool)
+              await pool.query('UPDATE registrations SET ticket_sent=TRUE WHERE id=$1', [ticketId])
+              console.log(`🎟 Ticket email sent → ${reg.email}`)
+            } catch (err) {
+              console.error('❌ Failed to send ticket email:', err)
             }
-          } else {
-            console.log(`ℹ Ticket already sent for registration ${reg.id}, skipping`)
           }
         }
       }
 
-      // --- TELEGRAM USER FLOW ---
-      else if (telegramUserId) {
-        await pool.query(
-          `INSERT INTO registrations (event_id, telegram_user_id, email, status)
-           VALUES ($1, $2, $3, 'pending')
-           ON CONFLICT (event_id, telegram_user_id) DO NOTHING`,
-          [eventId, telegramUserId, session.customer_details?.email || null]
-        )
-
-        const { rowCount } = await pool.query(
-          `UPDATE registrations
-           SET has_paid = TRUE,
-               paid_at = NOW(),
-               status = 'confirmed'
-           WHERE event_id = $1 AND telegram_user_id = $2`,
-          [eventId, telegramUserId]
-        )
-
-        if (rowCount > 0) {
-          console.log(
-            `✅ Payment recorded (TELEGRAM) for event ${eventId}, user ${telegramUserId}`
-          )
-          // Telegram users don’t get email
-        }
-      }
+      console.log(`✅ Payment recorded for ${ticketIds.length} tickets`)
     }
 
     res.status(200).send('Webhook received')
