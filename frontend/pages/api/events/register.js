@@ -1,4 +1,3 @@
-// pages/api/events/register.js
 import { pool } from '../../../lib/postgres.js'
 import { auth } from '../../../lib/auth.js'
 import { sendTicketEmail } from '../../../lib/email.js'
@@ -54,19 +53,39 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: `Max ${maxPerUser} tickets per user` })
     }
 
-    // --- Stripe logic
-    let clientSecret = null
+    // --- Stripe logic (Checkout Session)
+    let checkoutUrl = null
     const price = parseFloat(event.price) || 0
+
     if (price > 0) {
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(price * 100 * quantity),
-        currency: 'usd',
-        metadata: { eventId, userId },
+      const session = await stripe.checkout.sessions.create({
+        mode: 'payment',
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: 'usd',
+              product_data: {
+                name: event.name,
+                description: event.description || '',
+              },
+              unit_amount: Math.round(price * 100),
+            },
+            quantity,
+          },
+        ],
+        success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/event/${eventId}?success=true`,
+        cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/event/${eventId}?canceled=true`,
+        metadata: {
+          eventId,
+          userId: userId || 'guest',
+          quantity,
+        },
       })
-      clientSecret = paymentIntent.client_secret
+      checkoutUrl = session.url
     }
 
-    // --- Insert registrations with unique ticket_codes
+    // --- Insert registrations with unique ticket codes (prebooked if payment needed)
     const inserted = []
     for (let i = 0; i < quantity; i++) {
       const ticket_code = `TICKET-${eventId}-${userId || 'guest'}-${Date.now()}-${i}`
@@ -74,7 +93,14 @@ export default async function handler(req, res) {
         `INSERT INTO registrations (user_id, event_id, email, stage, has_paid, ticket_code)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING *`,
-        [userId, eventId, email || null, price > 0 ? 'prebook' : 'book', price > 0, ticket_code]
+        [
+          userId,
+          eventId,
+          email || null,
+          price > 0 ? 'prebook' : 'book',
+          price > 0,
+          ticket_code,
+        ]
       )
       inserted.push(rows[0])
     }
@@ -89,7 +115,7 @@ export default async function handler(req, res) {
       if (userRows.length) user = userRows[0]
     }
 
-    // --- Send ticket email for free event
+    // --- Send ticket email immediately for free events
     if (price === 0 && user?.email) {
       try {
         await sendTicketEmail(user.email, event, user, pool)
@@ -107,7 +133,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       registrations: inserted,
-      clientSecret,
+      checkoutUrl,
       userTickets: currentTickets + quantity,
     })
   } catch (err) {
