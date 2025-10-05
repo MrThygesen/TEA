@@ -1,76 +1,83 @@
 //pages/api/stripe-webhook.js
 
 import Stripe from 'stripe'
-import { buffer } from 'micro'
-import { pool } from '../../lib/postgres.js'
-import { sendTicketEmail } from '../../lib/email.js'
+import { pool } from '../../../lib/postgres.js'
+import { sendTicketEmail } from '../../../lib/email.js'
 
-export const config = { api: { bodyParser: false } }
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
+export const config = { api: { bodyParser: false } }
+
+async function buffer(readable) {
+  const chunks = []
+  for await (const chunk of readable) chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk)
+  return Buffer.concat(chunks)
+}
+
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).end('Method Not Allowed')
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   const sig = req.headers['stripe-signature']
   const buf = await buffer(req)
+  let event
 
   try {
-    const event = stripe.webhooks.constructEvent(
-      buf,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    )
+    event = stripe.webhooks.constructEvent(buf, sig, process.env.STRIPE_WEBHOOK_SECRET)
+  } catch (err) {
+    console.error('❌ Stripe webhook signature verification failed', err.message)
+    return res.status(400).send(`Webhook Error: ${err.message}`)
+  }
 
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object
-      const eventId = session.metadata?.eventId
-      const userId = session.metadata?.userId
-      const quantity = parseInt(session.metadata?.quantity || '1', 10)
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object
+    const { eventId, userId, email, quantity } = session.metadata || {}
 
-      if (!eventId) {
-        console.warn('⚠ Missing eventId in metadata')
-        return res.status(400).send('Missing metadata')
-      }
+    console.log('✅ Stripe session completed:', { eventId, userId, email, quantity })
 
-      // Mark all unpaid tickets for this user & event as paid
-      const { rows: tickets } = await pool.query(
-        `UPDATE registrations
-         SET has_paid=TRUE, paid_at=NOW(), stage='book'
-         WHERE event_id=$1 AND user_id=$2 AND has_paid=FALSE
-         RETURNING id, email, ticket_sent`,
-        [eventId, userId === 'guest' ? null : userId]
+    try {
+      const { rows: eventRows } = await pool.query('SELECT * FROM events WHERE id=$1', [eventId])
+      if (!eventRows.length) throw new Error('Event not found')
+      const eventInfo = eventRows[0]
+
+      // --- Find unpaid tickets for this session
+      const { rows: pendingTickets } = await pool.query(
+        `SELECT * FROM registrations
+         WHERE event_id=$1
+         AND (user_id=$2 OR email=$3)
+         AND stage='prebook'
+         ORDER BY id DESC
+         LIMIT $4`,
+        [eventId, userId === 'guest' ? null : userId, email, quantity]
       )
 
-      if (tickets.length === 0) {
-        console.log('ℹ️ No pending tickets found for session', session.id)
-        return res.status(200).send('No tickets to update')
-      }
+      if (!pendingTickets.length) {
+        console.warn('⚠ No pending tickets found for payment session.')
+      } else {
+        const ids = pendingTickets.map((t) => t.id)
+        await pool.query(
+          `UPDATE registrations SET has_paid=TRUE, stage='book'
+           WHERE id = ANY($1::int[])`,
+          [ids]
+        )
 
-      const { rows: eventRows } = await pool.query('SELECT * FROM events WHERE id=$1', [eventId])
-      const eventObj = eventRows[0]
-
-      // Find user email
-      let email = tickets[0].email
-      if (!email && userId && userId !== 'guest') {
-        const { rows } = await pool.query('SELECT email FROM user_profiles WHERE id=$1', [userId])
-        email = rows[0]?.email
-      }
-
-      if (email) {
-        for (const ticket of tickets) {
-          if (!ticket.ticket_sent) {
-            await sendTicketEmail(email, eventObj, { id: userId, email })
+        if (email) {
+          for (const t of pendingTickets) {
+            try {
+              await sendTicketEmail(email, eventInfo, { id: userId, email }, pool)
+            } catch (err) {
+              console.error('❌ Error sending paid ticket email:', err)
+            }
           }
         }
-        await pool.query('UPDATE registrations SET ticket_sent=TRUE WHERE id=ANY($1::int[])', [tickets.map(t => t.id)])
-        console.log(`✅ Sent ${tickets.length} ticket(s) to ${email}`)
       }
-    }
 
-    res.status(200).send('OK')
-  } catch (err) {
-    console.error('❌ Stripe webhook error:', err)
-    res.status(400).send(`Webhook Error: ${err.message}`)
+      return res.status(200).json({ received: true })
+    } catch (err) {
+      console.error('❌ Stripe webhook handling error:', err)
+      return res.status(500).json({ error: err.message })
+    }
   }
+
+  res.json({ received: true })
 }
 
