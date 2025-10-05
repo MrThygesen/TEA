@@ -6,7 +6,6 @@ import { pool } from '../../lib/postgres.js'
 import { sendTicketEmail } from '../../lib/email.js'
 
 export const config = { api: { bodyParser: false } }
-
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
 export default async function handler(req, res) {
@@ -15,74 +14,63 @@ export default async function handler(req, res) {
   const sig = req.headers['stripe-signature']
   const buf = await buffer(req)
 
-  let event
   try {
-    event = stripe.webhooks.constructEvent(buf, sig, process.env.STRIPE_WEBHOOK_SECRET)
-  } catch (err) {
-    console.error('❌ Webhook signature verification failed:', err.message)
-    return res.status(400).send(`Webhook Error: ${err.message}`)
-  }
+    const event = stripe.webhooks.constructEvent(
+      buf,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    )
 
-  try {
-    if (event.type === 'payment_intent.succeeded') {
-      const paymentIntent = event.data.object
-      const metadata = paymentIntent.metadata || {}
-      const ticketIds = metadata.ticketIds?.split(',') || []
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object
+      const eventId = session.metadata?.eventId
+      const userId = session.metadata?.userId
+      const quantity = parseInt(session.metadata?.quantity || '1', 10)
 
-      if (ticketIds.length === 0) {
-        console.warn('⚠ No ticket IDs in metadata')
-        return res.status(400).send('Missing ticket IDs')
+      if (!eventId) {
+        console.warn('⚠ Missing eventId in metadata')
+        return res.status(400).send('Missing metadata')
       }
 
-      // Update each ticket individually
-      for (const ticketId of ticketIds) {
-        const { rows: regRows } = await pool.query(
-          `UPDATE registrations
-           SET has_paid = TRUE,
-               paid_at = NOW(),
-               stage = 'book'
-           WHERE id=$1
-           RETURNING id, ticket_sent, email, user_id`,
-          [ticketId]
-        )
+      // Mark all unpaid tickets for this user & event as paid
+      const { rows: tickets } = await pool.query(
+        `UPDATE registrations
+         SET has_paid=TRUE, paid_at=NOW(), stage='book'
+         WHERE event_id=$1 AND user_id=$2 AND has_paid=FALSE
+         RETURNING id, email, ticket_sent`,
+        [eventId, userId === 'guest' ? null : userId]
+      )
 
-        if (regRows.length > 0) {
-          const reg = regRows[0]
-          if (!reg.ticket_sent && reg.email) {
-            // Fetch user and event info
-            const { rows: userRows } = await pool.query(
-              'SELECT id, username, email FROM user_profiles WHERE id=$1',
-              [reg.user_id]
-            )
-            const user = userRows[0]
+      if (tickets.length === 0) {
+        console.log('ℹ️ No pending tickets found for session', session.id)
+        return res.status(200).send('No tickets to update')
+      }
 
-            const { rows: eventRows } = await pool.query(
-              `SELECT e.*
-               FROM registrations r
-               JOIN events e ON e.id = r.event_id
-               WHERE r.id=$1`,
-              [ticketId]
-            )
-            const eventObj = eventRows[0]
+      const { rows: eventRows } = await pool.query('SELECT * FROM events WHERE id=$1', [eventId])
+      const eventObj = eventRows[0]
 
-            try {
-              await sendTicketEmail(reg.email, eventObj, user, pool)
-              await pool.query('UPDATE registrations SET ticket_sent=TRUE WHERE id=$1', [ticketId])
-              console.log(`🎟 Ticket email sent → ${reg.email}`)
-            } catch (err) {
-              console.error('❌ Failed to send ticket email:', err)
-            }
+      // Find user email
+      let email = tickets[0].email
+      if (!email && userId && userId !== 'guest') {
+        const { rows } = await pool.query('SELECT email FROM user_profiles WHERE id=$1', [userId])
+        email = rows[0]?.email
+      }
+
+      if (email) {
+        for (const ticket of tickets) {
+          if (!ticket.ticket_sent) {
+            await sendTicketEmail(email, eventObj, { id: userId, email })
           }
         }
+        await pool.query('UPDATE registrations SET ticket_sent=TRUE WHERE id=ANY($1::int[])', [tickets.map(t => t.id)])
+        console.log(`✅ Sent ${tickets.length} ticket(s) to ${email}`)
       }
-
-      console.log(`✅ Payment recorded for ${ticketIds.length} tickets`)
     }
 
-    res.status(200).send('Webhook received')
+    res.status(200).send('OK')
   } catch (err) {
-    console.error('❌ Error processing webhook:', err)
-    res.status(500).send('Internal Server Error')
+    console.error('❌ Stripe webhook error:', err)
+    res.status(400).send(`Webhook Error: ${err.message}`)
   }
 }
 

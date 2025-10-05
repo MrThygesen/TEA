@@ -8,11 +8,8 @@ import Stripe from 'stripe'
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  // --- Auth
   const token = auth.getTokenFromReq(req)
   let decoded = null
   if (token) {
@@ -26,48 +23,41 @@ export default async function handler(req, res) {
   const userId = decoded?.id || null
   const { eventId, quantity = 1, email } = req.body
 
-  if (!userId && !email) {
-    return res.status(400).json({ error: 'Must have user or email to register' })
+  if (!eventId || quantity < 1) {
+    return res.status(400).json({ error: 'Invalid request data' })
   }
 
   try {
-    // --- Fetch event
     const { rows: eventRows } = await pool.query('SELECT * FROM events WHERE id=$1', [eventId])
     if (!eventRows.length) return res.status(404).json({ error: 'Event not found' })
     const event = eventRows[0]
+    const price = parseFloat(event.price) || 0
 
     const maxPerUser = event.tag1 === 'group' ? 5 : 1
 
-    // --- Count existing tickets
-    let currentTickets = 0
+    // --- Limit check
     if (userId) {
       const { rows } = await pool.query(
         'SELECT COUNT(*) AS total FROM registrations WHERE event_id=$1 AND user_id=$2',
         [eventId, userId]
       )
-      currentTickets = parseInt(rows[0].total, 10) || 0
+      const existing = parseInt(rows[0].total, 10) || 0
+      if (existing + quantity > maxPerUser) {
+        return res.status(400).json({ error: `Max ${maxPerUser} tickets per user` })
+      }
     }
 
-    if (currentTickets + quantity > maxPerUser) {
-      return res.status(400).json({ error: `Max ${maxPerUser} tickets per user` })
-    }
-
-    const price = parseFloat(event.price) || 0
-
-    // --- Stripe Checkout session for paid events
+    // --- Stripe for paid tickets
     let checkoutUrl = null
     if (price > 0) {
       const session = await stripe.checkout.sessions.create({
         mode: 'payment',
-        payment_method_types: ['card'],
+        payment_method_types: ['card', 'link'],
         line_items: [
           {
             price_data: {
               currency: 'usd',
-              product_data: {
-                name: event.name,
-                description: event.description || '',
-              },
+              product_data: { name: event.name, description: event.description || '' },
               unit_amount: Math.round(price * 100),
             },
             quantity,
@@ -75,67 +65,45 @@ export default async function handler(req, res) {
         ],
         success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/event/${eventId}?success=true`,
         cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/event/${eventId}?canceled=true`,
-        metadata: {
-          eventId,
-          userId: userId || 'guest',
-          quantity,
-        },
+        metadata: { eventId, userId: userId || 'guest', quantity },
       })
       checkoutUrl = session.url
     }
 
-    // --- Insert registrations (multiple tickets)
-    const inserted = []
+    // --- Insert ticket records
+    const insertedIds = []
     for (let i = 0; i < quantity; i++) {
-      const ticket_code = `TICKET-${eventId}-${userId || 'guest'}-${Date.now()}-${i}`
+      const ticketCode = `T-${eventId}-${userId || 'guest'}-${Date.now()}-${i}`
       const { rows } = await pool.query(
         `INSERT INTO registrations (user_id, event_id, email, stage, has_paid, ticket_code)
          VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING *`,
-        [
-          userId,
-          eventId,
-          email || null,
-          price > 0 ? 'prebook' : 'book',
-          price > 0 ? false : true,
-          ticket_code,
-        ]
+         RETURNING id`,
+        [userId, eventId, email || null, price > 0 ? 'prebook' : 'book', price > 0 ? false : true, ticketCode]
       )
-      inserted.push(rows[0])
+      insertedIds.push(rows[0].id)
     }
 
-    // --- Fetch user info
-    let user = { id: userId, email }
-    if (userId) {
-      const { rows: userRows } = await pool.query('SELECT id, username, email FROM user_profiles WHERE id=$1', [userId])
-      if (userRows.length) user = userRows[0]
-    }
+    // --- Email immediately if free
+    if (price === 0) {
+      const userEmail = email || (
+        userId
+          ? (await pool.query('SELECT email FROM user_profiles WHERE id=$1', [userId])).rows[0]?.email
+          : null
+      )
 
-    // --- Send ticket emails for free events
-    if (price === 0 && user?.email) {
-      try {
-        for (const reg of inserted) {
-          if (!reg.ticket_sent) {
-            await sendTicketEmail(user.email, event, user, pool)
-          }
+      if (userEmail) {
+        for (const id of insertedIds) {
+          await sendTicketEmail(userEmail, event, { id: userId, email: userEmail })
         }
-        await pool.query(
-          'UPDATE registrations SET ticket_sent = TRUE WHERE id = ANY($1::int[])',
-          [inserted.map(r => r.id)]
-        )
-        console.log('✅ Ticket emails sent for free event')
-      } catch (err) {
-        console.error('❌ Failed to send ticket emails:', err)
+        await pool.query('UPDATE registrations SET ticket_sent=TRUE WHERE id=ANY($1::int[])', [insertedIds])
       }
     }
 
     return res.status(200).json({
       success: true,
-      registrations: inserted,
       checkoutUrl,
-      userTickets: currentTickets + quantity,
+      ticketIds: insertedIds,
     })
-
   } catch (err) {
     console.error('❌ register.js error:', err)
     return res.status(500).json({ error: 'Server error', details: err.message })
