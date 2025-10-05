@@ -24,11 +24,11 @@ export default function EventPage() {
   const handleBooking = async () => {
     if (!event) return
     if (!agreed) return alert('⚠️ Please agree to the guidelines.')
-    
+
     setLoading(true)
     try {
       const token = localStorage.getItem('token')
-      const res = await fetch('/api/events/checkout', {
+      const res = await fetch('/api/events/register', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -70,7 +70,6 @@ export default function EventPage() {
 
         <p className="text-gray-200 mb-4">{event.description}</p>
 
-        {/* Ticket info */}
         <div className="mb-6 space-y-2 text-sm">
           <div className="flex justify-between">
             <span>Price per ticket:</span>
@@ -94,7 +93,6 @@ export default function EventPage() {
           </div>
         </div>
 
-        {/* Agreement */}
         <label className="flex items-center gap-2 mb-6 text-sm">
           <input
             type="checkbox"
@@ -105,7 +103,6 @@ export default function EventPage() {
           I follow the guidelines of the event.
         </label>
 
-        {/* Book button */}
         <div className="flex justify-end">
           <button
             onClick={handleBooking}
