@@ -1,4 +1,4 @@
-//pages/api/events/register.js
+// pages/api/events/register.js
 
 import { pool } from '../../../lib/postgres.js'
 import { auth } from '../../../lib/auth.js'
@@ -55,29 +55,43 @@ export default async function handler(req, res) {
 
     // --- Stripe payment if price > 0
     if (price > 0) {
-      const session = await stripe.checkout.sessions.create({
-        mode: 'payment',
-        payment_method_types: ['card'],
-        line_items: [
-          {
-            price_data: {
-              currency: 'usd',
-              product_data: { name: event.name, description: event.description || '' },
-              unit_amount: Math.round(price * 100),
+      console.log('💳 Creating Stripe session for paid event', {
+        eventId,
+        userId,
+        email,
+        quantity,
+        price,
+      })
+
+      try {
+        const session = await stripe.checkout.sessions.create({
+          mode: 'payment',
+          payment_method_types: ['card'],
+          line_items: [
+            {
+              price_data: {
+                currency: 'usd',
+                product_data: { name: event.name, description: event.description || '' },
+                unit_amount: Math.round(price * 100),
+              },
+              quantity,
             },
+          ],
+          success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/event/${eventId}?success=true`,
+          cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/event/${eventId}?canceled=true`,
+          metadata: {
+            eventId,
+            userId: userId || 'guest',
+            email: email || '',
             quantity,
           },
-        ],
-        success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/event/${eventId}?success=true`,
-        cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/event/${eventId}?canceled=true`,
-        metadata: {
-          eventId,
-          userId: userId || 'guest',
-          email: email || '',
-          quantity,
-        },
-      })
-      checkoutUrl = session.url
+        })
+        checkoutUrl = session.url
+        console.log('✅ Stripe session created:', session.id, 'URL:', checkoutUrl)
+      } catch (err) {
+        console.error('❌ Stripe session creation failed:', err)
+        return res.status(500).json({ error: 'Stripe session creation failed', details: err.message })
+      }
     }
 
     // --- Insert all ticket placeholders
