@@ -46,10 +46,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         if (!rsvpRes.ok) throw new Error('Failed to load RSVPs')
         const rsvpData = await rsvpRes.json()
 
-        // filter RSVPs:
-        // 1. Remove RSVPs for events the user already has a ticket for
         const ticketEventIds = new Set(userTickets.map(t => t.event_id))
-        // 2. Remove RSVPs for events older than yesterday
         const cutoff = new Date()
         cutoff.setDate(cutoff.getDate() - 1)
 
@@ -71,59 +68,67 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     loadAccount()
   }, [refreshTrigger])
 
-  if (loading) return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md text-center">
-        <p>Loading your account...</p>
+  if (loading)
+    return (
+      <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 w-full max-w-md text-center">
+          <p data-translate>Loading your account...</p>
+        </div>
       </div>
-    </div>
-  )
+    )
 
-  if (error) return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md text-center">
-        <p className="text-red-600 mb-4">Error: {error}</p>
-        <button onClick={onClose} className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700">
-          Close
-        </button>
+  if (error)
+    return (
+      <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 w-full max-w-md text-center">
+          <p className="text-red-600 mb-4" data-translate>Error: {error}</p>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700"
+            data-translate
+          >
+            Close
+          </button>
+        </div>
       </div>
-    </div>
-  )
+    )
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-lg max-w-6xl w-full p-6 text-white relative">
-        <button onClick={onClose} className="absolute top-2 right-2 text-gray-400 hover:text-white text-xl">✕</button>
+        <button onClick={onClose} className="absolute top-2 right-2 text-gray-400 hover:text-white text-xl">
+          ✕
+        </button>
 
-        <h2 className="text-2xl font-bold mb-6 text-blue-400">Your Account</h2>
+        <h2 className="text-2xl font-bold mb-6 text-blue-400" data-translate>Your Account</h2>
 
         {profile && (
           <>
             {/* Profile Info */}
             <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-zinc-800 p-4 rounded-lg border border-zinc-700">
-              <p><span className="font-semibold text-gray-300">Name:</span> {profile.username || '-'}</p>
-              <p><span className="font-semibold text-gray-300">Email:</span> {profile.email || '-'}</p>
-              <p><span className="font-semibold text-gray-300">Wallet:</span> {profile.wallet_address || '-'}</p>
-              <p><span className="font-semibold text-gray-300">City:</span> {profile.city || '-'}</p>
-              <p><span className="font-semibold text-gray-300">Tier:</span> {profile.tier || '-'}</p>
-              <p><span className="font-semibold text-gray-300">Role:</span> {profile.role || '-'}</p>
+              <p><span className="font-semibold text-gray-300" data-translate>Name:</span> {profile.username || '-'}</p>
+              <p><span className="font-semibold text-gray-300" data-translate>Email:</span> {profile.email || '-'}</p>
+              <p><span className="font-semibold text-gray-300" data-translate>Wallet:</span> {profile.wallet_address || '-'}</p>
+              <p><span className="font-semibold text-gray-300" data-translate>City:</span> {profile.city || '-'}</p>
+              <p><span className="font-semibold text-gray-300" data-translate>Tier:</span> {profile.tier || '-'}</p>
+              <p><span className="font-semibold text-gray-300" data-translate>Role:</span> {profile.role || '-'}</p>
             </div>
 
             {/* Tickets Table */}
-            <h3 className="text-lg font-semibold mb-2">Your Tickets</h3>
+            <h3 className="text-lg font-semibold mb-2" data-translate>Your Tickets</h3>
             {tickets.length > 0 ? (
               <div className="overflow-x-auto mb-8">
                 <table className="min-w-full border-collapse border border-zinc-700 text-sm">
                   <thead>
                     <tr className="bg-zinc-800 text-gray-300">
-                      <th className="px-3 py-2 border border-zinc-700 text-left">Date</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left">Time</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left">Event</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left">Location</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left">Price</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left">Paid</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left">Popularity</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left">QR</th>
+                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Date</th>
+                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Time</th>
+                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Event</th>
+                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Location</th>
+                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Price</th>
+                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Paid</th>
+                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Popularity</th>
+                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>QR</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -141,14 +146,14 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                           </td>
                           <td className="px-3 py-2 border border-zinc-700">{t.location || '-'}</td>
                           <td className="px-3 py-2 border border-zinc-700">{t.event_price ? `${Number(t.event_price).toFixed(2)} DKK` : 'Free'}</td>
-                          <td className="px-3 py-2 border border-zinc-700">{t.has_paid ? <span className="text-green-400 font-semibold">Yes</span> : <span className="text-yellow-400 font-semibold">Free</span>}</td>
+                          <td className="px-3 py-2 border border-zinc-700">{t.has_paid ? <span className="text-green-400 font-semibold" data-translate>Yes</span> : <span className="text-yellow-400 font-semibold" data-translate>Free</span>}</td>
                           <td className="px-3 py-2 border border-zinc-700">{t.popularity || 0}</td>
                           <td className="px-3 py-2 border border-zinc-700">
                             {t.ticket_code ? (
                               <div className="cursor-pointer" onClick={() => setActiveQR(t.ticket_code)}>
                                 <QRCodeCanvas value={t.ticket_code} size={48} />
                               </div>
-                            ) : <span className="text-gray-500">No QR</span>}
+                            ) : <span className="text-gray-500" data-translate>No QR</span>}
                           </td>
                         </tr>
                       )
@@ -156,21 +161,21 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                   </tbody>
                 </table>
               </div>
-            ) : <p className="text-gray-400 mb-8">No tickets found.</p>}
+            ) : <p className="text-gray-400 mb-8" data-translate>No tickets found.</p>}
 
             {/* RSVPs Table */}
-            <h3 className="text-lg font-semibold mb-2">Your RSVPs</h3>
+            <h3 className="text-lg font-semibold mb-2" data-translate>Your RSVPs</h3>
             {rsvps.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="min-w-full border-collapse border border-zinc-700 text-sm">
                   <thead>
                     <tr className="bg-zinc-800 text-gray-300">
-                      <th className="px-3 py-2 border border-zinc-700 text-left">Date</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left">Time</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left">Event</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left">Location</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left">Price</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left">Popularity</th>
+                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Date</th>
+                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Time</th>
+                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Event</th>
+                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Location</th>
+                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Price</th>
+                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Popularity</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -194,7 +199,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                   </tbody>
                 </table>
               </div>
-            ) : <p className="text-gray-400">No RSVPs found.</p>}
+            ) : <p className="text-gray-400" data-translate>No RSVPs found.</p>}
           </>
         )}
       </div>
@@ -204,12 +209,11 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setActiveQR(null)}>
           <div className="bg-white p-6 rounded-lg shadow-lg">
             <QRCodeCanvas value={activeQR} size={256} />
-            <p className="text-black text-center mt-4">Scan this ticket</p>
+            <p className="text-black text-center mt-4" data-translate>Scan this ticket</p>
           </div>
         </div>
       )}
     </div>
   )
 }
-
 
