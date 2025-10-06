@@ -3,8 +3,6 @@ import '@rainbow-me/rainbowkit/styles.css'
 
 import { createContext, useContext, useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import useAutoTranslator from '../hooks/useAutoTranslator'
-
 import { Toaster } from 'react-hot-toast'
 import { WagmiConfig } from 'wagmi'
 import { RainbowKitProvider } from '@rainbow-me/rainbowkit'
@@ -21,35 +19,36 @@ export default function App({ Component, pageProps }) {
   const router = useRouter()
   const [lang, setLang] = useState('en')
 
-  // Detect language from URL and update lang state
+  // Detect from URL or browser
   useEffect(() => {
     const pathLang = router.asPath.split('/')[1]
-    if (['da', 'de', 'fr', 'es', 'us', 'zh'].includes(pathLang)) setLang(pathLang)
-    else setLang('en')
+    const supported = ['da', 'de', 'fr', 'es', 'zh']
+    if (supported.includes(pathLang)) {
+      setLang(pathLang)
+    } else {
+      const browserLang = navigator.language?.slice(0, 2)
+      if (supported.includes(browserLang)) setLang(browserLang)
+      else setLang('en')
+    }
   }, [router.asPath])
 
-  // Trigger auto translation whenever `lang` changes
-  useAutoTranslator(lang)
-
-  // Handle language switch
+  // Handle manual language change
   const handleLangChange = (newLang) => {
     setLang(newLang)
-    const pathParts = router.asPath.split('/')
-    // Replace language in URL if it exists, else add it
-    if (['da', 'de', 'fr', 'es', 'us', 'zh'].includes(pathParts[1])) pathParts[1] = newLang
-    else pathParts.unshift('', newLang)
-    router.push(pathParts.join('/'))
+    const parts = router.asPath.split('/')
+    if (['da', 'de', 'fr', 'es', 'zh'].includes(parts[1])) parts[1] = newLang
+    else parts.unshift('', newLang)
+    router.push(parts.join('/'))
   }
 
-  // Map of flags
+  // Flags
   const flags = {
     en: '🇬🇧',
     da: '🇩🇰',
     de: '🇩🇪',
     fr: '🇫🇷',
     es: '🇪🇸',
-    us: '🇺🇸',
-    zh: '🇨🇳'
+    zh: '🇨🇳',
   }
 
   return (
@@ -57,21 +56,22 @@ export default function App({ Component, pageProps }) {
       <WagmiConfig config={config}>
         <RainbowKitProvider>
           <LangContext.Provider value={{ lang, setLang }}>
-            {/* Language Flags */}
+            {/* Flag Selector */}
             <div className="fixed top-3 right-3 z-50 flex gap-1 bg-zinc-900 border border-zinc-700 rounded-md px-2 py-1">
-              {Object.keys(flags).map((l) => (
+              {Object.entries(flags).map(([code, flag]) => (
                 <button
-                  key={l}
-                  onClick={() => handleLangChange(l)}
-                  className={`text-sm ${lang === l ? 'opacity-100' : 'opacity-60'} hover:opacity-100`}
-                  title={l.toUpperCase()}
+                  key={code}
+                  onClick={() => handleLangChange(code)}
+                  className={`text-sm ${lang === code ? 'opacity-100' : 'opacity-60'} hover:opacity-100`}
+                  title={code.toUpperCase()}
+                  translate="no"
                 >
-                  {flags[l]}
+                  {flag}
                 </button>
               ))}
             </div>
 
-            {/* Main content */}
+            {/* Main Content */}
             <Component {...pageProps} />
             <Toaster position="top-right" />
           </LangContext.Provider>
