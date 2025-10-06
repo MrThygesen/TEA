@@ -4,7 +4,6 @@ import { pool } from '../../lib/postgres.js'
 import { sendTicketEmail } from '../../lib/email.js'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
-
 export const config = { api: { bodyParser: false } }
 
 async function buffer(readable) {
@@ -32,17 +31,14 @@ export default async function handler(req, res) {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object
     const { eventId, userId, email, quantity } = session.metadata || {}
-
-    console.log('✅ Stripe session completed:', { eventId, userId, email, quantity })
+    const dbUserId = userId === 'guest' ? null : userId
 
     try {
       const { rows: eventRows } = await pool.query('SELECT * FROM events WHERE id=$1', [eventId])
       if (!eventRows.length) throw new Error('Event not found')
       const eventInfo = eventRows[0]
 
-      const dbUserId = userId === 'guest' ? null : userId
-
-      // --- Fetch only tickets for this session
+      // Only select **prebooked tickets**, ignore free tickets already marked as booked
       const { rows: sessionTickets } = await pool.query(
         `SELECT * FROM registrations
          WHERE event_id=$1
@@ -53,14 +49,11 @@ export default async function handler(req, res) {
         [eventId, dbUserId, email, quantity]
       )
 
-      if (!sessionTickets.length) {
-        console.warn('⚠ No prebooked tickets found for this session.')
-        return res.status(200).json({ received: true })
-      }
+      if (!sessionTickets.length) return res.status(200).json({ received: true })
 
       const ticketIds = sessionTickets.map(t => t.id)
 
-      // --- Update only these tickets to paid
+      // Mark tickets as paid
       await pool.query(
         `UPDATE registrations
          SET has_paid = TRUE,
@@ -69,15 +62,10 @@ export default async function handler(req, res) {
         [ticketIds]
       )
 
-      // --- Send tickets for this session only
+      // Send paid ticket email
       if (email) {
-        try {
-          // sendTicketEmail should accept a **list of specific tickets**
-          await sendTicketEmail(email, eventInfo, { id: dbUserId, email }, pool, ticketIds)
-          console.log(`✅ Sent ${ticketIds.length} ticket(s) to ${email}`)
-        } catch (err) {
-          console.error('❌ Error sending paid ticket email:', err)
-        }
+        await sendTicketEmail(email, eventInfo, { id: dbUserId, email }, pool, ticketIds)
+        console.log(`✅ Sent ${ticketIds.length} paid ticket(s) to ${email}`)
       }
 
       return res.status(200).json({ received: true })
