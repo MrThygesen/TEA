@@ -46,7 +46,6 @@ export default async function handler(req, res) {
     r.stage,
     r.has_paid,
     r.timestamp,
-    r.ticket_type,
     e.name AS event_title,
     e.datetime AS event_date,
     e.venue AS location,    
@@ -60,11 +59,12 @@ export default async function handler(req, res) {
     GROUP BY event_id
   ) reg_count ON reg_count.event_id = e.id
   WHERE r.user_id = $1
-    AND (r.stage = 'book' OR (r.has_paid = FALSE AND r.ticket_type = 'free'))
+    AND (r.stage = 'book')  -- only show tickets that are booked (free or paid)
   ORDER BY e.datetime DESC
   `,
   [payload.id]
 )
+
     res.status(200).json({
       profile,
       tickets: regResult.rows,
