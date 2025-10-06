@@ -37,33 +37,34 @@ export default async function handler(req, res) {
     if (!profile) return res.status(404).json({ error: 'User not found' })
 
     // Load registrations/tickets with popularity
-    const regResult = await pool.query(
-      `
-      SELECT 
-        r.id AS id,
-        r.event_id,
-        r.ticket_code,
-        r.stage,
-        r.has_paid,
-        r.timestamp,
-        e.name AS event_title,
-        e.datetime AS event_date,
-        e.venue AS location,    
-        e.price AS event_price,
-        COALESCE(reg_count.count, 0) AS popularity
-      FROM registrations r
-      JOIN events e ON e.id = r.event_id
-      LEFT JOIN (
-        SELECT event_id, COUNT(*) AS count
-        FROM registrations
-        GROUP BY event_id
-      ) reg_count ON reg_count.event_id = e.id
-      WHERE r.user_id = $1
-      ORDER BY e.datetime DESC
-      `,
-      [payload.id]
-    )
-
+ const regResult = await pool.query(
+  `
+  SELECT 
+    r.id AS id,
+    r.event_id,
+    r.ticket_code,
+    r.stage,
+    r.has_paid,
+    r.timestamp,
+    r.ticket_type,
+    e.name AS event_title,
+    e.datetime AS event_date,
+    e.venue AS location,    
+    e.price AS event_price,
+    COALESCE(reg_count.count, 0) AS popularity
+  FROM registrations r
+  JOIN events e ON e.id = r.event_id
+  LEFT JOIN (
+    SELECT event_id, COUNT(*) AS count
+    FROM registrations
+    GROUP BY event_id
+  ) reg_count ON reg_count.event_id = e.id
+  WHERE r.user_id = $1
+    AND (r.stage = 'book' OR (r.has_paid = FALSE AND r.ticket_type = 'free'))
+  ORDER BY e.datetime DESC
+  `,
+  [payload.id]
+)
     res.status(200).json({
       profile,
       tickets: regResult.rows,
