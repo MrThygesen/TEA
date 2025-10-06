@@ -1,4 +1,4 @@
-// YourAccountModal.js
+//components/YourAccountModal.js
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -21,28 +21,24 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         const token = localStorage.getItem('token')
         if (!token) throw new Error('Not logged in')
 
-        // --- Fetch profile & tickets
-        const res = await fetch('/api/user/me', {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        const res = await fetch('/api/user/me', { headers: { Authorization: `Bearer ${token}` } })
         if (!res.ok) throw new Error('Failed to load profile')
         const data = await res.json()
 
-        setProfile(data.profile || null)
+        setProfile(data.profile ?? null)
         const userTickets = Array.isArray(data.tickets) ? data.tickets : []
 
-        // fallback ticket_code if missing
+        // Fallback ticket_code
         userTickets.forEach(t => {
           if (!t.ticket_code && t.event_id && data.profile?.id) {
             t.ticket_code = `ticket:${t.event_id}:${data.profile.id}`
           }
         })
+
         setTickets(userTickets)
 
-        // --- Fetch RSVPs
-        const rsvpRes = await fetch('/api/user/rsvps', {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        // Fetch RSVPs
+        const rsvpRes = await fetch('/api/user/rsvps', { headers: { Authorization: `Bearer ${token}` } })
         if (!rsvpRes.ok) throw new Error('Failed to load RSVPs')
         const rsvpData = await rsvpRes.json()
 
@@ -52,8 +48,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
 
         const filteredRsvps = (Array.isArray(rsvpData) ? rsvpData : []).filter(r => {
           if (ticketEventIds.has(r.event_id)) return false
-          const eventDate = new Date(r.date)
-          return eventDate >= cutoff
+          return new Date(r.date) >= cutoff
         })
 
         setRsvps(filteredRsvps)
@@ -68,30 +63,27 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     loadAccount()
   }, [refreshTrigger])
 
-  if (loading)
+  if (loading || error) {
     return (
       <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg p-6 w-full max-w-md text-center">
-          <p data-translate>Loading your account...</p>
+          {loading && <p data-translate>Loading your account...</p>}
+          {error && (
+            <>
+              <p className="text-red-600 mb-4" data-translate>Error: {error}</p>
+              <button
+                onClick={onClose}
+                className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700"
+                data-translate
+              >
+                Close
+              </button>
+            </>
+          )}
         </div>
       </div>
     )
-
-  if (error)
-    return (
-      <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 w-full max-w-md text-center">
-          <p className="text-red-600 mb-4" data-translate>Error: {error}</p>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700"
-            data-translate
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    )
+  }
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
@@ -106,29 +98,26 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
           <>
             {/* Profile Info */}
             <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-zinc-800 p-4 rounded-lg border border-zinc-700">
-              <p><span className="font-semibold text-gray-300" data-translate>Name:</span> {profile.username || '-'}</p>
-              <p><span className="font-semibold text-gray-300" data-translate>Email:</span> {profile.email || '-'}</p>
-              <p><span className="font-semibold text-gray-300" data-translate>Wallet:</span> {profile.wallet_address || '-'}</p>
-              <p><span className="font-semibold text-gray-300" data-translate>City:</span> {profile.city || '-'}</p>
-              <p><span className="font-semibold text-gray-300" data-translate>Tier:</span> {profile.tier || '-'}</p>
-              <p><span className="font-semibold text-gray-300" data-translate>Role:</span> {profile.role || '-'}</p>
+              {['username', 'email', 'wallet_address', 'city', 'tier', 'role'].map((key) => (
+                <p key={key}>
+                  <span className="font-semibold text-gray-300" data-translate>
+                    {key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}:
+                  </span>{' '}
+                  {profile[key] ?? '-'}
+                </p>
+              ))}
             </div>
 
             {/* Tickets Table */}
             <h3 className="text-lg font-semibold mb-2" data-translate>Your Tickets</h3>
-            {tickets.length > 0 ? (
+            {tickets.length ? (
               <div className="overflow-x-auto mb-8">
                 <table className="min-w-full border-collapse border border-zinc-700 text-sm">
                   <thead>
                     <tr className="bg-zinc-800 text-gray-300">
-                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Date</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Time</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Event</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Location</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Price</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Paid</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Popularity</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>QR</th>
+                      {['Date', 'Time', 'Event', 'Location', 'Price', 'Paid', 'Popularity', 'QR'].map((h) => (
+                        <th key={h} className="px-3 py-2 border border-zinc-700 text-left" data-translate>{h}</th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
@@ -144,10 +133,10 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                           <td className="px-3 py-2 border border-zinc-700">
                             <Link href={`/events/${t.event_id}`} className="text-blue-400 hover:underline">{t.event_title}</Link>
                           </td>
-                          <td className="px-3 py-2 border border-zinc-700">{t.location || '-'}</td>
+                          <td className="px-3 py-2 border border-zinc-700">{t.location ?? '-'}</td>
                           <td className="px-3 py-2 border border-zinc-700">{t.event_price ? `${Number(t.event_price).toFixed(2)} DKK` : 'Free'}</td>
                           <td className="px-3 py-2 border border-zinc-700">{t.has_paid ? <span className="text-green-400 font-semibold" data-translate>Yes</span> : <span className="text-yellow-400 font-semibold" data-translate>Free</span>}</td>
-                          <td className="px-3 py-2 border border-zinc-700">{t.popularity || 0}</td>
+                          <td className="px-3 py-2 border border-zinc-700">{t.popularity ?? 0}</td>
                           <td className="px-3 py-2 border border-zinc-700">
                             {t.ticket_code ? (
                               <div className="cursor-pointer" onClick={() => setActiveQR(t.ticket_code)}>
@@ -165,17 +154,14 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
 
             {/* RSVPs Table */}
             <h3 className="text-lg font-semibold mb-2" data-translate>Your RSVPs</h3>
-            {rsvps.length > 0 ? (
+            {rsvps.length ? (
               <div className="overflow-x-auto">
                 <table className="min-w-full border-collapse border border-zinc-700 text-sm">
                   <thead>
                     <tr className="bg-zinc-800 text-gray-300">
-                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Date</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Time</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Event</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Location</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Price</th>
-                      <th className="px-3 py-2 border border-zinc-700 text-left" data-translate>Popularity</th>
+                      {['Date', 'Time', 'Event', 'Location', 'Price', 'Popularity'].map((h) => (
+                        <th key={h} className="px-3 py-2 border border-zinc-700 text-left" data-translate>{h}</th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
@@ -190,9 +176,9 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                           <td className="px-3 py-2 border border-zinc-700">
                             <Link href={`/events/${r.event_id}`} className="text-blue-400 hover:underline">{r.title}</Link>
                           </td>
-                          <td className="px-3 py-2 border border-zinc-700">{r.location || '-'}</td>
+                          <td className="px-3 py-2 border border-zinc-700">{r.location ?? '-'}</td>
                           <td className="px-3 py-2 border border-zinc-700">{r.price ? `${Number(r.price).toFixed(2)} DKK` : 'Free'}</td>
-                          <td className="px-3 py-2 border border-zinc-700">{r.popularity || 0}</td>
+                          <td className="px-3 py-2 border border-zinc-700">{r.popularity ?? 0}</td>
                         </tr>
                       )
                     })}
@@ -202,17 +188,17 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
             ) : <p className="text-gray-400" data-translate>No RSVPs found.</p>}
           </>
         )}
-      </div>
 
-      {/* QR Modal */}
-      {activeQR && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setActiveQR(null)}>
-          <div className="bg-white p-6 rounded-lg shadow-lg">
-            <QRCodeCanvas value={activeQR} size={256} />
-            <p className="text-black text-center mt-4" data-translate>Scan this ticket</p>
+        {/* QR Modal */}
+        {activeQR && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setActiveQR(null)}>
+            <div className="bg-white p-6 rounded-lg shadow-lg">
+              <QRCodeCanvas value={activeQR} size={256} />
+              <p className="text-black text-center mt-4" data-translate>Scan this ticket</p>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

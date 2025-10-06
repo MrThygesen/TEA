@@ -1,4 +1,3 @@
-//_app.js
 import '../styles/globals.css'
 import '@rainbow-me/rainbowkit/styles.css'
 
@@ -25,7 +24,7 @@ export default function App({ Component, pageProps }) {
   // Detect language from URL and update lang state
   useEffect(() => {
     const pathLang = router.asPath.split('/')[1]
-    if (['da', 'de', 'fr'].includes(pathLang)) setLang(pathLang)
+    if (['da', 'de', 'fr', 'es', 'us', 'zh'].includes(pathLang)) setLang(pathLang)
     else setLang('en')
   }, [router.asPath])
 
@@ -37,9 +36,20 @@ export default function App({ Component, pageProps }) {
     setLang(newLang)
     const pathParts = router.asPath.split('/')
     // Replace language in URL if it exists, else add it
-    if (['da', 'de', 'fr'].includes(pathParts[1])) pathParts[1] = newLang
-    else pathParts.unshift('', newLang) // add newLang as prefix
+    if (['da', 'de', 'fr', 'es', 'us', 'zh'].includes(pathParts[1])) pathParts[1] = newLang
+    else pathParts.unshift('', newLang)
     router.push(pathParts.join('/'))
+  }
+
+  // Map of flags
+  const flags = {
+    en: '🇬🇧',
+    da: '🇩🇰',
+    de: '🇩🇪',
+    fr: '🇫🇷',
+    es: '🇪🇸',
+    us: '🇺🇸',
+    zh: '🇨🇳'
   }
 
   return (
@@ -47,18 +57,18 @@ export default function App({ Component, pageProps }) {
       <WagmiConfig config={config}>
         <RainbowKitProvider>
           <LangContext.Provider value={{ lang, setLang }}>
-            {/* Language Selector */}
-            <div className="fixed top-3 right-3 z-50 bg-zinc-900 text-white border border-zinc-700 rounded-md px-2 py-1">
-              <select
-                value={lang}
-                onChange={(e) => handleLangChange(e.target.value)}
-                className="bg-zinc-900 border-none outline-none text-sm"
-              >
-                <option value="en">🇬🇧 EN</option>
-                <option value="da">🇩🇰 DA</option>
-                <option value="de">🇩🇪 DE</option>
-                <option value="fr">🇫🇷 FR</option>
-              </select>
+            {/* Language Flags */}
+            <div className="fixed top-3 right-3 z-50 flex gap-1 bg-zinc-900 border border-zinc-700 rounded-md px-2 py-1">
+              {Object.keys(flags).map((l) => (
+                <button
+                  key={l}
+                  onClick={() => handleLangChange(l)}
+                  className={`text-sm ${lang === l ? 'opacity-100' : 'opacity-60'} hover:opacity-100`}
+                  title={l.toUpperCase()}
+                >
+                  {flags[l]}
+                </button>
+              ))}
             </div>
 
             {/* Main content */}

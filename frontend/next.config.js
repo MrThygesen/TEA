@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   i18n: {
-    locales: ['en', 'da', 'de', 'fr'],
+    locales: ['en', 'da', 'de', 'fr', 'es', 'us', 'zh'],
     defaultLocale: 'en',
     localeDetection: true, // Uses browser language if no /lang path
   },
@@ -10,11 +10,11 @@ const nextConfig = {
       config.module.rules.push({
         test: /HeartbeatWorker\.js$/,
         type: 'asset/source', // Fix Terser issue
-      });
+      })
     }
-    return config;
+    return config
   },
-};
+}
 
-module.exports = nextConfig;
+module.exports = nextConfig
 
