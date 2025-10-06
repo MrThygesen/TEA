@@ -140,13 +140,14 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                           
 
                           <td className="px-3 py-2 border border-zinc-700">
-  {(t.stage === 'book' || t.has_paid) && t.ticket_code ? (
-    <div className="cursor-pointer" onClick={() => setActiveQR(t.ticket_code)}>
-      <QRCodeCanvas value={t.ticket_code} size={48} />
-    </div>
-  ) : (
-    <span className="text-gray-500" data-translate>No QR</span>
-  )}
+ {t.stage === 'book' && t.ticket_code ? (
+  <div className="cursor-pointer" onClick={() => setActiveQR(t.ticket_code)}>
+    <QRCodeCanvas value={t.ticket_code} size={48} />
+  </div>
+) : (
+  <span className="text-gray-500" data-translate>No QR</span>
+)}
+
 </td>
 
                         </tr>
