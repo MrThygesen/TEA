@@ -36,47 +36,47 @@ export default async function handler(req, res) {
     console.log('✅ Stripe session completed:', { eventId, userId, email, quantity })
 
     try {
-      // --- Fetch event info
       const { rows: eventRows } = await pool.query('SELECT * FROM events WHERE id=$1', [eventId])
       if (!eventRows.length) throw new Error('Event not found')
       const eventInfo = eventRows[0]
 
-      // --- Determine DB userId
       const dbUserId = userId === 'guest' ? null : userId
 
-      // --- Fetch pending tickets
-      const { rows: pendingTickets } = await pool.query(
+      // --- Fetch only tickets for this session
+      const { rows: sessionTickets } = await pool.query(
         `SELECT * FROM registrations
-         WHERE event_id = $1
-           AND (user_id = $2 OR email = $3)
-           AND stage = 'prebook'
+         WHERE event_id=$1
+           AND (user_id=$2 OR email=$3)
+           AND stage='prebook'
          ORDER BY id ASC
          LIMIT $4`,
         [eventId, dbUserId, email, quantity]
       )
 
-      if (!pendingTickets.length) {
-        console.warn('⚠ No pending tickets found for this session.')
-      } else {
-        // --- Update tickets to paid
-        const ids = pendingTickets.map((t) => t.id)
-        await pool.query(
-          `UPDATE registrations
-           SET has_paid = TRUE,
-               stage = 'book'
-           WHERE id = ANY($1::int[])`,
-          [ids]
-        )
+      if (!sessionTickets.length) {
+        console.warn('⚠ No prebooked tickets found for this session.')
+        return res.status(200).json({ received: true })
+      }
 
-        // --- Send ticket emails
-        if (email) {
-          const userObj = { id: dbUserId, email }
-          try {
-            await sendTicketEmail(email, eventInfo, userObj, pool)
-            console.log(`✅ Sent ${pendingTickets.length} ticket(s) to ${email}`)
-          } catch (err) {
-            console.error('❌ Error sending ticket email:', err)
-          }
+      const ticketIds = sessionTickets.map(t => t.id)
+
+      // --- Update only these tickets to paid
+      await pool.query(
+        `UPDATE registrations
+         SET has_paid = TRUE,
+             stage = 'book'
+         WHERE id = ANY($1::int[])`,
+        [ticketIds]
+      )
+
+      // --- Send tickets for this session only
+      if (email) {
+        try {
+          // sendTicketEmail should accept a **list of specific tickets**
+          await sendTicketEmail(email, eventInfo, { id: dbUserId, email }, pool, ticketIds)
+          console.log(`✅ Sent ${ticketIds.length} ticket(s) to ${email}`)
+        } catch (err) {
+          console.error('❌ Error sending paid ticket email:', err)
         }
       }
 
@@ -87,7 +87,6 @@ export default async function handler(req, res) {
     }
   }
 
-  // Other event types can be ignored
   res.status(200).json({ received: true })
 }
 
