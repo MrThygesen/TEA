@@ -137,13 +137,18 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                           <td className="px-3 py-2 border border-zinc-700">{t.event_price ? `${Number(t.event_price).toFixed(2)} DKK` : 'Free'}</td>
                           <td className="px-3 py-2 border border-zinc-700">{t.has_paid ? <span className="text-green-400 font-semibold" data-translate>Yes</span> : <span className="text-yellow-400 font-semibold" data-translate>Free</span>}</td>
                           <td className="px-3 py-2 border border-zinc-700">{t.popularity ?? 0}</td>
+                          
+
                           <td className="px-3 py-2 border border-zinc-700">
-                            {t.ticket_code ? (
-                              <div className="cursor-pointer" onClick={() => setActiveQR(t.ticket_code)}>
-                                <QRCodeCanvas value={t.ticket_code} size={48} />
-                              </div>
-                            ) : <span className="text-gray-500" data-translate>No QR</span>}
-                          </td>
+  {(t.stage === 'book' || t.has_paid) && t.ticket_code ? (
+    <div className="cursor-pointer" onClick={() => setActiveQR(t.ticket_code)}>
+      <QRCodeCanvas value={t.ticket_code} size={48} />
+    </div>
+  ) : (
+    <span className="text-gray-500" data-translate>No QR</span>
+  )}
+</td>
+
                         </tr>
                       )
                     })}
