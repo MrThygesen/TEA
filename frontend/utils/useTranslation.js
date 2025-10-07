@@ -2,11 +2,10 @@
 import { useState, useEffect } from 'react'
 import en from '../locales/en.json'
 import da from '../locales/da.json'
-import ru from '../locales/ru.json'
 import fr from '../locales/fr.json'
 
 // ✅ Static imports = Webpack friendly
-const translations = { en, da, ru, fr }
+const translations = { en, da, fr }
 
 export default function useTranslation() {
   const [lang, setLang] = useState('en')
