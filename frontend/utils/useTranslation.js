@@ -4,11 +4,13 @@ import en from '../locales/en.json'
 import da from '../locales/da.json'
 import fr from '../locales/fr.json'
 
+// Static imports = Webpack friendly
 const translations = { en, da, fr }
 
 export default function useTranslation() {
   const [lang, setLang] = useState('en')
 
+  // Load saved language from localStorage (client-side only)
   useEffect(() => {
     const stored = localStorage.getItem('language')
     if (stored && translations[stored]) {
@@ -16,6 +18,7 @@ export default function useTranslation() {
     }
   }, [])
 
+  // Change language and persist
   function changeLang(newLang) {
     if (translations[newLang]) {
       localStorage.setItem('language', newLang)
@@ -23,6 +26,7 @@ export default function useTranslation() {
     }
   }
 
+  // Translate function
   function t(key) {
     return translations[lang]?.[key] || key
   }
