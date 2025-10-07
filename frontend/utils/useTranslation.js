@@ -1,13 +1,10 @@
 'use client'
 import { useState, useEffect } from 'react'
+import en from '../locales/en.json'
+import da from '../locales/da.json'
+import fr from '../locales/fr.json'
 
-// Dynamically import all locales
-const translations = {}
-const localeModules = import.meta.glob('../locales/*.json', { eager: true })
-for (const path in localeModules) {
-  const lang = path.match(/\/([a-z]+)\.json$/i)?.[1]
-  if (lang) translations[lang] = localeModules[path].default
-}
+const translations = { en, da, fr }
 
 export default function useTranslation() {
   const [lang, setLang] = useState('en')
