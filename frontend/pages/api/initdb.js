@@ -64,31 +64,33 @@ export default async function handler(req, res) {
     `)
 
     // EVENTS
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS events (
-        id SERIAL PRIMARY KEY,
-        group_id INTEGER,
-        name TEXT NOT NULL,
-        city TEXT NOT NULL,
-        datetime TIMESTAMPTZ NOT NULL,
-        min_attendees INTEGER DEFAULT 1,
-        max_attendees INTEGER DEFAULT 40,
-        is_confirmed BOOLEAN DEFAULT FALSE,
-        description TEXT,
-        details TEXT,
-        venue TEXT,
-        venue_type TEXT,
-        basic_perk TEXT,
-        advanced_perk TEXT,
-        tag1 TEXT,
-        tag2 TEXT,
-        tag3 TEXT,
-        price NUMERIC(10,2) DEFAULT 0,
-        image_url TEXT,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-      );
-    `)
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS events (
+    id SERIAL PRIMARY KEY,
+    group_id INTEGER,
+    name TEXT NOT NULL,
+    city TEXT NOT NULL,
+    datetime TIMESTAMPTZ NOT NULL,
+    min_attendees INTEGER DEFAULT 1,
+    max_attendees INTEGER DEFAULT 40,
+    is_confirmed BOOLEAN DEFAULT FALSE,
+    description TEXT,
+    details TEXT,
+    venue TEXT,
+    venue_type TEXT,
+    basic_perk TEXT,
+    advanced_perk TEXT,
+    tag1 TEXT,
+    tag2 TEXT,
+    tag3 TEXT,
+    tag4 TEXT, -- ✅ new column for extra tags (for filtering, categories, etc.)
+    language TEXT DEFAULT 'English', -- ✅ new column for event language
+    price NUMERIC(10,2) DEFAULT 0,
+    image_url TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+  );
+`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_events_city ON events(LOWER(city));`)
 
     // REGISTRATIONS

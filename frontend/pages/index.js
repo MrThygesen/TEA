@@ -8,6 +8,7 @@ import { toast } from 'react-hot-toast'
 import YourAccountModal from '../components/YourAccountModal'
 import Image from 'next/image'
 import EventPolicy from '../components/EventPolicy'
+import useTranslation from '../utils/useTranslation'
 
 //import AdminSBTManager from '../components/AdminSBTManager'
 
@@ -290,9 +291,10 @@ function EventListRow({ event, onPreview }) {
 // Main Home Component
 // ---------------------------
 
-
 export default function Home() {
   const { address } = useAccount()
+  const { t, lang, changeLang } = useTranslation()
+
 //  const [adminAddr, setAdminAddr] = useState(null)
 //  useEffect(() => { setAdminAddr(process.env.NEXT_PUBLIC_ADMIN?.toLowerCase?.() || null) }, [])
 //  const isAdmin = !!(address && adminAddr && address.toLowerCase() === adminAddr)
@@ -477,7 +479,28 @@ useEffect(() => {
   }
 
   return (
-    <main className="bg-black text-white min-h-screen flex flex-col items-center py-12 px-4">
+    <main className="bg-black text-white min-h-screen flex flex-col items-center py-12 px-4"> 
+
+<div className="flex gap-3 justify-center mt-6">
+  <select
+    className="bg-zinc-800 text-white p-2 rounded"
+    value={lang}
+    onChange={(e) => changeLang(e.target.value)}
+  >
+    <option value="en">🇬🇧 English</option>
+    <option value="zh">🇨🇳 中文</option>
+    <option value="hi">🇮🇳 हिंदी</option>
+    <option value="es">🇪🇸 Español</option>
+    <option value="ar">🇸🇦 العربية</option>
+    <option value="fr">🇫🇷 Français</option>
+    <option value="pt">🇧🇷 Português</option>
+    <option value="ru">🇷🇺 Русский</option>
+    <option value="de">🇩🇪 Deutsch</option>
+    <option value="da">🇩🇰 Dansk</option>
+  </select>
+</div>
+
+
       <div className="w-full max-w-3xl space-y-10">
 
         {/* HEADER */}
