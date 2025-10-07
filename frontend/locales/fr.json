@@ -1,6 +1,3 @@
-# Traduction française des textes UI
-
-```json
 {
   "PlatformTitle": "PLATEFORME D'ÉVÉNEMENTS EDGY",
   "CreateAccount": "Créer un compte",
@@ -76,4 +73,4 @@
   "ShowQRAtEntrance": "Veuillez présenter ce code QR à l'entrée :",
   "ViewInApp": "Voir dans l'application"
 }
-```
+
