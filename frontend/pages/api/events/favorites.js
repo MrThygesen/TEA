@@ -21,7 +21,7 @@ export default async function handler(req, res) {
   try {
     // ✅ Toggle like/unlike
     const check = await pool.query(
-      'SELECT 1 FROM hearts WHERE event_id = $1 AND user_id = $2',
+      'SELECT 1 FROM favorites WHERE event_id = $1 AND user_id = $2',
       [eventId, payload.id]
     )
 
@@ -33,7 +33,7 @@ export default async function handler(req, res) {
 
     // ✅ Return updated like count
     const { rows } = await pool.query(
-      'SELECT COUNT(*) AS count FROM hearts WHERE event_id = $1',
+      'SELECT COUNT(*) AS count FROM favorites WHERE event_id = $1',
       [eventId]
     )
 
