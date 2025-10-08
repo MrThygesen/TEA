@@ -83,13 +83,9 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
         setUserTickets(total)
         setMaxPerUser(event.tag1 === 'group' ? 5 : 1)
 
-        // derive totalBooked for this event
-        const allTickets = Array.isArray(data.tickets) ? data.tickets : []
-        const totalForEvent = allTickets
-          .filter((t) => t.event_id === event.id)
-          .reduce((sum, t) => sum + (t.quantity || 1), 0)
+// derive totalBooked globally (same as YourAccountModal)
+setTotalBooked(event.popularity || 0)
 
-        setTotalBooked(totalForEvent)
       } catch (err) {
         console.error('fetchFromMe error:', err)
       }
