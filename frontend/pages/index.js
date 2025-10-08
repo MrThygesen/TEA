@@ -30,19 +30,27 @@ function clearAuth() {
 }
 
 // ---------------------------
-// Dynamic Event Card (using myTickets popularity)
+// Dynamic Event Card (updated)
 // ---------------------------
-export function DynamicEventCard({ event, authUser, setShowAccountModal, refreshTrigger, setRefreshTrigger }) {
+export function DynamicEventCard({
+  event,
+  authUser,
+  setShowAccountModal,
+  refreshTrigger,
+  setRefreshTrigger,
+}) {
   const [heartCount, setHeartCount] = useState(0)
   const [bookable, setBookable] = useState(event.is_confirmed)
-  const [userTickets, setUserTickets] = useState(0)
-  const [popularity, setPopularity] = useState(0) // ✅ uses myTickets
+  const [userTickets, setUserTickets] = useState(0)       // user's own booked tickets
+  const [totalBooked, setTotalBooked] = useState(0)       // global booked/popularity
   const [showPolicyModal, setShowPolicyModal] = useState(false)
+  const [showPerks, setShowPerks] = useState(false)       // hover / background perks reveal
   const { t } = useTranslation()
 
   const HEART_THRESHOLD = 0
   const reachedLimit = userTickets >= (event.tag1 === 'group' ? 5 : 1)
 
+  // --- fetch hearts ---
   useEffect(() => {
     async function fetchHearts() {
       try {
@@ -56,8 +64,9 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       }
     }
     fetchHearts()
-  }, [event.id, event.is_confirmed])
+  }, [event.id, event.is_confirmed, refreshTrigger])
 
+  // --- fetch user's tickets (myTickets) ---
   useEffect(() => {
     if (!authUser) return
     async function fetchMyTickets() {
@@ -65,17 +74,18 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
         const token = localStorage.getItem('token')
         if (!token || token.split('.').length !== 3) return
         const res = await fetch('/api/user/myTickets', {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         })
         if (!res.ok) return
         const data = await res.json()
-        const myTickets = (data.tickets || []).filter(t => t.event_id === event.id)
+        // find tickets for this event
+        const myTickets = (data.tickets || []).filter((t) => t.event_id === event.id)
         const total = myTickets.reduce((sum, t) => sum + (t.quantity || 1), 0)
         setUserTickets(total)
-
-        // ✅ Set popularity from API (even if user not booked)
-        if (myTickets.length > 0 && myTickets[0].popularity) {
-          setPopularity(myTickets[0].popularity)
+        // If backend included a popularity field in the ticket rows (some endpoints do),
+        // we can opportunistically use it to seed the global count:
+        if (myTickets.length > 0 && typeof myTickets[0].popularity === 'number') {
+          setTotalBooked(Number(myTickets[0].popularity))
         }
       } catch (err) {
         console.error('myTickets error:', err)
@@ -84,6 +94,72 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
     fetchMyTickets()
   }, [authUser, event.id, refreshTrigger])
 
+  // --- fetch global booked/popularity ---
+  useEffect(() => {
+    let cancelled = false
+
+    async function fetchBooked() {
+      // Try a dedicated endpoint first (recommended):
+      try {
+        const res = await fetch(`/api/events/booked?eventId=${event.id}`)
+        if (res.ok) {
+          const json = await res.json()
+          if (!cancelled && typeof json.count === 'number') {
+            setTotalBooked(Number(json.count))
+            return
+          }
+        }
+      } catch (err) {
+        // ignore and try fallbacks
+      }
+
+      // Fallback: if user is authenticated, try to get popularity from /api/user/myTickets (some setups include popularity)
+      if (authUser) {
+        try {
+          const token = localStorage.getItem('token')
+          if (token && token.split('.').length === 3) {
+            const res = await fetch('/api/user/myTickets', {
+              headers: { Authorization: `Bearer ${token}` },
+            })
+            if (res.ok) {
+              const data = await res.json()
+              // find any ticket row for the event and use its popularity if present
+              const any = (data.tickets || []).find((t) => t.event_id === event.id && typeof t.popularity === 'number')
+              if (any && !cancelled) {
+                setTotalBooked(Number(any.popularity))
+                return
+              }
+            }
+          }
+        } catch (err) {
+          // ignore
+        }
+      }
+
+      // Last fallback: try to fetch aggregated registrations count from a public endpoint
+      // (if you have /api/events/popularity or /api/dump that returns counts, it will be used here)
+      try {
+        const res = await fetch(`/api/events/popularity?eventId=${event.id}`)
+        if (res.ok) {
+          const json = await res.json()
+          if (!cancelled && typeof json.count === 'number') {
+            setTotalBooked(Number(json.count))
+            return
+          }
+        }
+      } catch (err) {
+        // nothing else we can do on the front-end
+      }
+
+      // final fallback: zero (or keep previous)
+      if (!cancelled) setTotalBooked((prev) => prev || 0)
+    }
+
+    fetchBooked()
+    return () => { cancelled = true }
+  }, [event.id, authUser, refreshTrigger])
+
+  // --- Heart / Favorite toggle ---
   async function handleHeartClick() {
     try {
       const token = localStorage.getItem('token') || ''
@@ -93,19 +169,22 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       const res = await fetch('/api/events/favorites', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ eventId: event.id })
+        body: JSON.stringify({ eventId: event.id }),
       })
 
       if (!res.ok) throw new Error('Failed to like')
       const data = await res.json()
       if (data && typeof data.count === 'number') setHeartCount(data.count)
       toast.success('❤️ Liked!')
+      // refresh popularity/booking numbers in case your backend ties favorites -> bookable
+      setRefreshTrigger((p) => p + 1)
     } catch (err) {
       console.error(err)
       toast.error('❌ Error liking event (try again later)')
     }
   }
 
+  // --- RSVP ---
   async function handleRSVPClick() {
     if (!authUser) {
       setShowAccountModal(true)
@@ -118,57 +197,110 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       const res = await fetch('/api/events/rsvp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
-        body: JSON.stringify({ eventId: event.id })
+        body: JSON.stringify({ eventId: event.id }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to RSVP')
       toast.success('🎉 RSVP confirmed!')
-      setRefreshTrigger(prev => prev + 1)
+      setRefreshTrigger((p) => p + 1)
     } catch (err) {
       console.error(err)
       toast.error('❌ Could not save RSVP. Maybe you already RSVPed?')
     }
   }
 
+  // Language flag
   const langFlag = {
-    English: '🇬🇧', Mandarin: '🇨🇳', Hindi: '🇮🇳', Spanish: '🇪🇸', Arabic: '🇸🇦',
-    French: '🇫🇷', Portuguese: '🇧🇷', Russian: '🇷🇺', German: '🇩🇪', Danish: '🇩🇰'
+    English: '🇬🇧',
+    Mandarin: '🇨🇳',
+    Hindi: '🇮🇳',
+    Spanish: '🇪🇸',
+    Arabic: '🇸🇦',
+    French: '🇫🇷',
+    Portuguese: '🇧🇷',
+    Russian: '🇷🇺',
+    German: '🇩🇪',
+    Danish: '🇩🇰',
   }[event.language || 'English']
+
+  // Perks reveal handlers (hover + click-on-background)
+  let perksTimeout = null
+  const handleMouseEnter = () => {
+    setShowPerks(true)
+    // auto-hide after 4s
+    perksTimeout = setTimeout(() => setShowPerks(false), 4000)
+  }
+  const handleMouseLeave = () => {
+    if (perksTimeout) clearTimeout(perksTimeout)
+    setShowPerks(false)
+  }
+  const handleCardClick = (e) => {
+    // only toggle perks if the click is on the background (not buttons/links)
+    if (e.target.closest('button, a')) return
+    setShowPerks((s) => !s)
+    // auto-hide
+    if (perksTimeout) clearTimeout(perksTimeout)
+    perksTimeout = setTimeout(() => setShowPerks(false), 4000)
+  }
 
   return (
     <>
-      <div className="border border-zinc-700 rounded-xl p-5 bg-gradient-to-b from-zinc-900 to-zinc-800 shadow-lg relative transition hover:shadow-2xl hover:border-blue-500 flex flex-col">
+      <div
+        className="border border-zinc-700 rounded-xl p-5 bg-gradient-to-b from-zinc-900 to-zinc-800 shadow-lg relative transition hover:shadow-2xl hover:border-blue-500 flex flex-col"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onClick={handleCardClick}
+        role="button"
+        tabIndex={0}
+      >
         <div className="absolute top-2 right-2 text-xl">{langFlag}</div>
-        <h3 className="text-lg font-bold mb-1">{event.name}</h3>
-        <p className="text-xs text-gray-400 mb-3">
+
+        {/* Perks overlay (mysterious effect) */}
+        <div
+          aria-hidden
+          className={`pointer-events-none absolute inset-0 rounded-xl transition-all duration-300 ease-out
+            ${showPerks ? 'bg-black/40 backdrop-blur-sm' : 'bg-transparent'}`}
+        >
+          {showPerks && (
+            <div className="absolute left-4 bottom-4 p-3 rounded-lg bg-gradient-to-br from-white/5 to-white/3 text-xs text-white max-w-xs shadow-lg animate-[float_6s_ease-in-out_infinite]">
+              {event.basic_perk && <div className="mb-1">✨ <strong>Basic:</strong> {event.basic_perk}</div>}
+              {event.advanced_perk && <div>🔮 <strong>Advanced:</strong> {event.advanced_perk}</div>}
+              {!event.basic_perk && !event.advanced_perk && <div>✨ Special perks available at the event</div>}
+            </div>
+          )}
+        </div>
+
+        <h3 className="text-lg font-bold mb-1 z-10">{event.name}</h3>
+        <p className="text-xs text-gray-400 mb-3 z-10">
           📅 {new Date(event.datetime).toLocaleDateString()} · 📍 {event.city}
         </p>
 
-        <p className="text-sm text-gray-300 mb-3 truncate">
-          {event.description?.split(" ").slice(0,10).join(" ")}...
-        </p>
+        <p className="text-sm text-gray-300 mb-3 truncate z-10">{event.description?.split(' ').slice(0, 10).join(' ')}...</p>
 
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2 mb-4 z-10">
           {[event.tag1, event.tag2, event.tag3, event.tag4].filter(Boolean).map((tag, idx) => (
             <span key={idx} className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-600 text-white">{tag}</span>
           ))}
         </div>
 
-        <div className="flex flex-col gap-2 mt-auto">
-          <a href={`/event/${event.id}`} className="w-full px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm text-center transition">
-            {t("MoreInfo")}
+        <div className="flex flex-col gap-2 mt-auto z-10">
+          <a
+            href={`/event/${event.id}`}
+            className="w-full px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm text-center transition"
+          >
+            {t('MoreInfo')}
           </a>
 
           <div className="flex justify-between mt-2">
             <button
-              onClick={() => authUser ? setShowPolicyModal(true) : setShowAccountModal(true)}
+              onClick={() => (authUser ? setShowPolicyModal(true) : setShowAccountModal(true))}
               className="px-3 py-1 rounded bg-green-600 hover:bg-green-700 text-white text-sm"
             >
-              {t("Book")}
+              {t('Book')}
             </button>
 
             <button onClick={handleRSVPClick} className="px-3 py-1 rounded bg-yellow-500 hover:bg-yellow-600 text-black text-sm">
-              {t("RSVP")}
+              {t('RSVP')}
             </button>
 
             <button onClick={handleHeartClick} className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm flex items-center gap-1">
@@ -177,9 +309,13 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
           </div>
         </div>
 
-        <div className="mt-3 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
-          <span>💰 {event.price && Number(event.price) > 0 ? `${Number(event.price).toFixed(2)} USD` : t("Free")}</span>
-          <span>👥 {popularity} attending</span> {/* ✅ uses unified popularity */}
+        <div className="mt-3 border-t border-zinc-700 pt-2 flex flex-col sm:flex-row sm:justify-between items-start sm:items-center text-xs text-gray-400 z-10 gap-1">
+          <span>💰 {event.price && Number(event.price) > 0 ? `${Number(event.price).toFixed(2)} USD` : t('Free')}</span>
+
+          {/* Show global booked count together with user's own tickets */}
+          <span>
+            👥 {totalBooked} / {event.max_attendees || '∞'} booked {authUser ? ` · You: ${userTickets}` : ''}
+          </span>
         </div>
       </div>
 
@@ -189,8 +325,10 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
             <EventPolicy
               event={event}
               onBookingSuccess={(data) => {
-                setUserTickets(prev => prev + (data?.quantity || 1))
-                setRefreshTrigger(prev => prev + 1)
+                // data?.quantity is expected from EventPolicy
+                setUserTickets((prev) => prev + (data?.quantity || 1))
+                // bump refresh trigger to refresh counts across page
+                setRefreshTrigger((p) => p + 1)
                 setShowPolicyModal(false)
               }}
               onClose={() => setShowPolicyModal(false)}
