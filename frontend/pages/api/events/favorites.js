@@ -1,34 +1,32 @@
-import { auth } from '../../../lib/auth'
 import { pool } from '../../../lib/postgres.js'
+import { getUserFromJWT } from '../../../lib/auth.js'
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+  const user = getUserFromJWT(req)
+  if (!user) return res.status(401).json({ error: 'Unauthorized' })
 
-  const token = auth.getTokenFromReq(req)
-  const decoded = token ? auth.verifyToken(token) : null
-  if (!decoded) return res.status(401).json({ error: 'Unauthorized' })
-
-  const { eventId } = req.body
+  const { eventId } = req.body || {}
   if (!eventId) return res.status(400).json({ error: 'Missing eventId' })
 
   try {
-    // Insert once per user (duplicate likes ignored)
-    await pool.query(
-      `INSERT INTO favorites (event_id, user_id)
-       VALUES ($1, $2)
-       ON CONFLICT DO NOTHING`,
-      [eventId, decoded.id]
-    )
+    // Prevent duplicates — only one like per user per event
+    await pool.query(`
+      INSERT INTO hearts (user_id, event_id)
+      VALUES ($1, $2)
+      ON CONFLICT (user_id, event_id) DO NOTHING
+    `, [user.id, eventId])
 
-    const { rows } = await pool.query(
-      'SELECT COUNT(*)::int AS count FROM favorites WHERE event_id = $1',
-      [eventId]
-    )
+    // Return unique like count
+    const { rows } = await pool.query(`
+      SELECT COUNT(DISTINCT user_id) AS count
+      FROM hearts
+      WHERE event_id = $1
+    `, [eventId])
 
-    res.json({ count: rows[0]?.count || 0 })
+    res.json({ count: parseInt(rows[0].count, 10) })
   } catch (err) {
-    console.error('Favorites error:', err)
-    res.status(500).json({ error: 'Failed to save favorite' })
+    console.error('favorites error:', err)
+    res.status(500).json({ error: 'Database error' })
   }
 }
 
