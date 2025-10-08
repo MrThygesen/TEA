@@ -203,11 +203,18 @@ if (ticketRow && ticketRow.popularity !== undefined && ticketRow.popularity !== 
   }
 
   return (
-    <div
-      className="border border-zinc-700 rounded-xl p-5 bg-gradient-to-b from-zinc-900 to-zinc-800 shadow-lg relative transition hover:shadow-2xl hover:border-blue-500 flex flex-col overflow-hidden"
-      onMouseEnter={() => setShowPerks(true)}
-      onMouseLeave={() => setShowPerks(false)}
-    >
+<div
+  className="relative bg-zinc-900 border border-zinc-700 rounded-xl p-4 transition hover:bg-zinc-800 hover:shadow-lg cursor-pointer"
+  onClick={(e) => {
+    // Only trigger when clicking background — not buttons or links
+    const tag = e.target.tagName.toLowerCase()
+    if (['button', 'a', 'svg', 'path', 'input', 'textarea'].includes(tag)) return
+    setShowDetails(true) // 👈 your modal or detail view trigger
+  }}
+  onMouseEnter={() => setHovered(true)}
+  onMouseLeave={() => setHovered(false)}
+>
+
       {/* Hover overlay */}
       <div
         className={`absolute inset-0 bg-[rgba(64,48,24,0.85)] backdrop-blur-sm text-white flex flex-col items-center justify-center p-4 text-sm text-center z-20 transition-all duration-300 ${
