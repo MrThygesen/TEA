@@ -84,7 +84,21 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
         setMaxPerUser(event.tag1 === 'group' ? 5 : 1)
 
 // derive totalBooked globally (same as YourAccountModal)
-setTotalBooked(event.popularity || 0)
+
+const ticketRow = (Array.isArray(data.tickets) ? data.tickets : []).find(
+  (t) => Number(t.event_id) === Number(event.id)
+)
+
+if (ticketRow && ticketRow.popularity !== undefined && ticketRow.popularity !== null) {
+  // Use server-calculated global popularity when provided (matches YourAccountModal)
+  setTotalBooked(Number(ticketRow.popularity) || 0)
+} else {
+  // Fallback: sum quantities for this event from returned tickets
+  const fallbackTotal = (Array.isArray(data.tickets) ? data.tickets : [])
+    .filter((t) => Number(t.event_id) === Number(event.id))
+    .reduce((sum, t) => sum + (t.quantity || 1), 0)
+  setTotalBooked(fallbackTotal)
+}
 
       } catch (err) {
         console.error('fetchFromMe error:', err)
