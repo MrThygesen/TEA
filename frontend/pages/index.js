@@ -61,43 +61,41 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
     fetchHearts()
   }, [event.id, event.is_confirmed])
 
-  // --- fetch user tickets ---
+  // --- fetch user tickets & totalBooked from /api/user/me ---
   useEffect(() => {
     if (!authUser) return
-    async function fetchMyTickets() {
+    async function fetchFromMe() {
       try {
         const token = localStorage.getItem('token')
         if (!token || token.split('.').length !== 3) return
-        const res = await fetch('/api/user/myTickets', {
-          headers: { Authorization: `Bearer ${token}` }
+
+        const res = await fetch('/api/user/me', {
+          headers: { Authorization: `Bearer ${token}` },
         })
         if (!res.ok) return
         const data = await res.json()
-        const myTickets = (data.tickets || []).filter(t => t.event_id === event.id)
+
+        const myTickets = Array.isArray(data.tickets)
+          ? data.tickets.filter((t) => t.event_id === event.id)
+          : []
+
         const total = myTickets.reduce((sum, t) => sum + (t.quantity || 1), 0)
         setUserTickets(total)
         setMaxPerUser(event.tag1 === 'group' ? 5 : 1)
-      } catch (err) {
-        console.error('myTickets error:', err)
-      }
-    }
-    fetchMyTickets()
-  }, [authUser, event.id, event.tag1, refreshTrigger])
 
-  // --- fetch total booked ---
-  useEffect(() => {
-    async function fetchTotalBooked() {
-      try {
-        const res = await fetch(`/api/events/totalBooked?eventId=${event.id}`)
-        if (!res.ok) return
-        const data = await res.json()
-        setTotalBooked(data.total || 0)
+        // derive totalBooked for this event
+        const allTickets = Array.isArray(data.tickets) ? data.tickets : []
+        const totalForEvent = allTickets
+          .filter((t) => t.event_id === event.id)
+          .reduce((sum, t) => sum + (t.quantity || 1), 0)
+
+        setTotalBooked(totalForEvent)
       } catch (err) {
-        console.error('totalBooked error:', err)
+        console.error('fetchFromMe error:', err)
       }
     }
-    fetchTotalBooked()
-  }, [event.id, refreshTrigger])
+    fetchFromMe()
+  }, [authUser, event.id, event.tag1, refreshTrigger])
 
   // --- booking handler ---
   async function handleBooking() {
@@ -113,14 +111,14 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       const res = await fetch('/api/events/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ eventId: event.id, quantity, email })
+        body: JSON.stringify({ eventId: event.id, quantity, email }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Registration failed')
 
       setUserTickets(data.userTickets || userTickets + quantity)
-      setTotalBooked(prev => prev + quantity) // instant UI update
-      setRefreshTrigger(prev => prev + 1)
+      setTotalBooked((prev) => prev + quantity)
+      setRefreshTrigger((prev) => prev + 1)
 
       if (event.price && Number(event.price) > 0) {
         if (data.clientSecret) {
@@ -151,7 +149,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       const res = await fetch('/api/events/favorites', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ eventId: event.id })
+        body: JSON.stringify({ eventId: event.id }),
       })
 
       if (!res.ok) throw new Error('Failed to like')
@@ -181,13 +179,13 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       const res = await fetch('/api/events/rsvp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
-        body: JSON.stringify({ eventId: event.id })
+        body: JSON.stringify({ eventId: event.id }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to RSVP')
 
       toast.success('🎉 RSVP confirmed and added to Your Account!')
-      setRefreshTrigger(prev => prev + 1)
+      setRefreshTrigger((prev) => prev + 1)
     } catch (err) {
       console.error(err)
       toast.error('❌ Could not save RSVP. Maybe you already RSVPed?')
@@ -195,80 +193,81 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
   }
 
   return (
-    <>
+    <div
+      className="border border-zinc-700 rounded-xl p-5 bg-gradient-to-b from-zinc-900 to-zinc-800 shadow-lg relative transition hover:shadow-2xl hover:border-blue-500 flex flex-col overflow-hidden"
+      onMouseEnter={() => setShowPerks(true)}
+      onMouseLeave={() => setShowPerks(false)}
+    >
+      {/* Hover overlay */}
       <div
-        className="border border-zinc-700 rounded-xl p-5 bg-gradient-to-b from-zinc-900 to-zinc-800 shadow-lg relative transition hover:shadow-2xl hover:border-blue-500 flex flex-col overflow-hidden"
-        onMouseEnter={() => setShowPerks(true)}
-        onMouseLeave={() => setShowPerks(false)}
+        className={`absolute inset-0 bg-[rgba(64,48,24,0.85)] backdrop-blur-sm text-white flex flex-col items-center justify-center p-4 text-sm text-center z-20 transition-all duration-300 ${
+          showPerks ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
       >
-        {/* Hover overlay for perks */}
-        <div
-          className={`absolute inset-0 bg-[rgba(64,48,24,0.85)] backdrop-blur-sm text-white flex flex-col items-center justify-center p-4 text-sm text-center z-20 transition-all duration-300 ${
-            showPerks ? 'opacity-100' : 'opacity-0 pointer-events-none'
-          }`}
-        >
-          <h4 className="text-lg font-bold mb-2">🎁 Event Perks</h4>
-          <p className="text-xs text-gray-200 max-w-xs">
-            Access exclusive rewards, member bonuses, and surprise gifts tied to this event.
-          </p>
-        </div>
-
-        {/* Title + Date/City */}
-        <h3 className="text-lg font-bold mb-1">{event.name}</h3>
-        <p className="text-xs text-gray-400 mb-3">
-          📅 {new Date(event.datetime).toLocaleDateString()} · 📍 {event.city}
+        <h4 className="text-lg font-bold mb-2">🎁 Event Perks</h4>
+        <p className="text-xs text-gray-200 max-w-xs">
+          Access exclusive rewards, member bonuses, and surprise gifts tied to this event.
         </p>
+      </div>
 
-        {/* Short text */}
-        <p className="text-sm text-gray-300 mb-3 truncate">{event.description?.split(" ").slice(0, 10).join(" ")}...</p>
+      {/* Title + Date/City */}
+      <h3 className="text-lg font-bold mb-1">{event.name}</h3>
+      <p className="text-xs text-gray-400 mb-3">
+        📅 {new Date(event.datetime).toLocaleDateString()} · 📍 {event.city}
+      </p>
 
-        {/* Tags */}
-        <div className="flex gap-2 mb-4">
-          {[event.tag1, event.tag2, event.tag3].filter(Boolean).map((tag, idx) => (
+      {/* Short text */}
+      <p className="text-sm text-gray-300 mb-3 truncate">{event.description?.split(' ').slice(0, 10).join(' ')}...</p>
+
+      {/* Tags */}
+      <div className="flex gap-2 mb-4">
+        {[event.tag1, event.tag2, event.tag3]
+          .filter(Boolean)
+          .map((tag, idx) => (
             <span key={idx} className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-600 text-white">
               {tag}
             </span>
           ))}
-        </div>
+      </div>
 
-        {/* Actions */}
-        <div className="flex flex-col gap-2 mt-auto">
-          <a
-            href={`/event/${event.id}`}
-            className="w-full px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm text-center transition"
+      {/* Actions */}
+      <div className="flex flex-col gap-2 mt-auto">
+        <a
+          href={`/event/${event.id}`}
+          className="w-full px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm text-center transition"
+        >
+          More Info
+        </a>
+
+        <div className="flex justify-between mt-2">
+          <button
+            onClick={handleRSVPClick}
+            className="px-3 py-1 rounded bg-yellow-500 hover:bg-yellow-600 text-black text-sm"
           >
-            More Info
-          </a>
-
-          <div className="flex justify-between mt-2">
-            <button
-              onClick={handleRSVPClick}
-              className="px-3 py-1 rounded bg-yellow-500 hover:bg-yellow-600 text-black text-sm"
-            >
-              📌 RSVP
-            </button>
-            <button
-              onClick={handleHeartClick}
-              className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm flex items-center gap-1"
-            >
-              ❤️ {heartCount}
-            </button>
-          </div>
-        </div>
-
-        {/* Footer info */}
-        <div className="mt-3 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
-          <span>
-            💰 {event.price && Number(event.price) > 0 ? `${Number(event.price).toFixed(2)} USD` : 'Free'}
-          </span>
-          <span>
-            👥 {totalBooked} / {event.max_attendees || '∞'} booked
-          </span>
+            📌 RSVP
+          </button>
+          <button
+            onClick={handleHeartClick}
+            className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm flex items-center gap-1"
+          >
+            ❤️ {heartCount}
+          </button>
         </div>
       </div>
-    </>
+
+      {/* Footer info */}
+      <div className="mt-3 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
+        <span>
+          💰 {event.price && Number(event.price) > 0 ? `${Number(event.price).toFixed(2)} USD` : 'Free'}
+        </span>
+        <span>
+          👥 {totalBooked} / {event.max_attendees || '∞'} booked
+        </span>
+      </div>
+    </div>
   )
 }
+
 
 
 /////////////////////////////// VIDEO ///////
