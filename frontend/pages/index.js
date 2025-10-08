@@ -206,10 +206,11 @@ if (ticketRow && ticketRow.popularity !== undefined && ticketRow.popularity !== 
 <div
   className="relative bg-zinc-900 border border-zinc-700 rounded-xl p-4 transition hover:bg-zinc-800 hover:shadow-lg cursor-pointer"
   onClick={(e) => {
-    // Only trigger when clicking background — not buttons or links
-    const tag = e.target.tagName.toLowerCase()
-    if (['button', 'a', 'svg', 'path', 'input', 'textarea'].includes(tag)) return
-    setShowDetails(true) // 👈 your modal or detail view trigger
+  const tag = e.target.tagName.toLowerCase()
+  if (['button', 'a', 'svg', 'path', 'input', 'textarea'].includes(tag)) return
+  setShowPerks(true)
+}}
+ // 👈 your modal or detail view trigger
   }}
   onMouseEnter={() => setHovered(true)}
   onMouseLeave={() => setHovered(false)}
@@ -247,30 +248,32 @@ if (ticketRow && ticketRow.popularity !== undefined && ticketRow.popularity !== 
           ))}
       </div>
 
-      {/* Actions */}
-      <div className="flex flex-col gap-2 mt-auto">
-        <a
-          href={`/event/${event.id}`}
-          className="w-full px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm text-center transition"
-        >
-          More Info
-        </a>
+{/* Actions */}
+<div className="flex flex-col gap-2 mt-auto">
+  <div className="flex justify-between mt-2">
+    <button
+      onClick={handleRSVPClick}
+      className="px-3 py-1 rounded bg-yellow-500 hover:bg-yellow-600 text-black text-sm"
+    >
+      📌 RSVP
+    </button>
 
-        <div className="flex justify-between mt-2">
-          <button
-            onClick={handleRSVPClick}
-            className="px-3 py-1 rounded bg-yellow-500 hover:bg-yellow-600 text-black text-sm"
-          >
-            📌 RSVP
-          </button>
-          <button
-            onClick={handleHeartClick}
-            className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm flex items-center gap-1"
-          >
-            ❤️ {heartCount}
-          </button>
-        </div>
-      </div>
+    <button
+      onClick={handleBooking}
+      className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm"
+      disabled={loading || reachedLimit}
+    >
+      🎟️ Book
+    </button>
+
+    <button
+      onClick={handleHeartClick}
+      className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm flex items-center gap-1"
+    >
+      ❤️ {heartCount}
+    </button>
+  </div>
+</div>
 
       {/* Footer info */}
       <div className="mt-3 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
