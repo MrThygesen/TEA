@@ -12,7 +12,7 @@ import es from '../locales/es.json'
 import zh from '../locales/ru.json'
 
 // Static imports = Webpack friendly
-const translations = { en, da, fr, hi, ar, ru, pt, es, zh}
+const translations = { en, da, de, fr, hi, ar, ru, pt, es, zh}
 
 export default function useTranslation() {
   const [lang, setLang] = useState('en')
