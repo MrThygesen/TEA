@@ -1,43 +1,59 @@
-// pages/api/events/rsvps.js
-import { pool } from '../../../lib/postgres.js'
-import { getUserFromJWT } from '../../../lib/auth.js'
+// pages/api/user/rsvps.js
+import pkg from 'pg'
+import { auth } from '../../../lib/auth'
+
+const { Pool } = pkg
 
 export default async function handler(req, res) {
-  const { method } = req
-  if (method !== 'POST' && method !== 'GET') {
+  if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
+  const token = auth.getTokenFromReq(req)
+  if (!token) return res.status(401).json({ error: 'Unauthorized' })
+
+  let payload
   try {
-    const user = getUserFromJWT(req)
-    if (!user) return res.status(401).json({ error: 'Unauthorized' })
-
-    if (method === 'POST') {
-      const { eventId } = req.body
-      if (!eventId) return res.status(400).json({ error: 'Missing eventId' })
-
-      await pool.query(
-        'INSERT INTO rsvps (event_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-        [eventId, user.id]
-      )
-
-      return res.status(200).json({ success: true })
-    }
-
-    if (method === 'GET') {
-      const { rows } = await pool.query(
-        `SELECT e.* 
-         FROM rsvps r 
-         JOIN events e ON e.id = r.event_id 
-         WHERE r.user_id = $1 
-         ORDER BY e.datetime DESC`,
-        [user.id]
-      )
-      return res.status(200).json(rows)
-    }
+    payload = auth.verifyToken(token)
   } catch (err) {
-    console.error('rsvps.js error:', err)
+    return res.status(401).json({ error: 'Invalid token' })
+  }
+
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+  })
+
+  try {
+    // Load RSVPs for the user
+    const rsvpResult = await pool.query(
+      `
+      SELECT 
+        r.id AS rsvp_id,
+        r.event_id,
+        e.name AS title,
+        e.datetime AS date,
+        e.venue AS location,
+        COALESCE(reg_count.count, 0) AS popularity
+      FROM rsvps r
+      JOIN events e ON e.id = r.event_id
+      LEFT JOIN (
+        SELECT event_id, COUNT(*) AS count
+        FROM registrations
+        GROUP BY event_id
+      ) reg_count ON reg_count.event_id = e.id
+      WHERE r.user_id = $1
+      ORDER BY e.datetime DESC
+      `,
+      [payload.id]
+    )
+
+    res.status(200).json(rsvpResult.rows)
+  } catch (err) {
+    console.error('❌ rsvps.js error:', err)
     res.status(500).json({ error: 'Server error', details: err.message })
+  } finally {
+    await pool.end()
   }
 }
 
