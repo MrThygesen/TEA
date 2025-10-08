@@ -2,13 +2,14 @@
 import { useState, useEffect } from 'react'
 import en from '../locales/en.json'
 import da from '../locales/da.json'
+import da from '../locales/de.json'
 import fr from '../locales/fr.json'
-import hi from '../locales/fr.json'
-import ar from '../locales/fr.json'
-import ru from '../locales/fr.json'
-import pt from '../locales/fr.json'
-import es from '../locales/fr.json'
-import zh from '../locales/fr.json'
+import hi from '../locales/ar.json'
+import ar from '../locales/hi.json'
+import ru from '../locales/zh.json'
+import pt from '../locales/pt.json'
+import es from '../locales/es.json'
+import zh from '../locales/ru.json'
 
 // Static imports = Webpack friendly
 const translations = { en, da, fr, hi, ar, ru, pt, es, zh}
