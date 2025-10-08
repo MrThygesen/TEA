@@ -208,7 +208,7 @@ if (ticketRow && ticketRow.popularity !== undefined && ticketRow.popularity !== 
   onClick={(e) => {
   const tag = e.target.tagName.toLowerCase()
   if (['button', 'a', 'svg', 'path', 'input', 'textarea'].includes(tag)) return
-  setShowPerks(true)
+  setShowPerks((prev) => !prev)
 }}
  // 👈 your modal or detail view trigger
   
