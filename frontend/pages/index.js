@@ -30,13 +30,12 @@ function clearAuth() {
 }
 
 // ---------------------------
-// Dynamic Event Card (using myTickets popularity)
+// Dynamic Event Card
 // ---------------------------
 export function DynamicEventCard({ event, authUser, setShowAccountModal, refreshTrigger, setRefreshTrigger }) {
   const [heartCount, setHeartCount] = useState(0)
   const [bookable, setBookable] = useState(event.is_confirmed)
   const [userTickets, setUserTickets] = useState(0)
-  const [popularity, setPopularity] = useState(0) // ✅ uses myTickets
   const [showPolicyModal, setShowPolicyModal] = useState(false)
   const { t } = useTranslation()
 
@@ -72,11 +71,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
         const myTickets = (data.tickets || []).filter(t => t.event_id === event.id)
         const total = myTickets.reduce((sum, t) => sum + (t.quantity || 1), 0)
         setUserTickets(total)
-
-        // ✅ Set popularity from API (even if user not booked)
-        if (myTickets.length > 0 && myTickets[0].popularity) {
-          setPopularity(myTickets[0].popularity)
-        }
       } catch (err) {
         console.error('myTickets error:', err)
       }
@@ -130,6 +124,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
     }
   }
 
+  // language flag
   const langFlag = {
     English: '🇬🇧', Mandarin: '🇨🇳', Hindi: '🇮🇳', Spanish: '🇪🇸', Arabic: '🇸🇦',
     French: '🇫🇷', Portuguese: '🇧🇷', Russian: '🇷🇺', German: '🇩🇪', Danish: '🇩🇰'
@@ -144,9 +139,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
           📅 {new Date(event.datetime).toLocaleDateString()} · 📍 {event.city}
         </p>
 
-        <p className="text-sm text-gray-300 mb-3 truncate">
-          {event.description?.split(" ").slice(0,10).join(" ")}...
-        </p>
+        <p className="text-sm text-gray-300 mb-3 truncate">{event.description?.split(" ").slice(0,10).join(" ")}...</p>
 
         <div className="flex gap-2 mb-4">
           {[event.tag1, event.tag2, event.tag3, event.tag4].filter(Boolean).map((tag, idx) => (
@@ -179,7 +172,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
 
         <div className="mt-3 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
           <span>💰 {event.price && Number(event.price) > 0 ? `${Number(event.price).toFixed(2)} USD` : t("Free")}</span>
-          <span>👥 {popularity} attending</span> {/* ✅ uses unified popularity */}
+          <span>👥 {userTickets} / {event.max_attendees || '∞'} booked</span>
         </div>
       </div>
 
