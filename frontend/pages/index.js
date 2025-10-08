@@ -9,7 +9,6 @@ import YourAccountModal from '../components/YourAccountModal'
 import Image from 'next/image'
 //import AdminSBTManager from '../components/AdminSBTManager'
 
-
  // ---------------------------
 // Helpers: Auth persistence Test
 // ---------------------------
@@ -40,6 +39,8 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
   const [email, setEmail] = useState(authUser?.email || '')
   const [showPolicyModal, setShowPolicyModal] = useState(false)
   const [agreed, setAgreed] = useState(false)
+  const [showPerks, setShowPerks] = useState(false)
+  const [totalBooked, setTotalBooked] = useState(0)
 
   const HEART_THRESHOLD = 0
   const reachedLimit = userTickets >= maxPerUser
@@ -82,6 +83,21 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
     }
     fetchMyTickets()
   }, [authUser, event.id, event.tag1, refreshTrigger])
+
+  // --- fetch total booked ---
+  useEffect(() => {
+    async function fetchTotalBooked() {
+      try {
+        const res = await fetch(`/api/events/totalBooked?eventId=${event.id}`)
+        if (!res.ok) return
+        const data = await res.json()
+        setTotalBooked(data.total || 0)
+      } catch (err) {
+        console.error('totalBooked error:', err)
+      }
+    }
+    fetchTotalBooked()
+  }, [event.id, refreshTrigger])
 
   // --- booking handler ---
   async function handleBooking() {
@@ -179,15 +195,29 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
 
   return (
     <>
-      <div className="border border-zinc-700 rounded-xl p-5 bg-gradient-to-b from-zinc-900 to-zinc-800 shadow-lg relative transition hover:shadow-2xl hover:border-blue-500 flex flex-col">
-                {/* Title + Date/City */}
+      <div
+        className="border border-zinc-700 rounded-xl p-5 bg-gradient-to-b from-zinc-900 to-zinc-800 shadow-lg relative transition hover:shadow-2xl hover:border-blue-500 flex flex-col overflow-hidden"
+        onMouseEnter={() => setShowPerks(true)}
+        onMouseLeave={() => setShowPerks(false)}
+      >
+        {/* Hover overlay for perks */}
+        {showPerks && (
+          <div className="absolute inset-0 bg-[rgba(64,48,24,0.85)] backdrop-blur-sm text-white flex flex-col items-center justify-center p-4 text-sm text-center z-20 transition-all">
+            <h4 className="text-lg font-bold mb-2">🎁 Event Perks</h4>
+            <p className="text-xs text-gray-200 max-w-xs">
+              Access exclusive rewards, member bonuses, and surprise gifts tied to this event.
+            </p>
+          </div>
+        )}
+
+        {/* Title + Date/City */}
         <h3 className="text-lg font-bold mb-1">{event.name}</h3>
         <p className="text-xs text-gray-400 mb-3">
           📅 {new Date(event.datetime).toLocaleDateString()} · 📍 {event.city}
         </p>
 
         {/* Short text */}
-        <p className="text-sm text-gray-300 mb-3 truncate">{event.description?.split(" ").slice(0,10).join(" ")}...</p>
+        <p className="text-sm text-gray-300 mb-3 truncate">{event.description?.split(" ").slice(0, 10).join(" ")}...</p>
 
         {/* Tags */}
         <div className="flex gap-2 mb-4">
@@ -199,14 +229,13 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
         </div>
 
         {/* Actions */}
-<div className="flex flex-col gap-2 mt-auto">        
-<a
-  href={`/event/${event.id}`}
-  className="w-full px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm text-center transition"
->
-  More Info
-</a>
-
+        <div className="flex flex-col gap-2 mt-auto">
+          <a
+            href={`/event/${event.id}`}
+            className="w-full px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm text-center transition"
+          >
+            More Info
+          </a>
 
           <div className="flex justify-between mt-2">
             <button
@@ -215,12 +244,12 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
             >
               📌 RSVP
             </button>
-             <button
-    onClick={handleHeartClick}
-    className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm flex items-center gap-1"
-  >
-    ❤️ {heartCount}
-  </button>
+            <button
+              onClick={handleHeartClick}
+              className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm flex items-center gap-1"
+            >
+              ❤️ {heartCount}
+            </button>
           </div>
         </div>
 
@@ -230,7 +259,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
             💰 {event.price && Number(event.price) > 0 ? `${Number(event.price).toFixed(2)} USD` : 'Free'}
           </span>
           <span>
-            👥 {userTickets} / {event.max_attendees || '∞'} booked
+            👥 {totalBooked} / {event.max_attendees || '∞'} booked
           </span>
         </div>
       </div>
@@ -320,6 +349,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
     </>
   )
 }
+
 
 /////////////////////////////// VIDEO ///////
 function VideoHero() {
@@ -433,6 +463,9 @@ export default function Home() {
   const [showEventModal, setShowEventModal] = useState(false)
   const [refreshTrigger, setRefreshTrigger] = useState(0); 
   
+  const [totalBooked, setTotalBooked] = useState(0)       // new: total tickets booked across all users
+  const [showPerks, setShowPerks] = useState(false)       // new: hover overlay
+
 
   // --- fetch events ---
   useEffect(() => {
