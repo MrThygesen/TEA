@@ -1,6 +1,5 @@
-// pages/api/user/rsvps.js
 import pkg from 'pg'
-import { auth } from '../../../lib/auth'
+import { auth } from '../../../lib/auth.js'
 
 const { Pool } = pkg
 
@@ -25,7 +24,6 @@ export default async function handler(req, res) {
   })
 
   try {
-    // Load RSVPs for the user
     const rsvpResult = await pool.query(
       `
       SELECT 
@@ -34,12 +32,15 @@ export default async function handler(req, res) {
         e.name AS title,
         e.datetime AS date,
         e.venue AS location,
+        e.price,
         COALESCE(reg_count.count, 0) AS popularity
       FROM rsvps r
       JOIN events e ON e.id = r.event_id
       LEFT JOIN (
         SELECT event_id, COUNT(*) AS count
         FROM registrations
+        WHERE has_paid = true 
+           OR event_id IN (SELECT id FROM events WHERE price IS NULL OR price = 0)
         GROUP BY event_id
       ) reg_count ON reg_count.event_id = e.id
       WHERE r.user_id = $1
