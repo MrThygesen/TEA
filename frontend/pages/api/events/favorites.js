@@ -26,9 +26,9 @@ export default async function handler(req, res) {
     )
 
     if (check.rows.length > 0) {
-      await pool.query('DELETE FROM hearts WHERE event_id = $1 AND user_id = $2', [eventId, payload.id])
+      await pool.query('DELETE FROM favorites WHERE event_id = $1 AND user_id = $2', [eventId, payload.id])
     } else {
-      await pool.query('INSERT INTO hearts (user_id, event_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [payload.id, eventId])
+      await pool.query('INSERT INTO favorites (user_id, event_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [payload.id, eventId])
     }
 
     // ✅ Return updated like count
