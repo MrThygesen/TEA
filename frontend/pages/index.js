@@ -211,7 +211,7 @@ if (ticketRow && ticketRow.popularity !== undefined && ticketRow.popularity !== 
   setShowPerks(true)
 }}
  // 👈 your modal or detail view trigger
-  }}
+  
   onMouseEnter={() => setHovered(true)}
   onMouseLeave={() => setHovered(false)}
 >
