@@ -12,7 +12,6 @@ export default async function handler(req, res) {
 
   try {
     switch (method) {
-      // ---------------------------------------------------------------------
       case 'GET': {
         if (query.id) {
           const id = parseIntOrFail(query.id, 'id')
@@ -25,11 +24,9 @@ export default async function handler(req, res) {
         }
       }
 
-      // ---------------------------------------------------------------------
       case 'POST': {
         const {
           id,
-          group_id,
           name,
           city,
           datetime,
@@ -51,29 +48,27 @@ export default async function handler(req, res) {
           image_url,
         } = body
 
-        // Validate required fields
         if (!name || !city || !datetime) {
           return res.status(400).json({ error: 'Missing required fields (name, city, datetime)' })
         }
 
         const insertQuery = `
           INSERT INTO events (
-            id, group_id, name, city, datetime,
+            id, name, city, datetime,
             min_attendees, max_attendees, is_confirmed,
             description, details, venue, venue_type,
             basic_perk, advanced_perk,
             tag1, tag2, tag3, tag4, language,
             price, image_url
           ) VALUES (
-            $1, COALESCE($2::INTEGER, $1::INTEGER), $3, $4, $5,
-            $6, $7, $8,
-            $9, $10, $11, $12,
-            $13, $14,
-            $15, $16, $17, $18, $19,
-            $20, $21
+            $1, $2, $3, $4,
+            $5, $6, $7,
+            $8, $9, $10, $11,
+            $12, $13,
+            $14, $15, $16, $17, $18,
+            $19, $20
           )
           ON CONFLICT (id) DO UPDATE SET
-            group_id = EXCLUDED.group_id,
             name = EXCLUDED.name,
             city = EXCLUDED.city,
             datetime = EXCLUDED.datetime,
@@ -98,7 +93,6 @@ export default async function handler(req, res) {
 
         const result = await pool.query(insertQuery, [
           Number(id),
-          group_id ? Number(group_id) : null,
           name,
           city,
           datetime,
@@ -123,7 +117,6 @@ export default async function handler(req, res) {
         return res.status(200).json(result.rows[0])
       }
 
-      // ---------------------------------------------------------------------
       default:
         res.setHeader('Allow', ['GET', 'POST'])
         return res.status(405).end(`Method ${method} Not Allowed`)
