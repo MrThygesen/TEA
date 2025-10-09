@@ -212,14 +212,20 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       : null
 
   return (
-    <div
-      className="relative bg-zinc-900 border border-zinc-700 rounded-xl p-4 transition hover:bg-zinc-800 hover:shadow-lg cursor-pointer"
-      onClick={(e) => {
-        const tag = e.target.tagName.toLowerCase()
-        if (['button', 'a', 'svg', 'path', 'input', 'textarea'].includes(tag)) return
-        if (hasPerks) setShowPerks((prev) => !prev)
-      }}
-    >
+<div
+  className="relative bg-zinc-900 border border-zinc-700 rounded-xl p-4 transition hover:bg-zinc-800 hover:shadow-lg cursor-pointer"
+  onClick={(e) => {
+    const tag = e.target.tagName.toLowerCase()
+    if (tag !== 'button' && tag !== 'svg' && tag !== 'path') {
+      window.location.href = `/event/${event.id}`
+    }
+  }}
+>
+
+
+
+
+
       {/* Hover Perk Info */}
       <div
         className={`absolute inset-0 bg-zinc-900/95 backdrop-blur-md text-white flex flex-col items-center justify-center p-4 text-sm text-center z-20 transition-all duration-300 ${
@@ -262,31 +268,45 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       </div>
 
       {/* Buttons */}
-    <div className="flex justify-between items-center gap-2 mt-2">
+ {/* Buttons */}
+<div className="flex justify-between items-center gap-2 mt-2">
+  {/* RSVP button */}
   <button
-    onClick={handleRSVPClick}
+    onClick={(e) => {
+      e.stopPropagation()
+      handleRSVPClick()
+    }}
     className="flex-1 px-3 py-1 text-sm rounded text-yellow-400 border border-yellow-400 hover:text-yellow-300 transition"
   >
     📌 RSVP
   </button>
 
+  {/* Book button */}
   <button
-    onClick={() => (window.location.href = `/event/${event.id}`)}
+    onClick={(e) => {
+      e.stopPropagation()
+      window.location.href = `/event/${event.id}`
+    }}
     className="px-3 py-1 text-sm rounded text-blue-400 border border-blue-400 hover:text-blue-300 transition"
   >
     🎟️ Book
   </button>
 
-<div className="flex flex-col items-center border border-red-400 rounded-lg px-2 py-1">
-  <button
-    onClick={handleHeartClick}
-    className="text-sm text-red-400 hover:text-red-300 transition"
-  >
-    ❤️
-  </button>
-  <span className="text-xs text-gray-300 mt-1">{heartCount}</span>
+  {/* Heart counter */}
+  <div className="flex flex-col items-center border border-red-400 rounded-lg px-2 py-1">
+    <button
+      onClick={(e) => {
+        e.stopPropagation()
+        handleHeartClick()
+      }}
+      className="text-lg text-red-400 hover:text-red-300 transition"
+    >
+      ❤️
+    </button>
+    <span className="text-xs text-gray-300 mt-1">{heartCount}</span>
+  </div>
 </div>
-</div>
+
 
       {/* Footer */}
       {/* Footer with Perk Button */}
