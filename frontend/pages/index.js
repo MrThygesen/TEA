@@ -11,7 +11,6 @@ import { useRouter } from 'next/router'
 //import AdminSBTManager from '../components/AdminSBTManager'
 
 
-
  // ---------------------------
 // Helpers: Auth persistence Test
 // ---------------------------
@@ -24,15 +23,13 @@ function loadAuth() {
     return null
   }
 }
+
 function saveAuth(user) {
   try { localStorage.setItem('edgy_auth_user', JSON.stringify(user)) } catch (_) {}
 }
 function clearAuth() {
   try { localStorage.removeItem('edgy_auth_user') } catch (_) {}
 }
-
-
-
 
 export function DynamicEventCard({ event, authUser, setShowAccountModal, refreshTrigger, setRefreshTrigger }) {
   const [heartCount, setHeartCount] = useState(0)
@@ -65,7 +62,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
     fetchHearts()
   }, [event.id, event.is_confirmed])
 
-  // --- fetch user tickets & totalBooked ---
+  // --- fetch user tickets & totalBooked (global popularity supported) ---
   useEffect(() => {
     if (!authUser) return
     async function fetchFromMe() {
@@ -82,9 +79,9 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
         const myTickets = Array.isArray(data.tickets)
           ? data.tickets.filter((t) => t.event_id === event.id)
           : []
-
         const total = myTickets.reduce((sum, t) => sum + (t.quantity || 1), 0)
         setUserTickets(total)
+        setMaxPerUser(event.tag1 === 'group' ? 5 : 1)
 
         const ticketRow = (Array.isArray(data.tickets) ? data.tickets : []).find(
           (t) => Number(t.event_id) === Number(event.id)
@@ -103,9 +100,49 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       }
     }
     fetchFromMe()
-  }, [authUser, event.id, refreshTrigger])
+  }, [authUser, event.id, event.tag1, refreshTrigger])
 
-  // --- handlers ---
+  // --- booking handler ---
+  async function handleBooking() {
+    if (!authUser) {
+      setShowAccountModal(true)
+      toast.error('⚠️ Please login to buy a ticket.')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch('/api/events/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ eventId: event.id, quantity, email }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Registration failed')
+
+      setUserTickets(data.userTickets || userTickets + quantity)
+      setTotalBooked((prev) => prev + quantity)
+      setRefreshTrigger((prev) => prev + 1)
+
+      if (event.price && Number(event.price) > 0) {
+        if (data.clientSecret) {
+          window.location.href = `/api/events/checkout?payment_intent_client_secret=${data.clientSecret}`
+        } else {
+          toast.error('⚠️ Payment could not be initiated')
+        }
+      } else {
+        toast.success('✅ Ticket booked! Confirmation email sent.')
+      }
+    } catch (err) {
+      console.error(err)
+      toast.error('❌ Error registering')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // --- like handler ---
   async function handleHeartClick() {
     try {
       const token = localStorage.getItem('token') || ''
@@ -117,8 +154,8 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
         headers,
         body: JSON.stringify({ eventId: event.id }),
       })
-
       if (!res.ok) throw new Error('Failed to like')
+
       const data = await res.json()
       if (data && typeof data.count === 'number') {
         setHeartCount(data.count)
@@ -128,10 +165,11 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       toast.success('❤️ Liked!')
     } catch (err) {
       console.error('Like error:', err)
-      toast.error('❌ Error liking event')
+      toast.error('❌ Error liking event (try again later)')
     }
   }
 
+  // --- RSVP handler ---
   async function handleRSVPClick() {
     if (!authUser) {
       setShowAccountModal(true)
@@ -149,7 +187,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to RSVP')
 
-      toast.success('🎉 RSVP saved!')
+      toast.success('🎉 RSVP confirmed!')
       setRefreshTrigger((prev) => prev + 1)
     } catch (err) {
       console.error(err)
@@ -157,13 +195,21 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
     }
   }
 
-  // --- determine perk type ---
-  let perkType = null
-  if (totalBooked <= event.min_attendees) {
-    perkType = 'DOUBLE DEAL'
-  } else if (totalBooked > event.min_attendees && totalBooked < event.max_attendees) {
-    perkType = 'SINGLE DEAL'
-  }
+  // --- determine correct image path ---
+  const imagePath = event.image_url?.startsWith('http')
+    ? event.image_url
+    : event.image_url
+    ? `${event.image_url.startsWith('/') ? '' : '/'}${event.image_url.replace(/^frontend\/public\//, '')}`
+    : '/placeholder.jpg'
+
+  // --- determine perk info ---
+  const hasPerks = event.basic_perk || event.advanced_perk
+  const perkType =
+    totalBooked <= event.min_attendees
+      ? 'DOUBLE DEAL'
+      : totalBooked < event.max_attendees
+      ? 'SINGLE DEAL'
+      : null
 
   return (
     <div
@@ -171,69 +217,75 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       onClick={(e) => {
         const tag = e.target.tagName.toLowerCase()
         if (['button', 'a', 'svg', 'path', 'input', 'textarea'].includes(tag)) return
-        setShowPerks((prev) => !prev)
+        if (hasPerks) setShowPerks((prev) => !prev)
       }}
     >
       {/* Hover Perk Info */}
       <div
-        className={`absolute inset-0 bg-zinc-900/90 backdrop-blur-md text-white flex flex-col items-center justify-center p-4 text-sm text-center z-20 transition-all duration-300 ${
+        className={`absolute inset-0 bg-zinc-900/95 backdrop-blur-md text-white flex flex-col items-center justify-center p-4 text-sm text-center z-20 transition-all duration-300 ${
           showPerks ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
       >
-        <h4 className="text-xl font-bold mb-3">🎁 Event Perks</h4>
-        <p className="text-gray-300 max-w-xs mb-3">
+        <h4 className="text-xl font-bold mb-2">🎁 Event Perks</h4>
+        <p className="text-gray-300 max-w-xs mb-2">
           {event.basic_perk || event.advanced_perk || 'No perks available.'}
         </p>
         {perkType && (
-          <p className="text-green-400 text-sm font-semibold tracking-wide">
-            {perkType}
-          </p>
+          <p className="text-green-400 font-semibold tracking-wide">{perkType}</p>
         )}
       </div>
 
-      {/* Main Content */}
+      {/* Image */}
+      <img
+        src={imagePath}
+        alt={event.name}
+        className="w-full h-48 object-cover rounded-lg mb-3 border border-zinc-800"
+        onError={(e) => (e.target.src = '/placeholder.jpg')}
+      />
+
+      {/* Title + Info */}
       <h3 className="text-lg font-bold mb-1 truncate">{event.name}</h3>
       <p className="text-xs text-gray-400 mb-3">
         📅 {new Date(event.datetime).toLocaleDateString()} · 📍 {event.city}
       </p>
-
       <p className="text-sm text-gray-300 mb-3 truncate">
-        {event.description?.split(' ').slice(0, 10).join(' ')}...
+        {event.description?.split(' ').slice(0, 12).join(' ')}...
       </p>
 
       {/* Tags */}
-      <div className="flex gap-2 mb-4 flex-wrap">
+      <div className="flex gap-2 mb-3 flex-wrap">
         {[event.tag1, event.tag2, event.tag3, event.tag4]
           .filter(Boolean)
           .map((tag, idx) => (
             <span
               key={idx}
-              className="px-2 py-1 text-xs font-semibold rounded bg-blue-700/80 text-white border border-blue-500"
+              className="px-2 py-0.5 text-xs rounded-full bg-blue-700/80 text-white border border-blue-500"
             >
               {tag}
             </span>
           ))}
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex justify-between items-center mt-3">
+      {/* Buttons */}
+      <div className="flex justify-between items-center gap-2 mt-2">
         <button
           onClick={handleRSVPClick}
-          className="px-3 py-1 text-sm rounded border border-yellow-400 text-yellow-400 hover:bg-yellow-500/10 transition"
+          className="flex-1 px-3 py-1 text-sm rounded border border-yellow-400 text-yellow-400 hover:bg-yellow-500/10 transition"
         >
           📌 RSVP
         </button>
 
         <button
-          onClick={() => router.push(`/event/${event.id}`)}
-          className="px-3 py-1 text-sm rounded border border-blue-400 text-blue-400 hover:bg-blue-500/10 transition"
+          onClick={handleBooking}
+          disabled={loading || reachedLimit}
+          className="flex-1 px-3 py-1 text-sm rounded border border-blue-400 text-blue-400 hover:bg-blue-500/10 transition disabled:opacity-40"
         >
           🎟️ Book
         </button>
 
         <button
           onClick={handleHeartClick}
-          className="text-sm text-red-400 hover:text-red-500 transition flex items-center gap-1"
+          className="flex items-center justify-center gap-1 px-3 py-1 text-sm rounded border border-red-400 text-red-400 hover:bg-red-500/10 transition"
         >
           ❤️ {heartCount}
         </button>
@@ -251,8 +303,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
     </div>
   )
 }
-
-
 
 /////////////////////////////// VIDEO ///////
 function VideoHero() {
