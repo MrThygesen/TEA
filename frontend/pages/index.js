@@ -236,12 +236,12 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       </div>
 
       {/* Image */}
-      <img
-        src={imagePath}
-        alt={event.name}
-        className="w-full h-48 object-cover rounded-lg mb-3 border border-zinc-800"
-        onError={(e) => (e.target.src = '/placeholder.jpg')}
-      />
+//      <img
+//        src={imagePath}
+//        alt={event.name}
+//        className="w-full h-48 object-cover rounded-lg mb-3 border border-zinc-800"
+//        onError={(e) => (e.target.src = '/placeholder.jpg')}
+//      />
 
       {/* Title + Info */}
       <h3 className="text-lg font-bold mb-1 truncate">{event.name}</h3>
@@ -275,20 +275,25 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
           📌 RSVP
         </button>
 
-        <button
-          onClick={handleBooking}
-          disabled={loading || reachedLimit}
-          className="flex-1 px-3 py-1 text-sm rounded border border-blue-400 text-blue-400 hover:bg-blue-500/10 transition disabled:opacity-40"
-        >
-          🎟️ Book
-        </button>
+<button
+  onClick={() => (window.location.href = `/event/${event.id}`)}
+  className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm"
+>
+  🎟️ Book
+</button>
 
-        <button
-          onClick={handleHeartClick}
-          className="flex items-center justify-center gap-1 px-3 py-1 text-sm rounded border border-red-400 text-red-400 hover:bg-red-500/10 transition"
-        >
-          ❤️ {heartCount}
-        </button>
+
+
+<div className="flex flex-col items-center">
+  <button
+    onClick={handleHeartClick}
+    className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm"
+  >
+    ❤️
+  </button>
+  <span className="text-xs text-gray-300 mt-1">{heartCount}</span>
+</div>
+
       </div>
 
       {/* Footer */}
