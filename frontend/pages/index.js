@@ -277,27 +277,43 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
     🎟️ Book
   </button>
 
-  <div className="flex flex-col items-center">
-    <button
-      onClick={handleHeartClick}
-      className="px-3 py-1 text-sm text-red-400 hover:text-red-300 transition"
-    >
-      ❤️
-    </button>
-    <span className="text-xs text-gray-300 mt-1">{heartCount}</span>
-  </div>
+<div className="flex flex-col items-center border border-red-400 rounded-lg px-2 py-1">
+  <button
+    onClick={handleHeartClick}
+    className="text-sm text-red-400 hover:text-red-300 transition"
+  >
+    ❤️
+  </button>
+  <span className="text-xs text-gray-300 mt-1">{heartCount}</span>
+</div>
 </div>
 
       {/* Footer */}
-      <div className="mt-4 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
-        <span>
-          💰 {event.price && Number(event.price) > 0 ? `${Number(event.price).toFixed(2)} USD` : 'Free'}
-        </span>
-        <span>
-          👥 {totalBooked} / {event.max_attendees || '∞'}
-        </span>
-      </div>
-    </div>
+     {/* Footer with Perk Button */}
+<div className="mt-4 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
+  <span>
+    💰 {event.price && Number(event.price) > 0 ? `${Number(event.price).toFixed(2)} USD` : 'Free'}
+  </span>
+
+  {/* Perk button in center */}
+  {hasPerks && (
+    <button
+      onClick={(e) => {
+        e.stopPropagation()
+        setShowPerks((prev) => !prev)
+      }}
+      className="p-1 border border-pink-400 text-pink-400 rounded-full text-sm hover:bg-pink-500/10 transition"
+      title="View perks"
+    >
+      🎁
+    </button>
+  )}
+
+  <span>
+    👥 {totalBooked} / {event.max_attendees || '∞'}
+  </span>
+</div>
+
   )
 }
 
