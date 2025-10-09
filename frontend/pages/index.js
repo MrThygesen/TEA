@@ -7,7 +7,10 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { toast } from 'react-hot-toast'
 import YourAccountModal from '../components/YourAccountModal'
 import Image from 'next/image'
+import { useRouter } from 'next/router'
 //import AdminSBTManager from '../components/AdminSBTManager'
+
+
 
  // ---------------------------
 // Helpers: Auth persistence Test
@@ -29,9 +32,7 @@ function clearAuth() {
 }
 
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/router'
-import { toast } from 'react-hot-toast'
+
 
 export function DynamicEventCard({ event, authUser, setShowAccountModal, refreshTrigger, setRefreshTrigger }) {
   const [heartCount, setHeartCount] = useState(0)
