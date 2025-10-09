@@ -29,6 +29,10 @@ function clearAuth() {
 }
 
 
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/router'
+import { toast } from 'react-hot-toast'
+
 export function DynamicEventCard({ event, authUser, setShowAccountModal, refreshTrigger, setRefreshTrigger }) {
   const [heartCount, setHeartCount] = useState(0)
   const [bookable, setBookable] = useState(event.is_confirmed)
@@ -37,10 +41,9 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
   const [maxPerUser, setMaxPerUser] = useState(event.tag1 === 'group' ? 5 : 1)
   const [quantity, setQuantity] = useState(1)
   const [email, setEmail] = useState(authUser?.email || '')
-  const [showPolicyModal, setShowPolicyModal] = useState(false)
-  const [agreed, setAgreed] = useState(false)
   const [showPerks, setShowPerks] = useState(false)
   const [totalBooked, setTotalBooked] = useState(0)
+  const router = useRouter()
 
   const HEART_THRESHOLD = 0
   const reachedLimit = userTickets >= maxPerUser
@@ -61,7 +64,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
     fetchHearts()
   }, [event.id, event.is_confirmed])
 
-  // --- fetch user tickets & totalBooked from /api/user/me ---
+  // --- fetch user tickets & totalBooked ---
   useEffect(() => {
     if (!authUser) return
     async function fetchFromMe() {
@@ -81,75 +84,27 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
 
         const total = myTickets.reduce((sum, t) => sum + (t.quantity || 1), 0)
         setUserTickets(total)
-        setMaxPerUser(event.tag1 === 'group' ? 5 : 1)
 
-// derive totalBooked globally (same as YourAccountModal)
+        const ticketRow = (Array.isArray(data.tickets) ? data.tickets : []).find(
+          (t) => Number(t.event_id) === Number(event.id)
+        )
 
-const ticketRow = (Array.isArray(data.tickets) ? data.tickets : []).find(
-  (t) => Number(t.event_id) === Number(event.id)
-)
-
-if (ticketRow && ticketRow.popularity !== undefined && ticketRow.popularity !== null) {
-  // Use server-calculated global popularity when provided (matches YourAccountModal)
-  setTotalBooked(Number(ticketRow.popularity) || 0)
-} else {
-  // Fallback: sum quantities for this event from returned tickets
-  const fallbackTotal = (Array.isArray(data.tickets) ? data.tickets : [])
-    .filter((t) => Number(t.event_id) === Number(event.id))
-    .reduce((sum, t) => sum + (t.quantity || 1), 0)
-  setTotalBooked(fallbackTotal)
-}
-
+        if (ticketRow && ticketRow.popularity !== undefined && ticketRow.popularity !== null) {
+          setTotalBooked(Number(ticketRow.popularity) || 0)
+        } else {
+          const fallbackTotal = (Array.isArray(data.tickets) ? data.tickets : [])
+            .filter((t) => Number(t.event_id) === Number(event.id))
+            .reduce((sum, t) => sum + (t.quantity || 1), 0)
+          setTotalBooked(fallbackTotal)
+        }
       } catch (err) {
         console.error('fetchFromMe error:', err)
       }
     }
     fetchFromMe()
-  }, [authUser, event.id, event.tag1, refreshTrigger])
+  }, [authUser, event.id, refreshTrigger])
 
-  // --- booking handler ---
-  async function handleBooking() {
-    if (!authUser) {
-      setShowAccountModal(true)
-      toast.error('⚠️ Please login to buy a ticket.')
-      return
-    }
-
-    setLoading(true)
-    try {
-      const token = localStorage.getItem('token')
-      const res = await fetch('/api/events/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ eventId: event.id, quantity, email }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Registration failed')
-
-      setUserTickets(data.userTickets || userTickets + quantity)
-      setTotalBooked((prev) => prev + quantity)
-      setRefreshTrigger((prev) => prev + 1)
-
-      if (event.price && Number(event.price) > 0) {
-        if (data.clientSecret) {
-          window.location.href = `/api/events/checkout?payment_intent_client_secret=${data.clientSecret}`
-        } else {
-          toast.error('⚠️ Payment could not be initiated')
-        }
-      } else {
-        toast.success('✅ Ticket booked! Confirmation email sent.')
-      }
-    } catch (err) {
-      console.error(err)
-      toast.error('❌ Error registering')
-    } finally {
-      setLoading(false)
-      setShowPolicyModal(false)
-      setAgreed(false)
-    }
-  }
-
-  // --- like handler ---
+  // --- handlers ---
   async function handleHeartClick() {
     try {
       const token = localStorage.getItem('token') || ''
@@ -172,11 +127,10 @@ if (ticketRow && ticketRow.popularity !== undefined && ticketRow.popularity !== 
       toast.success('❤️ Liked!')
     } catch (err) {
       console.error('Like error:', err)
-      toast.error('❌ Error liking event (try again later)')
+      toast.error('❌ Error liking event')
     }
   }
 
-  // --- RSVP handler ---
   async function handleRSVPClick() {
     if (!authUser) {
       setShowAccountModal(true)
@@ -194,94 +148,103 @@ if (ticketRow && ticketRow.popularity !== undefined && ticketRow.popularity !== 
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to RSVP')
 
-      toast.success('🎉 RSVP confirmed and added to Your Account!')
+      toast.success('🎉 RSVP saved!')
       setRefreshTrigger((prev) => prev + 1)
     } catch (err) {
       console.error(err)
-      toast.error('❌ Could not save RSVP. Maybe you already RSVPed?')
+      toast.error('❌ Could not save RSVP')
     }
   }
 
-  return (
-<div
-  className="relative bg-zinc-900 border border-zinc-700 rounded-xl p-4 transition hover:bg-zinc-800 hover:shadow-lg cursor-pointer"
-  onClick={(e) => {
-  const tag = e.target.tagName.toLowerCase()
-  if (['button', 'a', 'svg', 'path', 'input', 'textarea'].includes(tag)) return
-  setShowPerks((prev) => !prev)
-}}
- // 👈 your modal or detail view trigger
-  
-  onMouseEnter={() => setHovered(true)}
-  onMouseLeave={() => setHovered(false)}
->
+  // --- determine perk type ---
+  let perkType = null
+  if (totalBooked <= event.min_attendees) {
+    perkType = 'DOUBLE DEAL'
+  } else if (totalBooked > event.min_attendees && totalBooked < event.max_attendees) {
+    perkType = 'SINGLE DEAL'
+  }
 
-      {/* Hover overlay */}
+  return (
+    <div
+      className="relative bg-zinc-900 border border-zinc-700 rounded-xl p-4 transition hover:bg-zinc-800 hover:shadow-lg cursor-pointer"
+      onClick={(e) => {
+        const tag = e.target.tagName.toLowerCase()
+        if (['button', 'a', 'svg', 'path', 'input', 'textarea'].includes(tag)) return
+        setShowPerks((prev) => !prev)
+      }}
+    >
+      {/* Hover Perk Info */}
       <div
-        className={`absolute inset-0 bg-[rgba(64,48,24,0.85)] backdrop-blur-sm text-white flex flex-col items-center justify-center p-4 text-sm text-center z-20 transition-all duration-300 ${
+        className={`absolute inset-0 bg-zinc-900/90 backdrop-blur-md text-white flex flex-col items-center justify-center p-4 text-sm text-center z-20 transition-all duration-300 ${
           showPerks ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
       >
-        <h4 className="text-lg font-bold mb-2">🎁 Event Perks</h4>
-        <p className="text-xs text-gray-200 max-w-xs">
-          Access exclusive rewards, member bonuses, and surprise gifts tied to this event.
+        <h4 className="text-xl font-bold mb-3">🎁 Event Perks</h4>
+        <p className="text-gray-300 max-w-xs mb-3">
+          {event.basic_perk || event.advanced_perk || 'No perks available.'}
         </p>
+        {perkType && (
+          <p className="text-green-400 text-sm font-semibold tracking-wide">
+            {perkType}
+          </p>
+        )}
       </div>
 
-      {/* Title + Date/City */}
-      <h3 className="text-lg font-bold mb-1">{event.name}</h3>
+      {/* Main Content */}
+      <h3 className="text-lg font-bold mb-1 truncate">{event.name}</h3>
       <p className="text-xs text-gray-400 mb-3">
         📅 {new Date(event.datetime).toLocaleDateString()} · 📍 {event.city}
       </p>
 
-      {/* Short text */}
-      <p className="text-sm text-gray-300 mb-3 truncate">{event.description?.split(' ').slice(0, 10).join(' ')}...</p>
+      <p className="text-sm text-gray-300 mb-3 truncate">
+        {event.description?.split(' ').slice(0, 10).join(' ')}...
+      </p>
 
       {/* Tags */}
-      <div className="flex gap-2 mb-4">
-        {[event.tag1, event.tag2, event.tag3]
+      <div className="flex gap-2 mb-4 flex-wrap">
+        {[event.tag1, event.tag2, event.tag3, event.tag4]
           .filter(Boolean)
           .map((tag, idx) => (
-            <span key={idx} className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-600 text-white">
+            <span
+              key={idx}
+              className="px-2 py-1 text-xs font-semibold rounded bg-blue-700/80 text-white border border-blue-500"
+            >
               {tag}
             </span>
           ))}
       </div>
 
-{/* Actions */}
-<div className="flex flex-col gap-2 mt-auto">
-  <div className="flex justify-between mt-2">
-    <button
-      onClick={handleRSVPClick}
-      className="px-3 py-1 rounded bg-yellow-500 hover:bg-yellow-600 text-black text-sm"
-    >
-      📌 RSVP
-    </button>
+      {/* Action Buttons */}
+      <div className="flex justify-between items-center mt-3">
+        <button
+          onClick={handleRSVPClick}
+          className="px-3 py-1 text-sm rounded border border-yellow-400 text-yellow-400 hover:bg-yellow-500/10 transition"
+        >
+          📌 RSVP
+        </button>
 
-    <button
-      onClick={handleBooking}
-      className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm"
-      disabled={loading || reachedLimit}
-    >
-      🎟️ Book
-    </button>
+        <button
+          onClick={() => router.push(`/event/${event.id}`)}
+          className="px-3 py-1 text-sm rounded border border-blue-400 text-blue-400 hover:bg-blue-500/10 transition"
+        >
+          🎟️ Book
+        </button>
 
-    <button
-      onClick={handleHeartClick}
-      className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm flex items-center gap-1"
-    >
-      ❤️ {heartCount}
-    </button>
-  </div>
-</div>
+        <button
+          onClick={handleHeartClick}
+          className="text-sm text-red-400 hover:text-red-500 transition flex items-center gap-1"
+        >
+          ❤️ {heartCount}
+        </button>
+      </div>
 
-      {/* Footer info */}
-      <div className="mt-3 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
+      {/* Footer */}
+      <div className="mt-4 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
         <span>
           💰 {event.price && Number(event.price) > 0 ? `${Number(event.price).toFixed(2)} USD` : 'Free'}
         </span>
         <span>
-          👥 {totalBooked} / {event.max_attendees || '∞'} booked
+          👥 {totalBooked} / {event.max_attendees || '∞'}
         </span>
       </div>
     </div>
