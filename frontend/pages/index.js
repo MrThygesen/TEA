@@ -312,7 +312,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
           👥 {totalBooked} / {event.max_attendees || '∞'}
         </span>
       </div>
-    </div> {/* closes main card */}
+    </div>
   )
 }
 
