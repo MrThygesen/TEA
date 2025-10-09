@@ -295,7 +295,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
           💰 {event.price && Number(event.price) > 0 ? `${Number(event.price).toFixed(2)} USD` : 'Free'}
         </span>
 
-        {/* Perk button in center */}
         {hasPerks && (
           <button
             onClick={(e) => {
@@ -313,7 +312,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
           👥 {totalBooked} / {event.max_attendees || '∞'}
         </span>
       </div>
-    </div> {/* ✅ CLOSE the main card wrapper */}
+    </div> {/* closes main card */}
   )
 }
 
