@@ -289,31 +289,31 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
 </div>
 
       {/* Footer */}
-     {/* Footer with Perk Button */}
-<div className="mt-4 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
-  <span>
-    💰 {event.price && Number(event.price) > 0 ? `${Number(event.price).toFixed(2)} USD` : 'Free'}
-  </span>
+      {/* Footer with Perk Button */}
+      <div className="mt-4 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
+        <span>
+          💰 {event.price && Number(event.price) > 0 ? `${Number(event.price).toFixed(2)} USD` : 'Free'}
+        </span>
 
-  {/* Perk button in center */}
-  {hasPerks && (
-    <button
-      onClick={(e) => {
-        e.stopPropagation()
-        setShowPerks((prev) => !prev)
-      }}
-      className="p-1 border border-pink-400 text-pink-400 rounded-full text-sm hover:bg-pink-500/10 transition"
-      title="View perks"
-    >
-      🎁
-    </button>
-  )}
+        {/* Perk button in center */}
+        {hasPerks && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowPerks((prev) => !prev)
+            }}
+            className="p-1 border border-pink-400 text-pink-400 rounded-full text-sm hover:bg-pink-500/10 transition"
+            title="View perks"
+          >
+            🎁
+          </button>
+        )}
 
-  <span>
-    👥 {totalBooked} / {event.max_attendees || '∞'}
-  </span>
-</div>
-
+        <span>
+          👥 {totalBooked} / {event.max_attendees || '∞'}
+        </span>
+      </div>
+    </div> {/* ✅ CLOSE the main card wrapper */}
   )
 }
 
