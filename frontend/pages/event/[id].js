@@ -1,3 +1,4 @@
+// frontend/pages/event/[id].js
 'use client'
 import { useRouter } from 'next/router'
 import { useEffect, useState } from 'react'
@@ -10,14 +11,26 @@ export default function EventPage() {
   const [quantity, setQuantity] = useState(1)
   const [agreed, setAgreed] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [imgError, setImgError] = useState(false)
+  const [debug, setDebug] = useState(false)
   const { t } = useTranslation()
 
   useEffect(() => {
     if (!id) return
     fetch(`/api/events/${id}`)
-      .then(res => res.json())
-      .then(setEvent)
-      .catch(err => console.error('Failed to load event:', err))
+      .then(async (res) => {
+        if (!res.ok) {
+          const txt = await res.text()
+          throw new Error(`API error ${res.status}: ${txt}`)
+        }
+        const data = await res.json()
+        setEvent(data)
+        console.log('Loaded event:', data)
+      })
+      .catch((err) => {
+        console.error('Failed to load event:', err)
+        setEvent(null)
+      })
   }, [id])
 
   async function handleBooking() {
@@ -27,16 +40,13 @@ export default function EventPage() {
       const token = localStorage.getItem('token')
       const res = await fetch('/api/events/register', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: token ? `Bearer ${token}` : ''
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
         body: JSON.stringify({ eventId: event.id, quantity })
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || t("BookingFailed"))
+      if (!res.ok) throw new Error(data.error || t('BookingFailed'))
       if (data.checkoutUrl) window.location.href = data.checkoutUrl
-      else alert(t("TicketBooked"))
+      else alert(t('TicketBooked'))
     } catch (err) {
       alert(err.message)
     } finally {
@@ -44,133 +54,167 @@ export default function EventPage() {
     }
   }
 
+  // === helpers ===
+  function resolveImageUrl(url) {
+    if (!url) return null
+    // Absolute URL: use as-is
+    if (/^https?:\/\//i.test(url) || /^\/\//.test(url)) return url
+    // remove local dev prefixes that may have been stored accidentally
+    let p = url.replace(/^frontend\/public\//i, '').replace(/^public\//i, '')
+    if (!p.startsWith('/')) p = '/' + p
+    return p
+  }
+
   if (!event) {
     return (
-      <main className="bg-black text-white flex items-center justify-center h-screen">
-        <p className="text-gray-400 text-lg animate-pulse">{t("LoadingEvent")}</p>
+      <main className="bg-black text-white flex items-center justify-center min-h-screen p-6">
+        <p className="text-gray-400 text-lg animate-pulse">{t('LoadingEvent') || 'Loading event...'}</p>
       </main>
     )
   }
 
-  // --- Helpers ---
+  const imgSrc = resolveImageUrl(event.image_url)
+  const eventDate = event.datetime ? new Date(event.datetime) : null
   const tags = [event.tag1, event.tag2, event.tag3, event.tag4].filter(Boolean)
-  const imgSrc = event.image_url?.startsWith('/')
-    ? event.image_url
-    : `/${event.image_url?.replace(/^frontend\/public\//, '')}`
 
-  const eventDate = new Date(event.datetime)
-  const perkInfo = event.basic_perk
-    ? event.basic_perk
-    : event.advanced_perk
-    ? event.advanced_perk
-    : t("NoPerk")
+  // Try several possible field names for "how many are booked" — adapt to your API
+  const bookedCount = Number(
+    event.registrations_count ??
+    event.registrations ??
+    event.tickets_sold ??
+    event.total_booked ??
+    event.booked_count ??
+    event.registered_count ??
+    event.bookings ??
+    0
+  )
 
-  // --- UI ---
+  const maxAtt = Number(event.max_attendees ?? 99999)
+  const showBasicPerk = Boolean(event.basic_perk) && bookedCount <= maxAtt
+  // You previously mentioned advanced perks when "total booked < 5" — implement that rule,
+  // but still only show if column exists.
+  const showAdvancedPerk = Boolean(event.advanced_perk) && bookedCount < 5
+
   return (
     <main className="bg-gradient-to-b from-black via-zinc-900 to-black text-white min-h-screen flex flex-col items-center py-12 px-4">
-      <div className="bg-zinc-900/80 rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden border border-zinc-800">
-        {/* HEADER IMAGE */}
-        {imgSrc && (
-          <div className="relative h-64 w-full overflow-hidden">
+      <div className="bg-zinc-900/90 rounded-3xl max-w-3xl w-full shadow-2xl overflow-hidden border border-zinc-800">
+        {/* HEADER */}
+        <div className="relative h-72 w-full bg-zinc-800/40">
+          {imgSrc && !imgError ? (
+            // native <img> is simplest here (no next/image restrictions)
             <img
               src={imgSrc}
-              alt={event.name}
-              className="object-cover w-full h-full brightness-90 hover:brightness-100 transition"
+              alt={event.name || 'Event image'}
+              onError={(e) => {
+                console.warn('Image failed to load:', imgSrc)
+                setImgError(true)
+                e.currentTarget.src = '/placeholder-event.png' // provide this fallback in public/
+              }}
+              className="object-cover w-full h-full brightness-90 transition"
             />
-            <div className="absolute bottom-0 left-0 p-4 bg-gradient-to-t from-black/80 to-transparent w-full">
-              <h1 className="text-3xl font-bold">{event.name}</h1>
-              <p className="text-sm text-gray-400">
-                📅 {eventDate.toLocaleDateString()} · 🕒{' '}
-                {eventDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </p>
-              <p className="text-sm text-gray-400">
-                📍 {event.city}
-                {event.venue_location ? `, ${event.venue_location}` : ''}
-              </p>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <div className="text-center">
+                <div className="text-2xl font-semibold">{event.name}</div>
+                <div className="text-sm text-gray-400 mt-2">Image not available</div>
+                {imgSrc && (
+                  <div className="text-xs text-gray-500 mt-1 break-all">{imgSrc}</div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* CONTENT */}
+          {/* overlay title */}
+          <div className="absolute bottom-0 left-0 p-4 w-full bg-gradient-to-t from-black/80 to-transparent">
+            <h1 className="text-3xl font-bold truncate">{event.name}</h1>
+            {eventDate && (
+              <p className="text-sm text-gray-400">
+                📅 {eventDate.toLocaleDateString()} · 🕒 {eventDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            )}
+            <p className="text-sm text-gray-400">
+              📍 {event.city}{event.venue ? ` · ${event.venue}` : event.venue_location ? ` · ${event.venue_location}` : ''}
+            </p>
+          </div>
+        </div>
+
+        {/* BODY */}
         <div className="p-6 space-y-6">
-          {/* TAGS */}
+          {/* tags */}
           {tags.length > 0 && (
             <div className="flex flex-wrap gap-2">
-              {tags.map((tag, i) => (
-                <span
-                  key={i}
-                  className="bg-zinc-800 text-xs px-3 py-1 rounded-full border border-zinc-700"
-                >
-                  #{tag}
-                </span>
+              {tags.map((tname, i) => (
+                <span key={i} className="bg-zinc-800 text-xs px-3 py-1 rounded-full border border-zinc-700">#{tname}</span>
               ))}
             </div>
           )}
 
-          {/* DESCRIPTION */}
-          {event.description && (
-            <p className="text-gray-300 leading-relaxed">{event.description}</p>
-          )}
-          {event.details && (
-            <p className="text-gray-400 text-sm italic">{event.details}</p>
-          )}
+          {/* description/details */}
+          {event.description && <p className="text-gray-300 leading-relaxed">{event.description}</p>}
+          {event.details && <p className="text-gray-400 text-sm italic">{event.details}</p>}
 
-          {/* PERK BOX */}
-          <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4 text-sm">
-            <h3 className="font-semibold text-green-400 mb-1">{t("Perks")}</h3>
-            <p className="text-gray-300">{perkInfo}</p>
-          </div>
-
-          {/* BOOKING BOX */}
-          <div className="border-t border-zinc-700 pt-4 space-y-4">
-            <div className="flex justify-between text-sm">
-              <span>{t("PricePerTicket")}</span>
-              <span>
-                {event.price && Number(event.price) > 0
-                  ? `${Number(event.price).toFixed(2)} USD`
-                  : t("Free")}
-              </span>
+          {/* perks */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4">
+              <h3 className="font-semibold text-green-400 mb-1">Basic perk</h3>
+              {showBasicPerk ? (
+                <p className="text-gray-300">{event.basic_perk}</p>
+              ) : (
+                <p className="text-gray-500 text-sm">
+                  {event.basic_perk ? 'Basic perk not available due to current bookings.' : 'No basic perk defined.'}
+                </p>
+              )}
             </div>
 
-            <div className="flex justify-between items-center text-sm">
-              <label htmlFor="quantity">{t("Quantity")}</label>
-              <input
-                id="quantity"
-                type="number"
-                value={quantity}
-                onChange={(e) => setQuantity(Number(e.target.value))}
-                min={1}
-                max={event.max_attendees || 10}
-                className="w-16 p-1 rounded bg-zinc-800 border border-zinc-600 text-white text-center"
-              />
+            <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4">
+              <h3 className="font-semibold text-amber-300 mb-1">Advanced perk</h3>
+              {showAdvancedPerk ? (
+                <p className="text-gray-300">{event.advanced_perk}</p>
+              ) : (
+                <p className="text-gray-500 text-sm">
+                  {event.advanced_perk ? 'Advanced perk not active (requires fewer than 5 bookings).' : 'No advanced perk defined.'}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* booking */}
+          <div className="border-t border-zinc-700 pt-4">
+            <div className="flex justify-between text-sm mb-2">
+              <span>Price</span>
+              <span>{event.price && Number(event.price) > 0 ? `${Number(event.price).toFixed(2)} USD` : 'Free'}</span>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <label htmlFor="quantity" className="text-sm">Quantity</label>
+              <input id="quantity" type="number" value={quantity} onChange={(e) => setQuantity(Math.max(1, Number(e.target.value || 1)))} min={1} max={event.max_attendees || 10} className="w-20 p-2 rounded bg-zinc-800 border border-zinc-600 text-white text-center"/>
             </div>
 
             <label className="flex items-center gap-2 text-sm mt-3">
-              <input
-                type="checkbox"
-                checked={agreed}
-                onChange={(e) => setAgreed(e.target.checked)}
-                className="accent-green-600"
-              />
-              {t("Iagree")} — {t("VenuePolicy")}
+              <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="accent-green-500" />
+              I agree to the event policy
             </label>
 
-            <button
-              onClick={handleBooking}
-              disabled={!agreed || loading}
-              className={`w-full mt-4 py-3 rounded-xl font-semibold transition ${
-                !agreed || loading
-                  ? 'bg-green-700/40 cursor-not-allowed'
-                  : 'bg-green-600 hover:bg-green-700'
-              }`}
-            >
-              {loading ? t("Processing") : t("GetTicket")}
+            <button onClick={handleBooking} disabled={!agreed || loading} className={`w-full mt-4 py-3 rounded-xl font-semibold transition ${(!agreed || loading) ? 'bg-green-700/40 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}>
+              {loading ? 'Processing...' : 'Get ticket'}
             </button>
 
-            <div className="text-gray-400 text-xs mt-4">
-              <p>{t("ShowYourQR")}</p>
-              <p>{t("EmailContainsPerk")}</p>
+            <div className="text-gray-400 text-xs mt-3">
+              <p>Show the QR code from the email at the venue.</p>
+              <p>If you paid, you will receive a confirmation email with the perk information.</p>
             </div>
+          </div>
+
+          {/* small debug area */}
+          <div className="mt-2 text-right">
+            <button onClick={() => setDebug((s) => !s)} className="text-xs text-gray-400 hover:underline">
+              {debug ? 'Hide debug' : 'Show debug'}
+            </button>
+            {debug && (
+              <pre className="mt-2 p-3 bg-black/60 text-xs text-gray-300 rounded max-h-64 overflow-auto">
+                {JSON.stringify(event, null, 2)}
+              </pre>
+            )}
           </div>
         </div>
       </div>
