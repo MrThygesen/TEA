@@ -235,13 +235,8 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
         )}
       </div>
 
-      {/* Image */}
-      <img
-        src={imagePath}
-        alt={event.name}
-        className="w-full h-48 object-cover rounded-lg mb-3 border border-zinc-800"
-        onError={(e) => (e.target.src = '/placeholder.jpg')}
-      />
+     {/* No image shown in this view */}
+<div className="h-2" />
 
       {/* Title + Info */}
       <h3 className="text-lg font-bold mb-1 truncate">{event.name}</h3>
@@ -267,34 +262,31 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       </div>
 
       {/* Buttons */}
-      <div className="flex justify-between items-center gap-2 mt-2">
-        <button
-          onClick={handleRSVPClick}
-          className="flex-1 px-3 py-1 text-sm rounded border border-yellow-400 text-yellow-400 hover:bg-yellow-500/10 transition"
-        >
-          📌 RSVP
-        </button>
-
-<button
-  onClick={() => (window.location.href = `/event/${event.id}`)}
-  className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm"
->
-  🎟️ Book
-</button>
-
-
-
-<div className="flex flex-col items-center">
+    <div className="flex justify-between items-center gap-2 mt-2">
   <button
-    onClick={handleHeartClick}
-    className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm"
+    onClick={handleRSVPClick}
+    className="flex-1 px-3 py-1 text-sm rounded text-yellow-400 border border-yellow-400 hover:text-yellow-300 transition"
   >
-    ❤️
+    📌 RSVP
   </button>
-  <span className="text-xs text-gray-300 mt-1">{heartCount}</span>
-</div>
 
-      </div>
+  <button
+    onClick={() => (window.location.href = `/event/${event.id}`)}
+    className="px-3 py-1 text-sm rounded text-blue-400 border border-blue-400 hover:text-blue-300 transition"
+  >
+    🎟️ Book
+  </button>
+
+  <div className="flex flex-col items-center">
+    <button
+      onClick={handleHeartClick}
+      className="px-3 py-1 text-sm text-red-400 hover:text-red-300 transition"
+    >
+      ❤️
+    </button>
+    <span className="text-xs text-gray-300 mt-1">{heartCount}</span>
+  </div>
+</div>
 
       {/* Footer */}
       <div className="mt-4 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
