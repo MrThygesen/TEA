@@ -236,12 +236,12 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       </div>
 
       {/* Image */}
-//      <img
-//        src={imagePath}
-//        alt={event.name}
-//        className="w-full h-48 object-cover rounded-lg mb-3 border border-zinc-800"
-//        onError={(e) => (e.target.src = '/placeholder.jpg')}
-//      />
+      <img
+        src={imagePath}
+        alt={event.name}
+        className="w-full h-48 object-cover rounded-lg mb-3 border border-zinc-800"
+        onError={(e) => (e.target.src = '/placeholder.jpg')}
+      />
 
       {/* Title + Info */}
       <h3 className="text-lg font-bold mb-1 truncate">{event.name}</h3>
