@@ -250,8 +250,8 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       <p className="text-xs text-gray-400 mb-3">
         📅 {new Date(event.datetime).toLocaleDateString()} · 📍 {event.city}
       </p>
-<p className="text-sm text-gray-300 mb-3 truncate">
-  {event.description?.length > 50 ? event.description.slice(0, 50) + '…' : event.description}
+<p className="text-sm text-gray-300 mb-3 line-clamp-2">
+  {event.description}
 </p>
 
       {/* Tags */}

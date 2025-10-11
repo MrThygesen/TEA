@@ -1,4 +1,3 @@
-// frontend/pages/event/[id].js
 'use client'
 import { useRouter } from 'next/router'
 import { useEffect, useState } from 'react'
@@ -13,6 +12,7 @@ export default function EventPage() {
   const [loading, setLoading] = useState(false)
   const [imgError, setImgError] = useState(false)
   const [debug, setDebug] = useState(false)
+  const [showPerks, setShowPerks] = useState(false)
   const { t } = useTranslation()
 
   useEffect(() => {
@@ -57,9 +57,7 @@ export default function EventPage() {
   // === helpers ===
   function resolveImageUrl(url) {
     if (!url) return null
-    // Absolute URL: use as-is
     if (/^https?:\/\//i.test(url) || /^\/\//.test(url)) return url
-    // remove local dev prefixes that may have been stored accidentally
     let p = url.replace(/^frontend\/public\//i, '').replace(/^public\//i, '')
     if (!p.startsWith('/')) p = '/' + p
     return p
@@ -77,7 +75,6 @@ export default function EventPage() {
   const eventDate = event.datetime ? new Date(event.datetime) : null
   const tags = [event.tag1, event.tag2, event.tag3, event.tag4].filter(Boolean)
 
-  // Try several possible field names for "how many are booked" — adapt to your API
   const bookedCount = Number(
     event.registrations_count ??
     event.registrations ??
@@ -90,24 +87,24 @@ export default function EventPage() {
   )
 
   const maxAtt = Number(event.max_attendees ?? 100)
- const minNeeded = Number(event.min_attendees ?? 0)
-const showBasicPerk = bookedCount >= minNeeded && !!event.basic_perk
-const showAdvancedPerk = bookedCount < minNeeded && !!event.advanced_perk
+  const minNeeded = Number(event.min_attendees ?? 0)
+  const showBasicPerk = bookedCount >= minNeeded && !!event.basic_perk
+  const showAdvancedPerk = bookedCount < minNeeded && !!event.advanced_perk
 
   return (
     <main className="bg-gradient-to-b from-black via-zinc-900 to-black text-white min-h-screen flex flex-col items-center py-12 px-4">
       <div className="bg-zinc-900/90 rounded-3xl max-w-3xl w-full shadow-2xl overflow-hidden border border-zinc-800">
+
         {/* HEADER */}
         <div className="relative h-72 w-full bg-zinc-800/40">
           {imgSrc && !imgError ? (
-            // native <img> is simplest here (no next/image restrictions)
             <img
               src={imgSrc}
               alt={event.name || 'Event image'}
               onError={(e) => {
                 console.warn('Image failed to load:', imgSrc)
                 setImgError(true)
-                e.currentTarget.src = '/placeholder-event.png' // provide this fallback in public/
+                e.currentTarget.src = '/placeholder-event.png'
               }}
               className="object-cover w-full h-full brightness-90 transition"
             />
@@ -116,9 +113,7 @@ const showAdvancedPerk = bookedCount < minNeeded && !!event.advanced_perk
               <div className="text-center">
                 <div className="text-2xl font-semibold">{event.name}</div>
                 <div className="text-sm text-gray-400 mt-2">Image not available</div>
-                {imgSrc && (
-                  <div className="text-xs text-gray-500 mt-1 break-all">{imgSrc}</div>
-                )}
+                {imgSrc && <div className="text-xs text-gray-500 mt-1 break-all">{imgSrc}</div>}
               </div>
             </div>
           )}
@@ -139,6 +134,7 @@ const showAdvancedPerk = bookedCount < minNeeded && !!event.advanced_perk
 
         {/* BODY */}
         <div className="p-6 space-y-6">
+
           {/* tags */}
           {tags.length > 0 && (
             <div className="flex flex-wrap gap-2">
@@ -148,32 +144,54 @@ const showAdvancedPerk = bookedCount < minNeeded && !!event.advanced_perk
             </div>
           )}
 
-          {/* description/details */}
-          {event.description && <p className="text-gray-300 leading-relaxed">{event.description}</p>}
-          {event.details && <p className="text-gray-400 text-sm italic">{event.details}</p>}
+          {/* description */}
+          {event.description && (
+            <p className="text-gray-300 leading-relaxed">{event.description}</p>
+          )}
 
-          {/* perks */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4">
-              <h3 className="font-semibold text-green-400 mb-1">Basic perk</h3>
-              {showBasicPerk ? (
-                <p className="text-gray-300">{event.basic_perk}</p>
-              ) : (
-                <p className="text-gray-500 text-sm">
-                  {event.basic_perk ? 'Basic perk not available due to current bookings.' : 'No basic perk defined.'}
-                </p>
-              )}
+          {/* details / venue-organizer */}
+          {event.details && (
+            <div className="bg-zinc-800/40 border border-zinc-700 rounded-xl p-4 text-sm text-gray-400 italic">
+              <p>{event.details}</p>
             </div>
+          )}
 
-            <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4">
-              <h3 className="font-semibold text-amber-300 mb-1">Advanced perk</h3>
-              {showAdvancedPerk ? (
-                <p className="text-gray-300">{event.advanced_perk}</p>
-              ) : (
-                <p className="text-gray-500 text-sm">
-                  {event.advanced_perk ? 'Advanced perk not active (requires fewer than 5 bookings).' : 'No advanced perk defined.'}
-                </p>
-              )}
+          {/* PERKS - COLLAPSIBLE */}
+          <div className="border border-zinc-700 rounded-xl overflow-hidden">
+            <button
+              onClick={() => setShowPerks((v) => !v)}
+              className="w-full flex justify-between items-center px-4 py-3 bg-zinc-800/60 hover:bg-zinc-800 transition text-left"
+            >
+              <span className="font-semibold text-lg">🎁 Perks & Rewards</span>
+              <span className="text-gray-400 text-sm">{showPerks ? '▲ Hide' : '▼ Show'}</span>
+            </button>
+
+            <div
+              className={`transition-max-h duration-500 ease-in-out overflow-hidden`}
+              style={{ maxHeight: showPerks ? '500px' : '0px' }}
+            >
+              <div className="p-4 bg-zinc-900/70 text-center space-y-4">
+                {showBasicPerk && (
+                  <div>
+                    <h3 className="font-semibold text-green-400 mb-1">Included Perk</h3>
+                    <p className="text-gray-300">{event.basic_perk}</p>
+                    <p className="text-xs text-gray-500 mt-1">(Unlocked — enough attendees joined 🎉)</p>
+                  </div>
+                )}
+                {showAdvancedPerk && (
+                  <div>
+                    <h3 className="font-semibold text-amber-300 mb-1">Included Perk</h3>
+                    <p className="text-gray-300">{event.advanced_perk}</p>
+                    <p className="text-xs text-gray-500 mt-1">(Exclusive early perk — more signups will unlock the next stage!)</p>
+                  </div>
+                )}
+                {!showBasicPerk && !showAdvancedPerk && (
+                  <div>
+                    <h3 className="font-semibold text-gray-400 mb-1">No perk available yet</h3>
+                    <p className="text-gray-500 text-sm">More participants might unlock rewards for this event!</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -186,7 +204,15 @@ const showAdvancedPerk = bookedCount < minNeeded && !!event.advanced_perk
 
             <div className="flex justify-between items-center">
               <label htmlFor="quantity" className="text-sm">Quantity</label>
-              <input id="quantity" type="number" value={quantity} onChange={(e) => setQuantity(Math.max(1, Number(e.target.value || 1)))} min={1} max={event.max_attendees || 10} className="w-20 p-2 rounded bg-zinc-800 border border-zinc-600 text-white text-center"/>
+              <input
+                id="quantity"
+                type="number"
+                value={quantity}
+                onChange={(e) => setQuantity(Math.max(1, Number(e.target.value || 1)))}
+                min={1}
+                max={event.max_attendees || 10}
+                className="w-20 p-2 rounded bg-zinc-800 border border-zinc-600 text-white text-center"
+              />
             </div>
 
             <label className="flex items-center gap-2 text-sm mt-3">
@@ -194,7 +220,11 @@ const showAdvancedPerk = bookedCount < minNeeded && !!event.advanced_perk
               I agree to the event policy
             </label>
 
-            <button onClick={handleBooking} disabled={!agreed || loading} className={`w-full mt-4 py-3 rounded-xl font-semibold transition ${(!agreed || loading) ? 'bg-green-700/40 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}>
+            <button
+              onClick={handleBooking}
+              disabled={!agreed || loading}
+              className={`w-full mt-4 py-3 rounded-xl font-semibold transition ${(!agreed || loading) ? 'bg-green-700/40 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
+            >
               {loading ? 'Processing...' : 'Get ticket'}
             </button>
 
@@ -215,6 +245,7 @@ const showAdvancedPerk = bookedCount < minNeeded && !!event.advanced_perk
               </pre>
             )}
           </div>
+
         </div>
       </div>
     </main>
