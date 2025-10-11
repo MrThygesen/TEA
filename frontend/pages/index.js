@@ -251,7 +251,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
         📅 {new Date(event.datetime).toLocaleDateString()} · 📍 {event.city}
       </p>
 <p className="text-sm text-gray-300 mb-3 truncate">
-  {event.description?.length > 30 ? event.description.slice(0, 30) + '…' : event.description}
+  {event.description?.length > 50 ? event.description.slice(0, 50) + '…' : event.description}
 </p>
 
       {/* Tags */}
@@ -268,7 +268,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
           ))}
       </div>
 
-      {/* Buttons */}
+{/* Buttons */}
 <div className="flex justify-between items-center gap-2 mt-2">
   {/* RSVP button */}
   <button
@@ -276,9 +276,10 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       e.stopPropagation()
       handleRSVPClick()
     }}
-    className="flex-1 flex justify-center items-center h-9 rounded border border-yellow-400 text-yellow-400 hover:text-yellow-300 transition"
+    className="flex-1 flex flex-col justify-center items-center h-16 rounded border border-yellow-400 text-yellow-400 hover:text-yellow-300 transition text-sm"
   >
-    📌 RSVP
+    <span className="text-base mb-1">📌</span>
+    <span>RSVP</span>
   </button>
 
   {/* Book button */}
@@ -287,9 +288,10 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       e.stopPropagation()
       if (!showPerks) window.location.href = `/event/${event.id}`
     }}
-    className="flex-1 flex justify-center items-center h-9 rounded border border-blue-400 text-blue-400 hover:text-blue-300 transition"
+    className="flex-1 flex flex-col justify-center items-center h-16 rounded border border-blue-400 text-blue-400 hover:text-blue-300 transition text-sm"
   >
-    🎟️ Book
+    <span className="text-base mb-1">🎟️</span>
+    <span>Book</span>
   </button>
 
   {/* Heart counter */}
@@ -298,12 +300,13 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       e.stopPropagation()
       handleHeartClick()
     }}
-    className="flex flex-col justify-center items-center border border-red-400 rounded h-9 px-3 text-red-400 hover:text-red-300 transition"
+    className="flex flex-col justify-center items-center h-16 rounded border border-red-400 text-red-400 hover:text-red-300 transition text-sm px-3"
   >
-    ❤️
-    <span className="text-[10px] text-gray-300 mt-0.5 leading-none">{heartCount}</span>
+    <span className="text-base mb-1">❤️</span>
+    <span className="text-[11px] leading-none">{heartCount}</span>
   </button>
 </div>
+
 
       {/* Footer */}
       {/* Footer with Perk Button */}
