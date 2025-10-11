@@ -25,7 +25,6 @@ export default function EventPage() {
         }
         const data = await res.json()
         setEvent(data)
-        console.log('Loaded event:', data)
       })
       .catch((err) => {
         console.error('Failed to load event:', err)
@@ -54,7 +53,6 @@ export default function EventPage() {
     }
   }
 
-  // === helpers ===
   function resolveImageUrl(url) {
     if (!url) return null
     if (/^https?:\/\//i.test(url) || /^\/\//.test(url)) return url
@@ -118,7 +116,6 @@ export default function EventPage() {
             </div>
           )}
 
-          {/* overlay title */}
           <div className="absolute bottom-0 left-0 p-4 w-full bg-gradient-to-t from-black/80 to-transparent">
             <h1 className="text-3xl font-bold truncate">{event.name}</h1>
             {eventDate && (
@@ -135,22 +132,17 @@ export default function EventPage() {
         {/* BODY */}
         <div className="p-6 space-y-6">
 
- {/* tags */}
-{tags.length > 0 && (
-  <div className="flex flex-wrap gap-2">
-    {tags.map((tname, i) => (
-      <span
-        key={i}
-        className="bg-blue-600 text-white text-xs px-3 py-1 rounded-full border border-blue-700"
-      >
-        #{tname}
-      </span>
-    ))}
-  </div>
-)}
-
-
-
+          {/* tags */}
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {tags.map((tname, i) => (
+                <span
+                  key={i}
+                  className="bg-blue-600 text-white text-xs px-3 py-1 rounded-full border border-blue-700"
+                >
+                  #{tname}
+                </span>
+              ))}
             </div>
           )}
 
@@ -159,14 +151,14 @@ export default function EventPage() {
             <p className="text-gray-300 leading-relaxed">{event.description}</p>
           )}
 
-          {/* details / venue-organizer */}
+          {/* details */}
           {event.details && (
             <div className="bg-zinc-800/40 border border-zinc-700 rounded-xl p-4 text-sm text-gray-400 italic">
               <p>{event.details}</p>
             </div>
           )}
 
-          {/* PERKS - COLLAPSIBLE */}
+          {/* PERKS */}
           <div className="border border-zinc-700 rounded-xl overflow-hidden">
             <button
               onClick={() => setShowPerks((v) => !v)}
@@ -177,7 +169,7 @@ export default function EventPage() {
             </button>
 
             <div
-              className={`transition-max-h duration-500 ease-in-out overflow-hidden`}
+              className="transition-max-h duration-500 ease-in-out overflow-hidden"
               style={{ maxHeight: showPerks ? '500px' : '0px' }}
             >
               <div className="p-4 bg-zinc-900/70 text-center space-y-4">
@@ -230,14 +222,13 @@ export default function EventPage() {
               I agree to the event policy
             </label>
 
-<button
-  onClick={handleBooking}
-  disabled={!agreed || loading}
-  className="w-full mt-4 py-3 px-6 rounded-xl font-bold text-white shadow-lg transition duration-200 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-700/40 disabled:cursor-not-allowed"
->
-  {loading ? 'Processing...' : 'Get ticket'}
-</button>
-
+            <button
+              onClick={handleBooking}
+              disabled={!agreed || loading}
+              className="w-full mt-4 py-3 px-6 rounded-xl font-bold text-white shadow-lg transition duration-200 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-700/40 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Processing...' : 'Get ticket'}
+            </button>
 
             <div className="text-gray-400 text-xs mt-3">
               <p>Show the QR code from the email at the venue.</p>
@@ -245,7 +236,7 @@ export default function EventPage() {
             </div>
           </div>
 
-          {/* small debug area */}
+          {/* debug */}
           <div className="mt-2 text-right">
             <button onClick={() => setDebug((s) => !s)} className="text-xs text-gray-400 hover:underline">
               {debug ? 'Hide debug' : 'Show debug'}
