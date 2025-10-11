@@ -5,7 +5,8 @@ import Link from 'next/link'
 //import useTranslation from '../utils/useTranslation'
 
 export default function YourAccountModal({ onClose, refreshTrigger }) {
-  const { t } = useTranslation()
+  //const { t } = useTranslation()
+  const t = (text) => text
   const [profile, setProfile] = useState(null)
   const [tickets, setTickets] = useState([])
   const [rsvps, setRsvps] = useState([])
