@@ -136,11 +136,15 @@ export default function EventPage() {
         <div className="p-6 space-y-6">
 
           {/* tags */}
-          {tags.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {tags.map((tname, i) => (
-                <span key={i} className="bg-zinc-800 text-xs px-3 py-1 rounded-full border border-zinc-700">#{tname}</span>
-              ))}
+          {tags.map((tname, i) => (
+  <span
+    key={i}
+    className="bg-blue-600 text-white text-xs px-3 py-1 rounded-full border border-blue-700"
+  >
+    #{tname}
+  </span>
+))}
+
             </div>
           )}
 
@@ -223,7 +227,7 @@ export default function EventPage() {
 <button
   onClick={handleBooking}
   disabled={!agreed || loading}
-  className="w-full mt-4 py-3 px-6 rounded-xl font-bold text-white shadow-lg transition duration-200 bg-green-600 hover:bg-green-700 disabled:bg-green-700/40 disabled:cursor-not-allowed"
+  className="w-full mt-4 py-3 px-6 rounded-xl font-bold text-white shadow-lg transition duration-200 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-700/40 disabled:cursor-not-allowed"
 >
   {loading ? 'Processing...' : 'Get ticket'}
 </button>
