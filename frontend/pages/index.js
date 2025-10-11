@@ -211,144 +211,167 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       ? 'SINGLE DEAL'
       : null
 
-return (
-  <div
-    className="relative bg-zinc-900 border border-zinc-700 rounded-xl p-4 transition hover:bg-zinc-800 hover:shadow-lg cursor-pointer"
-    onClick={(e) => {
-      const tag = e.target.tagName.toLowerCase()
-      // only navigate if NOT clicking buttons/icons and perks view is closed
-      if (!showPerks && tag !== 'button' && tag !== 'svg' && tag !== 'path') {
-        window.location.href = `/event/${event.id}`
+export function DynamicEventCard({ event, authUser, setShowAccountModal, refreshTrigger, setRefreshTrigger }) {
+  const [heartCount, setHeartCount] = useState(0)
+  const [bookable, setBookable] = useState(event.is_confirmed)
+  const [showPerks, setShowPerks] = useState(false)
+  const [perkType, setPerkType] = useState(null)
+
+  const totalBooked = event.total_booked || 0
+  const hasPerks = event.basic_perk || event.advanced_perk
+
+  useEffect(() => {
+    if (hasPerks) {
+      if (totalBooked < (event.min_attendees || 0)) {
+        setPerkType('Advanced Perk')
+      } else {
+        setPerkType('Basic Perk')
       }
-    }}
-  >
-    {/* Hover Perk Info */}
+    }
+  }, [totalBooked, event.min_attendees, hasPerks])
+
+  // --- handle clicks ---
+  function handleHeartClick() {
+    setHeartCount((prev) => prev + 1)
+  }
+
+  function handleRSVPClick() {
+    console.log('RSVP clicked')
+  }
+
+  return (
     <div
-      className={`absolute inset-0 bg-zinc-900/95 backdrop-blur-md text-white flex flex-col items-center justify-center p-4 text-sm text-center z-20 transition-all duration-300 ${
-        showPerks ? 'opacity-100' : 'opacity-0 pointer-events-none'
-      }`}
-    >
-      <h4 className="text-xl font-bold mb-2">🎁 Event Perks</h4>
-      <p className="text-gray-300 max-w-xs mb-2">
-        {event.basic_perk || event.advanced_perk || 'No perks available.'}
-      </p>
-      {perkType && <p className="text-green-400 font-semibold tracking-wide">{perkType}</p>}
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          setShowPerks(false)
-        }}
-        className="mt-4 px-3 py-1 text-sm border border-gray-500 text-gray-300 rounded hover:bg-gray-700/30"
-      >
-        Close
-      </button>
-    </div>
-
-    {/* spacing */}
-    <div className="h-2" />
-
-    {/* Title + Info */}
-    <h3 className="text-lg font-bold mb-1 truncate">
-      {event.name?.slice(0, 30) + (event.name?.length > 30 ? '…' : '')}
-    </h3>
-    <p className="text-xs text-gray-400 mb-3">
-      📅 {new Date(event.datetime).toLocaleDateString()} · 📍 {event.city}
-    </p>
-    <p className="text-sm text-gray-300 mb-3 truncate">
-      {event.description
-        ? event.description.slice(0, 30) + (event.description.length > 30 ? '…' : '')
-        : ''}
-    </p>
-
-    {/* Tags */}
-    <div className="flex gap-2 mb-3 flex-wrap">
-      {[event.tag1, event.tag2, event.tag3, event.tag4]
-        .filter(Boolean)
-        .map((tag, idx) => (
-          <span
-            key={idx}
-            className="px-2 py-0.5 text-xs rounded-full bg-blue-700/80 text-white border border-blue-500"
-          >
-            {tag}
-          </span>
-        ))}
-    </div>
-
-    {/* Unified Clickable Button Area */}
-    <div
-      className="flex justify-between items-center gap-2 mt-2"
+      className="relative bg-zinc-900 border border-zinc-700 rounded-xl p-4 transition hover:bg-zinc-800 hover:shadow-lg cursor-pointer"
       onClick={(e) => {
-        e.stopPropagation()
-        if (!showPerks) window.location.href = `/event/${event.id}`
+        if (showPerks) return // disable navigation if perk info is open
+        const tag = e.target.tagName.toLowerCase()
+        if (!['button', 'svg', 'path'].includes(tag)) {
+          window.location.href = `/event/${event.id}`
+        }
       }}
     >
-      {/* RSVP */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          handleRSVPClick()
-        }}
-        className="flex-1 flex justify-center items-center px-3 py-1.5 text-sm rounded border text-yellow-400 border-yellow-400 hover:text-yellow-300 transition h-9"
+      {/* Hover Perk Info */}
+      <div
+        className={`absolute inset-0 bg-zinc-900/95 backdrop-blur-md text-white flex flex-col items-center justify-center p-4 text-sm text-center z-20 transition-all duration-300 ${
+          showPerks ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
       >
-        📌 RSVP
-      </button>
+        <h4 className="text-xl font-bold mb-2">🎁 Event Perks</h4>
+        <p className="text-gray-300 max-w-xs mb-2">
+          {totalBooked < (event.min_attendees || 0)
+            ? event.advanced_perk || 'No perks available.'
+            : event.basic_perk || 'No perks available.'}
+        </p>
+        {perkType && (
+          <p className="text-green-400 font-semibold tracking-wide">{perkType}</p>
+        )}
+      </div>
 
-      {/* Book */}
-      <button
+      {/* Title + Info */}
+      <h3 className="text-lg font-bold mb-1 truncate">
+        {event.name?.length > 30 ? event.name.slice(0, 30) + '…' : event.name}
+      </h3>
+
+      <p className="text-xs text-gray-400 mb-3">
+        📅 {new Date(event.datetime).toLocaleDateString()} · 📍 {event.city}
+      </p>
+
+      <p className="text-sm text-gray-300 mb-3 truncate">
+        {event.description?.length > 30
+          ? event.description.slice(0, 30) + '…'
+          : event.description}
+      </p>
+
+      {/* Tags */}
+      <div className="flex gap-2 mb-3 flex-wrap">
+        {[event.tag1, event.tag2, event.tag3, event.tag4]
+          .filter(Boolean)
+          .map((tag, idx) => (
+            <span
+              key={idx}
+              className="px-2 py-0.5 text-xs rounded-full bg-blue-700/80 text-white border border-blue-500"
+            >
+              {tag}
+            </span>
+          ))}
+      </div>
+
+      {/* Button Row (Entire bottom zone clickable, except sub-buttons) */}
+      <div
+        className="flex justify-between items-center gap-2 mt-2 cursor-pointer"
         onClick={(e) => {
           e.stopPropagation()
           window.location.href = `/event/${event.id}`
         }}
-        className="flex-1 flex justify-center items-center px-3 py-1.5 text-sm rounded border text-blue-400 border-blue-400 hover:text-blue-300 transition h-9"
       >
-        🎟️ Book
-      </button>
-
-      {/* Heart */}
-      <div className="flex flex-col justify-center items-center border border-red-400 rounded h-9 px-3">
+        {/* RSVP */}
         <button
           onClick={(e) => {
             e.stopPropagation()
-            handleHeartClick()
+            handleRSVPClick()
           }}
-          className="text-base text-red-400 hover:text-red-300 transition leading-none"
+          className="flex-1 flex justify-center items-center px-3 py-1.5 text-sm rounded border text-yellow-400 border-yellow-400 hover:text-yellow-300 transition h-9"
         >
-          ❤️
+          📌 RSVP
         </button>
-        <span className="text-[10px] text-gray-300 mt-0.5 leading-none">
-          {heartCount}
+
+        {/* Book */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            window.location.href = `/event/${event.id}`
+          }}
+          className="flex-1 flex justify-center items-center px-3 py-1.5 text-sm rounded border text-blue-400 border-blue-400 hover:text-blue-300 transition h-9"
+        >
+          🎟️ Book
+        </button>
+
+        {/* Heart */}
+        <div className="flex flex-col justify-center items-center border border-red-400 rounded h-9 px-3">
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              handleHeartClick()
+            }}
+            className="text-base text-red-400 hover:text-red-300 transition leading-none"
+          >
+            ❤️
+          </button>
+          <span className="text-[10px] text-gray-300 mt-0.5 leading-none">
+            {heartCount}
+          </span>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="mt-4 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
+        <span>
+          💰{' '}
+          {event.price && Number(event.price) > 0
+            ? `${Number(event.price).toFixed(2)} USD`
+            : 'Free'}
+        </span>
+
+        {hasPerks && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowPerks((prev) => !prev)
+            }}
+            className="p-1 border border-pink-400 text-pink-400 rounded-full text-sm hover:bg-pink-500/10 transition"
+            title="View perks"
+          >
+            🎁
+          </button>
+        )}
+
+        <span>
+          👥 {totalBooked} / {event.max_attendees || '∞'}
         </span>
       </div>
     </div>
-
-    {/* Footer */}
-    <div className="mt-4 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
-      <span>
-        💰{' '}
-        {event.price && Number(event.price) > 0
-          ? `${Number(event.price).toFixed(2)} USD`
-          : 'Free'}
-      </span>
-
-      {hasPerks && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            setShowPerks((prev) => !prev)
-          }}
-          className="p-1 border border-pink-400 text-pink-400 rounded-full text-sm hover:bg-pink-500/10 transition"
-          title="View perks"
-        >
-          🎁
-        </button>
-      )}
-
-      <span>
-        👥 {totalBooked} / {event.max_attendees || '∞'}
-      </span>
-    </div>
-  </div>
-)
+  )
+}
 
 /////////////////////////////// VIDEO ///////
 function VideoHero() {
@@ -745,10 +768,6 @@ setRefreshTrigger={setRefreshTrigger}
     refreshTrigger={0} // or some dummy number if required
   />
 )}
-
-
-
-
 
       {showLoginModal && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={() => setShowLoginModal(false)}>

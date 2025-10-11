@@ -89,11 +89,10 @@ export default function EventPage() {
     0
   )
 
-  const maxAtt = Number(event.max_attendees ?? 99999)
-  const showBasicPerk = Boolean(event.basic_perk) && bookedCount <= maxAtt
-  // You previously mentioned advanced perks when "total booked < 5" — implement that rule,
-  // but still only show if column exists.
-  const showAdvancedPerk = Boolean(event.advanced_perk) && bookedCount < 5
+  const maxAtt = Number(event.max_attendees ?? 100)
+ const minNeeded = Number(event.min_attendees ?? 0)
+const showBasicPerk = bookedCount >= minNeeded && !!event.basic_perk
+const showAdvancedPerk = bookedCount < minNeeded && !!event.advanced_perk
 
   return (
     <main className="bg-gradient-to-b from-black via-zinc-900 to-black text-white min-h-screen flex flex-col items-center py-12 px-4">
