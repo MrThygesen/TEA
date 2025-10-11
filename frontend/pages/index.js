@@ -304,7 +304,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
     <span className="text-[10px] text-gray-300 mt-0.5 leading-none">{heartCount}</span>
   </button>
 </div>
-</div>
 
       {/* Footer */}
       {/* Footer with Perk Button */}
