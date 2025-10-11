@@ -268,7 +268,6 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       </div>
 
       {/* Buttons */}
- {/* Buttons */}
 <div className="flex justify-between items-center gap-2 mt-2">
   {/* RSVP button */}
   <button
@@ -276,7 +275,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       e.stopPropagation()
       handleRSVPClick()
     }}
-    className="flex-1 px-3 py-1 text-sm rounded text-yellow-400 border border-yellow-400 hover:text-yellow-300 transition"
+    className="flex-1 flex justify-center items-center px-3 py-1.5 text-sm rounded border text-yellow-400 border-yellow-400 hover:text-yellow-300 transition h-9"
   >
     📌 RSVP
   </button>
@@ -287,26 +286,25 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       e.stopPropagation()
       window.location.href = `/event/${event.id}`
     }}
-    className="px-3 py-1 text-sm rounded text-blue-400 border border-blue-400 hover:text-blue-300 transition"
+    className="flex-1 flex justify-center items-center px-3 py-1.5 text-sm rounded border text-blue-400 border-blue-400 hover:text-blue-300 transition h-9"
   >
     🎟️ Book
   </button>
 
   {/* Heart counter */}
-  <div className="flex flex-col items-center border border-red-400 rounded-lg px-2 py-1">
+  <div className="flex flex-col justify-center items-center border border-red-400 rounded h-9 px-3">
     <button
       onClick={(e) => {
         e.stopPropagation()
         handleHeartClick()
       }}
-      className="text-lg text-red-400 hover:text-red-300 transition"
+      className="text-base text-red-400 hover:text-red-300 transition leading-none"
     >
       ❤️
     </button>
-    <span className="text-xs text-gray-300 mt-1">{heartCount}</span>
+    <span className="text-[10px] text-gray-300 mt-0.5 leading-none">{heartCount}</span>
   </div>
 </div>
-
 
       {/* Footer */}
       {/* Footer with Perk Button */}
