@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
 import Link from 'next/link'
-import useTranslation from '../utils/useTranslation'
+//import useTranslation from '../utils/useTranslation'
 
 export default function YourAccountModal({ onClose, refreshTrigger }) {
   const { t } = useTranslation()
