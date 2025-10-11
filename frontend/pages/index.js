@@ -214,160 +214,170 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
 export function DynamicEventCard({ event, authUser, setShowAccountModal, refreshTrigger, setRefreshTrigger }) {
   const [heartCount, setHeartCount] = useState(0)
   const [bookable, setBookable] = useState(event.is_confirmed)
+  const [loading, setLoading] = useState(false)
+  const [userTickets, setUserTickets] = useState(0)
   const [showPerks, setShowPerks] = useState(false)
-  const [perkType, setPerkType] = useState(null)
+  const [totalBooked, setTotalBooked] = useState(0)
+  const router = useRouter()
 
-  const totalBooked = event.total_booked || 0
-  const hasPerks = event.basic_perk || event.advanced_perk
+  const HEART_THRESHOLD = 0
+  const reachedLimit = userTickets >= (event.tag1 === 'group' ? 5 : 1)
 
+  // --- fetch hearts ---
   useEffect(() => {
-    if (hasPerks) {
-      if (totalBooked < (event.min_attendees || 0)) {
-        setPerkType('Advanced Perk')
-      } else {
-        setPerkType('Basic Perk')
+    async function fetchHearts() {
+      try {
+        const res = await fetch(`/api/events/hearts?eventId=${event.id}`)
+        if (!res.ok) return
+        const data = await res.json()
+        setHeartCount(data.count)
+        setBookable(data.count >= HEART_THRESHOLD || event.is_confirmed)
+      } catch (err) {
+        console.error('Failed to fetch hearts', err)
       }
     }
-  }, [totalBooked, event.min_attendees, hasPerks])
+    fetchHearts()
+  }, [event.id, event.is_confirmed])
 
-  // --- handle clicks ---
-  function handleHeartClick() {
-    setHeartCount((prev) => prev + 1)
+  // --- fetch user tickets ---
+  useEffect(() => {
+    if (!authUser) return
+    async function fetchTickets() {
+      try {
+        const token = localStorage.getItem('token')
+        if (!token) return
+        const res = await fetch('/api/user/me', { headers: { Authorization: `Bearer ${token}` } })
+        if (!res.ok) return
+        const data = await res.json()
+        const myTickets = Array.isArray(data.tickets)
+          ? data.tickets.filter((t) => t.event_id === event.id)
+          : []
+        const total = myTickets.reduce((sum, t) => sum + (t.quantity || 1), 0)
+        setUserTickets(total)
+      } catch (err) {
+        console.error('fetchTickets error:', err)
+      }
+    }
+    fetchTickets()
+  }, [authUser, event.id, refreshTrigger])
+
+  // --- like handler ---
+  async function handleHeartClick(e) {
+    e.stopPropagation()
+    try {
+      const token = localStorage.getItem('token') || ''
+      const headers = { 'Content-Type': 'application/json' }
+      if (token) headers.Authorization = `Bearer ${token}`
+
+      const res = await fetch('/api/events/favorites', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ eventId: event.id }),
+      })
+      if (!res.ok) throw new Error('Failed to like')
+      const data = await res.json()
+      setHeartCount(data.count)
+      toast.success('❤️ Liked!')
+    } catch (err) {
+      toast.error('❌ Error liking event')
+    }
   }
 
-  function handleRSVPClick() {
-    console.log('RSVP clicked')
+  // --- booking handler ---
+  async function handleBooking(e) {
+    e.stopPropagation()
+    if (!authUser) {
+      setShowAccountModal(true)
+      toast.error('⚠️ Please login to buy a ticket.')
+      return
+    }
+    router.push(`/event/${event.id}`)
   }
+
+  // --- image ---
+  const imagePath = event.image_url?.startsWith('http')
+    ? event.image_url
+    : event.image_url
+    ? `/${event.image_url.replace(/^frontend\/public\//, '')}`
+    : '/placeholder.jpg'
 
   return (
     <div
       className="relative bg-zinc-900 border border-zinc-700 rounded-xl p-4 transition hover:bg-zinc-800 hover:shadow-lg cursor-pointer"
       onClick={(e) => {
-        if (showPerks) return // disable navigation if perk info is open
-        const tag = e.target.tagName.toLowerCase()
-        if (!['button', 'svg', 'path'].includes(tag)) {
-          window.location.href = `/event/${event.id}`
-        }
+        if (showPerks) setShowPerks(false)
+        else router.push(`/event/${event.id}`)
       }}
     >
-      {/* Hover Perk Info */}
-      <div
-        className={`absolute inset-0 bg-zinc-900/95 backdrop-blur-md text-white flex flex-col items-center justify-center p-4 text-sm text-center z-20 transition-all duration-300 ${
-          showPerks ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
-      >
-        <h4 className="text-xl font-bold mb-2">🎁 Event Perks</h4>
-        <p className="text-gray-300 max-w-xs mb-2">
-          {totalBooked < (event.min_attendees || 0)
-            ? event.advanced_perk || 'No perks available.'
-            : event.basic_perk || 'No perks available.'}
-        </p>
-        {perkType && (
-          <p className="text-green-400 font-semibold tracking-wide">{perkType}</p>
-        )}
-      </div>
+      {/* Perk Overlay */}
+      {showPerks && (
+        <div className="absolute inset-0 bg-black/90 text-white flex flex-col items-center justify-center rounded-xl z-20 p-4">
+          <h4 className="text-xl font-bold mb-2">🎁 Event Perks</h4>
+          <p className="text-sm text-gray-300 mb-2 max-w-xs text-center">
+            {event.basic_perk || 'No perks available'}
+          </p>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowPerks(false)
+            }}
+            className="px-3 py-1 border border-pink-400 text-pink-400 rounded-full hover:bg-pink-500/10 mt-2"
+          >
+            Close
+          </button>
+        </div>
+      )}
 
-      {/* Title + Info */}
-      <h3 className="text-lg font-bold mb-1 truncate">
-        {event.name?.length > 30 ? event.name.slice(0, 30) + '…' : event.name}
-      </h3>
-
+      {/* Content */}
+      <h3 className="text-lg font-bold mb-1 truncate">{event.name}</h3>
       <p className="text-xs text-gray-400 mb-3">
         📅 {new Date(event.datetime).toLocaleDateString()} · 📍 {event.city}
       </p>
 
       <p className="text-sm text-gray-300 mb-3 truncate">
-        {event.description?.length > 30
-          ? event.description.slice(0, 30) + '…'
-          : event.description}
+        {event.description?.length > 40 ? event.description.slice(0, 40) + '…' : event.description}
       </p>
 
-      {/* Tags */}
-      <div className="flex gap-2 mb-3 flex-wrap">
-        {[event.tag1, event.tag2, event.tag3, event.tag4]
-          .filter(Boolean)
-          .map((tag, idx) => (
-            <span
-              key={idx}
-              className="px-2 py-0.5 text-xs rounded-full bg-blue-700/80 text-white border border-blue-500"
-            >
-              {tag}
-            </span>
-          ))}
-      </div>
+      {/* Image */}
+      <img
+        src={imagePath}
+        alt={event.name}
+        className="w-full h-40 object-cover rounded-md mb-3 border border-zinc-700"
+      />
 
-      {/* Button Row (Entire bottom zone clickable, except sub-buttons) */}
-      <div
-        className="flex justify-between items-center gap-2 mt-2 cursor-pointer"
-        onClick={(e) => {
-          e.stopPropagation()
-          window.location.href = `/event/${event.id}`
-        }}
-      >
-        {/* RSVP */}
+      {/* Bottom buttons */}
+      <div className="flex justify-between items-center mt-2">
         <button
-          onClick={(e) => {
-            e.stopPropagation()
-            handleRSVPClick()
-          }}
-          className="flex-1 flex justify-center items-center px-3 py-1.5 text-sm rounded border text-yellow-400 border-yellow-400 hover:text-yellow-300 transition h-9"
-        >
-          📌 RSVP
-        </button>
-
-        {/* Book */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            window.location.href = `/event/${event.id}`
-          }}
-          className="flex-1 flex justify-center items-center px-3 py-1.5 text-sm rounded border text-blue-400 border-blue-400 hover:text-blue-300 transition h-9"
+          onClick={handleBooking}
+          className="flex-1 text-blue-400 hover:text-blue-300 border border-blue-400 rounded py-1 transition"
         >
           🎟️ Book
         </button>
 
-        {/* Heart */}
-        <div className="flex flex-col justify-center items-center border border-red-400 rounded h-9 px-3">
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              handleHeartClick()
-            }}
-            className="text-base text-red-400 hover:text-red-300 transition leading-none"
-          >
-            ❤️
-          </button>
-          <span className="text-[10px] text-gray-300 mt-0.5 leading-none">
-            {heartCount}
-          </span>
-        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            setShowPerks((p) => !p)
+          }}
+          className="mx-2 p-1 text-pink-400 hover:text-pink-300 border border-pink-400 rounded-full"
+          title="Show perks"
+        >
+          🎁
+        </button>
+
+        <button
+          onClick={handleHeartClick}
+          className="text-red-400 hover:text-red-300 border border-red-400 rounded px-2 py-1"
+          title="Like"
+        >
+          ❤️ {heartCount}
+        </button>
       </div>
 
-      {/* Footer */}
-      <div className="mt-4 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
-        <span>
-          💰{' '}
-          {event.price && Number(event.price) > 0
-            ? `${Number(event.price).toFixed(2)} USD`
-            : 'Free'}
-        </span>
-
-        {hasPerks && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              setShowPerks((prev) => !prev)
-            }}
-            className="p-1 border border-pink-400 text-pink-400 rounded-full text-sm hover:bg-pink-500/10 transition"
-            title="View perks"
-          >
-            🎁
-          </button>
-        )}
-
-        <span>
-          👥 {totalBooked} / {event.max_attendees || '∞'}
-        </span>
+      {/* Footer info */}
+      <div className="mt-3 text-xs text-gray-400 flex justify-between">
+        <span>💰 {event.price > 0 ? `${event.price} USD` : 'Free'}</span>
+        <span>👥 {event.total_booked || 0} / {event.max_attendees || '∞'}</span>
       </div>
     </div>
   )
