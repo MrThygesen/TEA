@@ -220,13 +220,14 @@ export default function EventPage() {
               I agree to the event policy
             </label>
 
-            <button
-              onClick={handleBooking}
-              disabled={!agreed || loading}
-              className={`w-full mt-4 py-3 rounded-xl font-semibold transition ${(!agreed || loading) ? 'bg-green-700/40 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
-            >
-              {loading ? 'Processing...' : 'Get ticket'}
-            </button>
+<button
+  onClick={handleBooking}
+  disabled={!agreed || loading}
+  className="w-full mt-4 py-3 px-6 rounded-xl font-bold text-white shadow-lg transition duration-200 bg-green-600 hover:bg-green-700 disabled:bg-green-700/40 disabled:cursor-not-allowed"
+>
+  {loading ? 'Processing...' : 'Get ticket'}
+</button>
+
 
             <div className="text-gray-400 text-xs mt-3">
               <p>Show the QR code from the email at the venue.</p>

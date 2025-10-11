@@ -254,19 +254,20 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
   {event.description}
 </p>
 
-      {/* Tags */}
-      <div className="flex gap-2 mb-3 flex-wrap">
-        {[event.tag1, event.tag2, event.tag3, event.tag4]
-          .filter(Boolean)
-          .map((tag, idx) => (
-            <span
-              key={idx}
-              className="px-2 py-0.5 text-xs rounded-full bg-blue-700/80 text-white border border-blue-500"
-            >
-              {tag}
-            </span>
-          ))}
-      </div>
+{/* Tags */}
+<div className="flex gap-2 mb-3 flex-wrap">
+  {[event.tag1, event.tag2, event.tag3, event.tag4]
+    .filter(Boolean)
+    .map((tag, idx) => (
+      <span
+        key={idx}
+        className="px-3 py-1 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition"
+      >
+        {tag}
+      </span>
+    ))}
+</div>
+
 
 {/* Buttons */}
 <div className="flex justify-between items-center gap-2 mt-2">
