@@ -211,128 +211,144 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
       ? 'SINGLE DEAL'
       : null
 
-  return (
-<div
-  className="relative bg-zinc-900 border border-zinc-700 rounded-xl p-4 transition hover:bg-zinc-800 hover:shadow-lg cursor-pointer"
-  onClick={(e) => {
-    const tag = e.target.tagName.toLowerCase()
-    if (tag !== 'button' && tag !== 'svg' && tag !== 'path') {
-      window.location.href = `/event/${event.id}`
-    }
-  }}
->
-
-
-
-
-
-      {/* Hover Perk Info */}
-      <div
-        className={`absolute inset-0 bg-zinc-900/95 backdrop-blur-md text-white flex flex-col items-center justify-center p-4 text-sm text-center z-20 transition-all duration-300 ${
-          showPerks ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
+return (
+  <div
+    className="relative bg-zinc-900 border border-zinc-700 rounded-xl p-4 transition hover:bg-zinc-800 hover:shadow-lg cursor-pointer"
+    onClick={(e) => {
+      const tag = e.target.tagName.toLowerCase()
+      // only navigate if NOT clicking buttons/icons and perks view is closed
+      if (!showPerks && tag !== 'button' && tag !== 'svg' && tag !== 'path') {
+        window.location.href = `/event/${event.id}`
+      }
+    }}
+  >
+    {/* Hover Perk Info */}
+    <div
+      className={`absolute inset-0 bg-zinc-900/95 backdrop-blur-md text-white flex flex-col items-center justify-center p-4 text-sm text-center z-20 transition-all duration-300 ${
+        showPerks ? 'opacity-100' : 'opacity-0 pointer-events-none'
+      }`}
+    >
+      <h4 className="text-xl font-bold mb-2">🎁 Event Perks</h4>
+      <p className="text-gray-300 max-w-xs mb-2">
+        {event.basic_perk || event.advanced_perk || 'No perks available.'}
+      </p>
+      {perkType && <p className="text-green-400 font-semibold tracking-wide">{perkType}</p>}
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          setShowPerks(false)
+        }}
+        className="mt-4 px-3 py-1 text-sm border border-gray-500 text-gray-300 rounded hover:bg-gray-700/30"
       >
-        <h4 className="text-xl font-bold mb-2">🎁 Event Perks</h4>
-        <p className="text-gray-300 max-w-xs mb-2">
-          {event.basic_perk || event.advanced_perk || 'No perks available.'}
-        </p>
-        {perkType && (
-          <p className="text-green-400 font-semibold tracking-wide">{perkType}</p>
-        )}
-      </div>
+        Close
+      </button>
+    </div>
 
-     {/* No image shown in this view */}
-<div className="h-2" />
+    {/* spacing */}
+    <div className="h-2" />
 
-      {/* Title + Info */}
-      <h3 className="text-lg font-bold mb-1 truncate">{event.name}</h3>
-      <p className="text-xs text-gray-400 mb-3">
-        📅 {new Date(event.datetime).toLocaleDateString()} · 📍 {event.city}
-      </p>
-      <p className="text-sm text-gray-300 mb-3 truncate">
-        {event.description?.split(' ').slice(0, 12).join(' ')}...
-      </p>
+    {/* Title + Info */}
+    <h3 className="text-lg font-bold mb-1 truncate">
+      {event.name?.slice(0, 30) + (event.name?.length > 30 ? '…' : '')}
+    </h3>
+    <p className="text-xs text-gray-400 mb-3">
+      📅 {new Date(event.datetime).toLocaleDateString()} · 📍 {event.city}
+    </p>
+    <p className="text-sm text-gray-300 mb-3 truncate">
+      {event.description
+        ? event.description.slice(0, 30) + (event.description.length > 30 ? '…' : '')
+        : ''}
+    </p>
 
-      {/* Tags */}
-      <div className="flex gap-2 mb-3 flex-wrap">
-        {[event.tag1, event.tag2, event.tag3, event.tag4]
-          .filter(Boolean)
-          .map((tag, idx) => (
-            <span
-              key={idx}
-              className="px-2 py-0.5 text-xs rounded-full bg-blue-700/80 text-white border border-blue-500"
-            >
-              {tag}
-            </span>
-          ))}
-      </div>
+    {/* Tags */}
+    <div className="flex gap-2 mb-3 flex-wrap">
+      {[event.tag1, event.tag2, event.tag3, event.tag4]
+        .filter(Boolean)
+        .map((tag, idx) => (
+          <span
+            key={idx}
+            className="px-2 py-0.5 text-xs rounded-full bg-blue-700/80 text-white border border-blue-500"
+          >
+            {tag}
+          </span>
+        ))}
+    </div>
 
-      {/* Buttons */}
-<div className="flex justify-between items-center gap-2 mt-2">
-  {/* RSVP button */}
-  <button
-    onClick={(e) => {
-      e.stopPropagation()
-      handleRSVPClick()
-    }}
-    className="flex-1 flex justify-center items-center px-3 py-1.5 text-sm rounded border text-yellow-400 border-yellow-400 hover:text-yellow-300 transition h-9"
-  >
-    📌 RSVP
-  </button>
-
-  {/* Book button */}
-  <button
-    onClick={(e) => {
-      e.stopPropagation()
-      window.location.href = `/event/${event.id}`
-    }}
-    className="flex-1 flex justify-center items-center px-3 py-1.5 text-sm rounded border text-blue-400 border-blue-400 hover:text-blue-300 transition h-9"
-  >
-    🎟️ Book
-  </button>
-
-  {/* Heart counter */}
-  <div className="flex flex-col justify-center items-center border border-red-400 rounded h-9 px-3">
-    <button
+    {/* Unified Clickable Button Area */}
+    <div
+      className="flex justify-between items-center gap-2 mt-2"
       onClick={(e) => {
         e.stopPropagation()
-        handleHeartClick()
+        if (!showPerks) window.location.href = `/event/${event.id}`
       }}
-      className="text-base text-red-400 hover:text-red-300 transition leading-none"
     >
-      ❤️
-    </button>
-    <span className="text-[10px] text-gray-300 mt-0.5 leading-none">{heartCount}</span>
-  </div>
-</div>
+      {/* RSVP */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          handleRSVPClick()
+        }}
+        className="flex-1 flex justify-center items-center px-3 py-1.5 text-sm rounded border text-yellow-400 border-yellow-400 hover:text-yellow-300 transition h-9"
+      >
+        📌 RSVP
+      </button>
 
-      {/* Footer */}
-      {/* Footer with Perk Button */}
-      <div className="mt-4 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
-        <span>
-          💰 {event.price && Number(event.price) > 0 ? `${Number(event.price).toFixed(2)} USD` : 'Free'}
-        </span>
+      {/* Book */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          window.location.href = `/event/${event.id}`
+        }}
+        className="flex-1 flex justify-center items-center px-3 py-1.5 text-sm rounded border text-blue-400 border-blue-400 hover:text-blue-300 transition h-9"
+      >
+        🎟️ Book
+      </button>
 
-        {hasPerks && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              setShowPerks((prev) => !prev)
-            }}
-            className="p-1 border border-pink-400 text-pink-400 rounded-full text-sm hover:bg-pink-500/10 transition"
-            title="View perks"
-          >
-            🎁
-          </button>
-        )}
-
-        <span>
-          👥 {totalBooked} / {event.max_attendees || '∞'}
+      {/* Heart */}
+      <div className="flex flex-col justify-center items-center border border-red-400 rounded h-9 px-3">
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            handleHeartClick()
+          }}
+          className="text-base text-red-400 hover:text-red-300 transition leading-none"
+        >
+          ❤️
+        </button>
+        <span className="text-[10px] text-gray-300 mt-0.5 leading-none">
+          {heartCount}
         </span>
       </div>
     </div>
-  )
-}
+
+    {/* Footer */}
+    <div className="mt-4 border-t border-zinc-700 pt-2 flex justify-between items-center text-xs text-gray-400">
+      <span>
+        💰{' '}
+        {event.price && Number(event.price) > 0
+          ? `${Number(event.price).toFixed(2)} USD`
+          : 'Free'}
+      </span>
+
+      {hasPerks && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            setShowPerks((prev) => !prev)
+          }}
+          className="p-1 border border-pink-400 text-pink-400 rounded-full text-sm hover:bg-pink-500/10 transition"
+          title="View perks"
+        >
+          🎁
+        </button>
+      )}
+
+      <span>
+        👥 {totalBooked} / {event.max_attendees || '∞'}
+      </span>
+    </div>
+  </div>
+)
 
 /////////////////////////////// VIDEO ///////
 function VideoHero() {
