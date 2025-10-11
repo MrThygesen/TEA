@@ -135,7 +135,7 @@ export default function EventPage() {
         {/* BODY */}
         <div className="p-6 space-y-6">
 
-     {/* tags */}
+ {/* tags */}
 {tags.length > 0 && (
   <div className="flex flex-wrap gap-2">
     {tags.map((tname, i) => (
