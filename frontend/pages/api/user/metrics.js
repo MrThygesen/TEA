@@ -1,4 +1,3 @@
-// pages/api/user/metrics.js
 import pkg from 'pg'
 import dotenv from 'dotenv'
 dotenv.config()
@@ -29,15 +28,23 @@ export default async function handler(req, res) {
     const arrivals = parseInt(arrivedCount.rows[0].count || 0)
     const favorites = parseInt(favoritesCount.rows[0].count || 0)
 
-    const showUpRate =
-      ticketsBought > 0 ? Math.round((arrivals / ticketsBought) * 100) : 0
+    const showUpRate = ticketsBought > 0 ? Math.round((arrivals / ticketsBought) * 100) : 0
+
+    // Points: 1 point per arrival for standard events
+    const points = arrivals
+
+    // Free rewards: 1 free for each 9 points attended
+    const freeRewards = Math.floor(points / 9)
+    const pointsTowardNextFree = points % 9
 
     res.status(200).json({
       tickets_bought: ticketsBought,
       rsvp_count: rsvps,
       favorites,
       show_up_rate: showUpRate,
-      points: ticketsBought * 10 + favorites * 2, // simple points logic
+      points,
+      free_rewards: freeRewards,
+      points_toward_next_free: pointsTowardNextFree
     })
   } catch (err) {
     console.error('❌ User metrics error:', err)

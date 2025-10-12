@@ -18,36 +18,45 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [updatingEmail, setUpdatingEmail] = useState(false)
   const [deletingAccount, setDeletingAccount] = useState(false)
 
-  useEffect(() => {
-    async function loadAccount() {
-      setLoading(true)
-      try {
-        const token = localStorage.getItem('token')
-        if (!token) throw new Error('Not logged in')
+ useEffect(() => {
+  async function loadAccount() {
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('Not logged in')
 
-        // Fetch profile, tickets, and RSVPs
-        const res = await fetch('/api/user/me', { headers: { Authorization: `Bearer ${token}` } })
-        const data = await res.json()
-        setProfile(data.profile ?? null)
-        setTickets(Array.isArray(data.tickets) ? data.tickets : [])
+      // Fetch profile and tickets
+      const res = await fetch('/api/user/me', { headers: { Authorization: `Bearer ${token}` } })
+      const data = await res.json()
+      setProfile(data.profile ?? null)
+      const userTickets = Array.isArray(data.tickets) ? data.tickets : []
 
-        const rsvpRes = await fetch('/api/user/rsvps', { headers: { Authorization: `Bearer ${token}` } })
-        const rsvpData = await rsvpRes.json()
-        setRsvps(Array.isArray(rsvpData) ? rsvpData : [])
+      // Fetch RSVPs
+      const rsvpRes = await fetch('/api/user/rsvps', { headers: { Authorization: `Bearer ${token}` } })
+      let rsvpData = await rsvpRes.json()
+      rsvpData = Array.isArray(rsvpData) ? rsvpData : []
 
-        // Fetch metrics (admin or user)
-        const metricEndpoint = data.profile?.role === 'admin' ? '/api/admin/stats' : '/api/user/metrics'
-        const metricRes = await fetch(metricEndpoint, { headers: { Authorization: `Bearer ${token}` } })
-        const metricData = await metricRes.json()
-        setMetrics(metricData)
-      } catch (err) {
-        setError(err.message)
-      } finally {
-        setLoading(false)
-      }
+      // ✅ Hide RSVPs for events where the user already has a ticket
+      const eventIdsWithTickets = new Set(userTickets.map(t => t.event_id))
+      const filteredRsvps = rsvpData.filter(r => !eventIdsWithTickets.has(r.event_id))
+
+      setTickets(userTickets)
+      setRsvps(filteredRsvps)
+
+      // Fetch metrics
+      const metricEndpoint = data.profile?.role === 'admin' ? '/api/admin/stats' : '/api/user/metrics'
+      const metricRes = await fetch(metricEndpoint, { headers: { Authorization: `Bearer ${token}` } })
+      const metricData = await metricRes.json()
+      setMetrics(metricData)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
     }
-    loadAccount()
-  }, [refreshTrigger])
+  }
+  loadAccount()
+}, [refreshTrigger])
+
 
   async function handleEmailUpdate() {
     if (!newEmail) return
