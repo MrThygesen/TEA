@@ -16,16 +16,24 @@ export default async function handler(req, res) {
   })
 
   try {
-    const [[rsvpCount], [paidCount], [arrivedCount], [favoritesCount]] = await Promise.all([
+    const [[rsvpCount], [ticketCount], [arrivedCount], [favoritesCount]] = await Promise.all([
       pool.query(`SELECT COUNT(*) FROM rsvps WHERE user_id = $1`, [userId]),
-      pool.query(`SELECT COUNT(*) FROM registrations WHERE user_id = $1 AND (has_paid = TRUE OR (has_paid = FALSE AND (event_price IS NULL OR event_price = 0)))
-`, [userId]),
-      pool.query(`SELECT COUNT(*) FROM registrations WHERE user_id = $1 AND has_arrived = true`, [userId]),
+      pool.query(
+        `SELECT COUNT(*) 
+         FROM registrations 
+         WHERE user_id = $1 
+           AND (
+             has_paid = TRUE 
+             OR (has_paid = FALSE AND (event_price IS NULL OR event_price = 0))
+           )`,
+        [userId]
+      ),
+      pool.query(`SELECT COUNT(*) FROM registrations WHERE user_id = $1 AND has_arrived = TRUE`, [userId]),
       pool.query(`SELECT COUNT(*) FROM favorites WHERE user_id = $1`, [userId]),
     ])
 
     const rsvps = parseInt(rsvpCount.rows[0].count || 0)
-    const ticketsBought = parseInt(paidCount.rows[0].count || 0)
+    const ticketsBought = parseInt(ticketCount.rows[0].count || 0)
     const arrivals = parseInt(arrivedCount.rows[0].count || 0)
     const favorites = parseInt(favoritesCount.rows[0].count || 0)
 
@@ -45,7 +53,7 @@ export default async function handler(req, res) {
       show_up_rate: showUpRate,
       points,
       free_rewards: freeRewards,
-      points_toward_next_free: pointsTowardNextFree
+      points_toward_next_free: pointsTowardNextFree,
     })
   } catch (err) {
     console.error('❌ User metrics error:', err)
