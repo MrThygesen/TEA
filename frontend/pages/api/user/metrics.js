@@ -1,13 +1,26 @@
+//metrics.js
+
 import pkg from 'pg'
 import dotenv from 'dotenv'
+import jwt from 'jsonwebtoken'
+
 dotenv.config()
 const { Pool } = pkg
+const TOKEN_KEY = process.env.JWT_SECRET || 'dev_secret'
 
 export default async function handler(req, res) {
-  const { userId } = req.query
+  const auth = req.headers.authorization
+  if (!auth) {
+    return res.status(401).json({ error: 'Missing authorization header' })
+  }
 
-  if (!userId) {
-    return res.status(400).json({ error: 'Missing userId' })
+  const [, token] = auth.split(' ')
+  let userId
+  try {
+    const decoded = jwt.verify(token, TOKEN_KEY)
+    userId = decoded.id
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid token' })
   }
 
   const pool = new Pool({
@@ -16,7 +29,8 @@ export default async function handler(req, res) {
   })
 
   try {
-    const [[rsvpCount], [ticketCount], [arrivedCount], [favoritesCount]] = await Promise.all([
+    // Run all 4 queries in parallel
+    const [rsvpCount, ticketCount, arrivedCount, favoritesCount] = await Promise.all([
       pool.query(`SELECT COUNT(*) FROM rsvps WHERE user_id = $1`, [userId]),
       pool.query(
         `SELECT COUNT(*) 
@@ -39,10 +53,8 @@ export default async function handler(req, res) {
 
     const showUpRate = ticketsBought > 0 ? Math.round((arrivals / ticketsBought) * 100) : 0
 
-    // Points: 1 point per arrival for standard events
+    // Loyalty logic
     const points = arrivals
-
-    // Free rewards: 1 free for each 9 points attended
     const freeRewards = Math.floor(points / 9)
     const pointsTowardNextFree = points % 9
 
