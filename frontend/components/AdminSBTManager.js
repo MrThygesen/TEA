@@ -481,28 +481,29 @@ function SetRoleForm() {
 }
 
 function EventCreator() {
-const [event, setEvent] = useState({
-  id: '',
-  name: '',
-  city: '',
-  datetime: '',
-  min_attendees: 1,
-  max_attendees: 40,
-  is_confirmed: false,
-  description: '',
-  details: '',
-  venue: '',
-  venue_type: '',
-  basic_perk: '',
-  advanced_perk: '',
-  tag1: '',
-  tag2: '',
-  tag3: '',
-  tag4: '',        // <-- added
-  language: '',    // <-- added
-  price: '',
-  image_url: ''
-});
+  const [event, setEvent] = useState({
+    id: '',
+    name: '',
+    city: '',
+    datetime: '',
+    min_attendees: 1,
+    max_attendees: 40,
+    is_confirmed: false,
+    description: '',
+    details: '',
+    venue: '',
+    venue_type: '',
+    basic_perk: '',
+    advanced_perk: '',
+    tag1: '',
+    tag2: '',
+    tag3: '',
+    tag4: '',
+    language: '',
+    price: '',
+    image_url: '',
+    admin_email: '', // <-- new field
+  })
 
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
@@ -519,6 +520,7 @@ const [event, setEvent] = useState({
     if (!event.name) newErrors.name = 'Event Name is required'
     if (!event.city) newErrors.city = 'City is required'
     if (!event.datetime) newErrors.datetime = 'Date and Time are required'
+    if (method === 'POST' && !event.admin_email) newErrors.admin_email = 'Admin email is required'
     if (event.min_attendees && isNaN(Number(event.min_attendees))) newErrors.min_attendees = 'Must be a number'
     if (event.max_attendees && isNaN(Number(event.max_attendees))) newErrors.max_attendees = 'Must be a number'
     return newErrors
@@ -535,10 +537,8 @@ const [event, setEvent] = useState({
     setLoading(true)
     setMessage('')
     try {
-      // Ensure group_id = id and never null
       const body = {
         ...event,
-        group_id: Number(event.id) || Date.now(), // fallback in case id is empty
         min_attendees: Number(event.min_attendees),
         max_attendees: Number(event.max_attendees),
         datetime: new Date(event.datetime).toISOString()
@@ -553,30 +553,7 @@ const [event, setEvent] = useState({
       if (!res.ok) throw new Error(data.error || 'Error saving event')
 
       setMessage(`✅ Event ${method === 'POST' ? 'created' : 'updated'} successfully`)
-      if (method === 'POST') {
-        setEvent({
-          id: '',
-          name: '',
-          city: '',
-          datetime: '',
-          min_attendees: 1,
-          max_attendees: 40,
-          is_confirmed: false,
-          description: '',
-          details: '',
-          venue: '',
-          venue_type: '',
-          basic_perk: '',
-          advanced_perk: '',
-          tag1: '',
-          tag2: '',
-          tag3: '',
-          tag4: '',
-          language: '',
-          price: '',
-        image_url: ''
-        })
-      }
+      if (method === 'POST') setEvent(prev => ({ ...prev, id: '' }))
     } catch (err) {
       setMessage('❌ ' + err.message)
     } finally {
@@ -601,42 +578,36 @@ const [event, setEvent] = useState({
       <input type="datetime-local" value={event.datetime} onChange={e => handleChange('datetime', e.target.value)} className={inputClass('datetime')} />
       {errors.datetime && <p className="text-red-500 text-sm">{errors.datetime}</p>}
 
-      <input type="number" placeholder="Min Attendees" value={event.min_attendees} onChange={e => handleChange('min_attendees', e.target.value)} className={inputClass('min_attendees')} />
-      {errors.min_attendees && <p className="text-red-500 text-sm">{errors.min_attendees}</p>}
+      <input type="email" placeholder="Admin Email" value={event.admin_email} onChange={e => handleChange('admin_email', e.target.value)} className={inputClass('admin_email')} />
+      {errors.admin_email && <p className="text-red-500 text-sm">{errors.admin_email}</p>}
 
+      <input type="number" placeholder="Min Attendees" value={event.min_attendees} onChange={e => handleChange('min_attendees', e.target.value)} className={inputClass('min_attendees')} />
       <input type="number" placeholder="Max Attendees" value={event.max_attendees} onChange={e => handleChange('max_attendees', e.target.value)} className={inputClass('max_attendees')} />
-      {errors.max_attendees && <p className="text-red-500 text-sm">{errors.max_attendees}</p>}
 
       <textarea placeholder="Description" value={event.description} onChange={e => handleChange('description', e.target.value)} className={inputClass('description')} />
       <textarea placeholder="Details" value={event.details} onChange={e => handleChange('details', e.target.value)} className={inputClass('details')} />
-      <input type="text" placeholder="Venue" value={event.venue} onChange={e => handleChange('venue', e.target.value)} className={inputClass('venue')} />
-    
-<select
-  value={event.venue_type}
-  onChange={e => handleChange('venue_type', e.target.value)}
-  className={inputClass('venue_type')}
->
-  <option value="">Select Venue Type</option>
-  <option value="Business">Business</option>
-  <option value="Entrepreneur">Entrepreneur</option>
-  <option value="Concerts">Concerts</option>
-  <option value="Romance">Romance</option>
-  <option value="Social">Social</option>
-</select>
-{errors.venue_type && <p className="text-red-500 text-sm">{errors.venue_type}</p>}
 
-  <input type="text" placeholder="Basic Perk" value={event.basic_perk} onChange={e => handleChange('basic_perk', e.target.value)} className={inputClass('basic_perk')} />
+      <input type="text" placeholder="Venue" value={event.venue} onChange={e => handleChange('venue', e.target.value)} className={inputClass('venue')} />
+      <select value={event.venue_type} onChange={e => handleChange('venue_type', e.target.value)} className={inputClass('venue_type')}>
+        <option value="">Select Venue Type</option>
+        <option value="Business">Business</option>
+        <option value="Entrepreneur">Entrepreneur</option>
+        <option value="Concerts">Concerts</option>
+        <option value="Romance">Romance</option>
+        <option value="Social">Social</option>
+      </select>
+
+      <input type="text" placeholder="Basic Perk" value={event.basic_perk} onChange={e => handleChange('basic_perk', e.target.value)} className={inputClass('basic_perk')} />
       <input type="text" placeholder="Advanced Perk" value={event.advanced_perk} onChange={e => handleChange('advanced_perk', e.target.value)} className={inputClass('advanced_perk')} />
+
       <input type="text" placeholder="Tag1" value={event.tag1} onChange={e => handleChange('tag1', e.target.value)} className={inputClass('tag1')} />
       <input type="text" placeholder="Tag2" value={event.tag2} onChange={e => handleChange('tag2', e.target.value)} className={inputClass('tag2')} />
       <input type="text" placeholder="Tag3" value={event.tag3} onChange={e => handleChange('tag3', e.target.value)} className={inputClass('tag3')} />
-<input type="text" placeholder="Tag4" value={event.tag4} onChange={e => handleChange('tag4', e.target.value)} className={inputClass('tag4')} />
-<input type="text" placeholder="Language" value={event.language} onChange={e => handleChange('language', e.target.value)} className={inputClass('language')} />
-<input type="number" placeholder="Price" value={event.price} onChange={e => handleChange('price', e.target.value)} className={inputClass('price')} />
- {errors.price && <p className="text-red-500 text-sm">{errors.price}</p>}
+      <input type="text" placeholder="Tag4" value={event.tag4} onChange={e => handleChange('tag4', e.target.value)} className={inputClass('tag4')} />
+      <input type="text" placeholder="Language" value={event.language} onChange={e => handleChange('language', e.target.value)} className={inputClass('language')} />
+      <input type="number" placeholder="Price" value={event.price} onChange={e => handleChange('price', e.target.value)} className={inputClass('price')} />
 
-   
-<input type="text" placeholder="Image URL" value={event.image_url} onChange={e => handleChange('image_url', e.target.value)} className={inputClass('image_url')} />
+      <input type="text" placeholder="Image URL" value={event.image_url} onChange={e => handleChange('image_url', e.target.value)} className={inputClass('image_url')} />
 
       <label className="flex items-center">
         <input type="checkbox" checked={event.is_confirmed} onChange={e => handleChange('is_confirmed', e.target.checked)} className="mr-2" />
@@ -652,4 +623,5 @@ const [event, setEvent] = useState({
     </div>
   )
 }
+
 
