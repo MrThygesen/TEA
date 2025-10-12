@@ -118,7 +118,12 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-lg max-w-6xl w-full p-6 text-white relative overflow-y-auto max-h-[90vh]">
         <button onClick={onClose} className="absolute top-2 right-2 text-gray-400 hover:text-white text-xl">✕</button>
-        <h2 className="text-2xl font-bold mb-6 text-blue-400">{t('YourAccount')}</h2>
+        //<h2 className="text-2xl font-bold mb-6 text-blue-400">{t('YourAccount')}</h2> 
+<h2 className="text-2xl font-bold mb-1 text-blue-400">{t('YourAccount')}</h2>
+{profile?.email && (
+  <p className="text-sm text-gray-400 mb-6">Email: {profile.email}</p>
+)}
+
 
         {/* Tickets */}
         {tickets.length > 0 && (
