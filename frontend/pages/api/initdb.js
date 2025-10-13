@@ -67,6 +67,7 @@ export default async function handler(req, res) {
 await pool.query(`
   CREATE TABLE IF NOT EXISTS events (
     id SERIAL PRIMARY KEY,
+    admin_email TEXT NOT NULL REFERENCES user_profiles(email),
     group_id INTEGER,
     name TEXT NOT NULL,
     city TEXT NOT NULL,
@@ -192,7 +193,7 @@ await pool.query(`
 `);
 
 
-    // rsvps (likes)
+    // rsvps
     await pool.query(`
       CREATE TABLE IF NOT EXISTS rsvps (
         id SERIAL PRIMARY KEY,

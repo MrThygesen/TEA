@@ -1,5 +1,4 @@
 // pages/api/events.js
-
 import { pool } from '../../lib/postgres.js'
 
 export default async function handler(req, res) {
@@ -13,6 +12,7 @@ export default async function handler(req, res) {
 
   try {
     switch (method) {
+      // 🔹 GET: Fetch one or all events
       case 'GET': {
         if (query.id) {
           const id = parseIntOrFail(query.id, 'id')
@@ -25,9 +25,10 @@ export default async function handler(req, res) {
         }
       }
 
+      // 🔹 POST: Create a new event
       case 'POST': {
         const {
-          admin_email,
+          admin_email, // required
           name,
           city,
           datetime,
@@ -47,33 +48,47 @@ export default async function handler(req, res) {
           language,
           price,
           image_url,
+          group_id // optional
         } = body
 
         if (!name || !city || !datetime || !admin_email) {
           return res.status(400).json({ error: 'Missing required fields (name, city, datetime, admin_email)' })
         }
 
-        // 1️⃣ Find admin user
-        const userRes = await pool.query('SELECT * FROM user_profiles WHERE email = $1', [admin_email])
-        const user = userRes.rows[0]
-        if (!user) return res.status(404).json({ error: 'Admin user not found' })
+        // 1️⃣ Find or create the admin user
+        let userRes = await pool.query('SELECT * FROM user_profiles WHERE email = $1', [admin_email])
+        let user = userRes.rows[0]
 
-        if (user.role !== 'user') return res.status(400).json({ error: 'User already has a role' })
+        if (!user) {
+          // Create the user if missing
+          const newUser = await pool.query(
+            'INSERT INTO user_profiles (email, role) VALUES ($1, $2) RETURNING *',
+            [admin_email, 'admin']
+          )
+          user = newUser.rows[0]
+        } else if (!user.role || user.role === 'user') {
+          // Promote user to admin if necessary
+          await pool.query('UPDATE user_profiles SET role = $1 WHERE id = $2', ['admin', user.id])
+        }
 
-        // 2️⃣ Insert event
+        // 2️⃣ Insert the event
         const insertResult = await pool.query(
           `
           INSERT INTO events (
+            admin_email, group_id,
             name, city, datetime,
             min_attendees, max_attendees, is_confirmed,
             description, details, venue, venue_type,
             basic_perk, advanced_perk,
             tag1, tag2, tag3, tag4,
             language, price, image_url
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+          )
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
           RETURNING id
           `,
           [
+            admin_email,
+            group_id || null,
             name,
             city,
             datetime,
@@ -92,24 +107,24 @@ export default async function handler(req, res) {
             tag4 || '',
             language || 'en',
             price ? Number(price) : 0,
-            image_url || '',
+            image_url || ''
           ]
         )
 
         const newEventId = insertResult.rows[0].id
 
-        // 3️⃣ Assign admin to event
+        // 3️⃣ Assign admin as organizer (avoid duplicates)
         await pool.query(
-          'INSERT INTO event_organizers (event_id, user_id) VALUES ($1,$2)',
+          `
+          INSERT INTO event_organizers (event_id, user_id)
+          VALUES ($1,$2)
+          ON CONFLICT (event_id, user_id) DO NOTHING
+          `,
           [newEventId, user.id]
         )
 
-        // 4️⃣ Update user role to admin
-        await pool.query('UPDATE user_profiles SET role=$1 WHERE id=$2', ['admin', user.id])
-
-        // ❌ Removed automatic group_id update
-
-        const fullRow = await pool.query('SELECT * FROM events WHERE id=$1', [newEventId])
+        // ✅ Done
+        const fullRow = await pool.query('SELECT * FROM events WHERE id = $1', [newEventId])
         return res.status(200).json(fullRow.rows[0])
       }
 
