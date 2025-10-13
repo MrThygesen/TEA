@@ -1,62 +1,74 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
 import Link from 'next/link'
-//import useTranslation from '../utils/useTranslation'
 
 export default function YourAccountModal({ onClose, refreshTrigger }) {
-  //const { t } = useTranslation()
   const t = (text) => text
   const [profile, setProfile] = useState(null)
   const [tickets, setTickets] = useState([])
   const [rsvps, setRsvps] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [activeQR, setActiveQR] = useState(null)
-  const [error, setError] = useState(null)
   const [metrics, setMetrics] = useState(null)
   const [newEmail, setNewEmail] = useState('')
   const [updatingEmail, setUpdatingEmail] = useState(false)
   const [deletingAccount, setDeletingAccount] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
- useEffect(() => {
-  async function loadAccount() {
-    setLoading(true)
-    try {
-      const token = localStorage.getItem('token')
-      if (!token) throw new Error('Not logged in')
+  useEffect(() => {
+    let cancelled = false
 
-      // Fetch profile and tickets
-      const res = await fetch('/api/user/me', { headers: { Authorization: `Bearer ${token}` } })
-      const data = await res.json()
-      setProfile(data.profile ?? null)
-      const userTickets = Array.isArray(data.tickets) ? data.tickets : []
+    async function loadAccount() {
+      setLoading(true)
+      try {
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('Not logged in')
 
-      // Fetch RSVPs
-      const rsvpRes = await fetch('/api/user/rsvps', { headers: { Authorization: `Bearer ${token}` } })
-      let rsvpData = await rsvpRes.json()
-      rsvpData = Array.isArray(rsvpData) ? rsvpData : []
+        const headers = { Authorization: `Bearer ${token}` }
 
-      // ✅ Hide RSVPs for events where the user already has a ticket
-      const eventIdsWithTickets = new Set(userTickets.map(t => t.event_id))
-      const filteredRsvps = rsvpData.filter(r => !eventIdsWithTickets.has(r.event_id))
+        // Parallel fetches for /me and /rsvps
+        const [meRes, rsvpRes] = await Promise.all([
+          fetch('/api/user/me', { headers }),
+          fetch('/api/user/rsvps', { headers }),
+        ])
 
-      setTickets(userTickets)
-      setRsvps(filteredRsvps)
+        if (!meRes.ok) throw new Error('Failed to fetch user profile')
+        if (!rsvpRes.ok) throw new Error('Failed to fetch RSVPs')
 
-      // Fetch metrics
-      const metricEndpoint = data.profile?.role === 'admin' ? '/api/admin/stats' : '/api/user/metrics'
-      const metricRes = await fetch(metricEndpoint, { headers: { Authorization: `Bearer ${token}` } })
-      const metricData = await metricRes.json()
-      setMetrics(metricData)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
+        const [meData, rsvpDataRaw] = await Promise.all([meRes.json(), rsvpRes.json()])
+
+        if (cancelled) return
+
+        setProfile(meData.profile ?? null)
+        const userTickets = Array.isArray(meData.tickets) ? meData.tickets : []
+        let rsvpData = Array.isArray(rsvpDataRaw) ? rsvpDataRaw : []
+
+        // Hide RSVPs for events where the user already has a ticket
+        const eventIdsWithTickets = new Set(userTickets.map((t) => t.event_id))
+        const filteredRsvps = rsvpData.filter((r) => !eventIdsWithTickets.has(r.event_id))
+
+        setTickets(userTickets)
+        setRsvps(filteredRsvps)
+
+        // Fetch metrics in parallel
+        const metricEndpoint = meData.profile?.role === 'admin' ? '/api/admin/stats' : '/api/user/metrics'
+        const metricRes = await fetch(metricEndpoint, { headers })
+        if (metricRes.ok) {
+          const metricData = await metricRes.json()
+          if (!cancelled) setMetrics(metricData)
+        }
+      } catch (err) {
+        if (!cancelled) setError(err.message)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
     }
-  }
-  loadAccount()
-}, [refreshTrigger])
 
+    loadAccount()
+    return () => {
+      cancelled = true
+    }
+  }, [refreshTrigger])
 
   async function handleEmailUpdate() {
     if (!newEmail) return
@@ -106,7 +118,9 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
           {error && (
             <>
               <p className="text-red-600 mb-4">{t('Error')} {error}</p>
-              <button onClick={onClose} className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700">{t('Close')}</button>
+              <button onClick={onClose} className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700">
+                {t('Close')}
+              </button>
             </>
           )}
         </div>
@@ -118,11 +132,11 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-lg max-w-6xl w-full p-6 text-white relative overflow-y-auto max-h-[90vh]">
         <button onClick={onClose} className="absolute top-2 right-2 text-gray-400 hover:text-white text-xl">✕</button>
-  <h2 className="text-2xl font-bold mb-1 text-blue-400">{t('YourAccount')}</h2>
-{profile?.email && (
-  <p className="text-sm text-gray-400 mb-6">Email: {profile.email}</p>
-)}
 
+        <h2 className="text-2xl font-bold mb-1 text-blue-400">{t('YourAccount')}</h2>
+        {profile?.email && (
+          <p className="text-sm text-gray-400 mb-6">Email: {profile.email}</p>
+        )}
 
         {/* Tickets */}
         {tickets.length > 0 && (
@@ -132,7 +146,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
               <table className="min-w-full border-collapse border border-zinc-700 text-sm">
                 <thead>
                   <tr className="bg-zinc-800 text-gray-300">
-                    {['Date', 'Time', 'Event', 'Location', 'Price', 'Paid', 'QR'].map(h => (
+                    {['Date', 'Time', 'Event', 'Location', 'Price', 'Paid', 'QR'].map((h) => (
                       <th key={h} className="px-3 py-2 border border-zinc-700 text-left">{t(h)}</th>
                     ))}
                   </tr>
@@ -143,15 +157,21 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                     return (
                       <tr key={i} className="bg-zinc-800 hover:bg-zinc-700">
                         <td className="px-3 py-2 border border-zinc-700">{dt.toLocaleDateString()}</td>
-                        <td className="px-3 py-2 border border-zinc-700">{dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                         <td className="px-3 py-2 border border-zinc-700">
-                          <Link href={`/event/${t.event_id}`} className="text-blue-400 hover:underline">{t.event_title}</Link>
+                          {dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td className="px-3 py-2 border border-zinc-700">
+                          <Link href={`/event/${t.event_id}`} className="text-blue-400 hover:underline">
+                            {t.event_title}
+                          </Link>
                         </td>
                         <td className="px-3 py-2 border border-zinc-700">{t.location ?? '-'}</td>
-                        <td className="px-3 py-2 border border-zinc-700">{t.event_price ? `${t.event_price} DKK` : t('Free')}</td>
+                        <td className="px-3 py-2 border border-zinc-700">
+                          {t.event_price ? `${t.event_price} DKK` : t('Free')}
+                        </td>
                         <td className="px-3 py-2 border border-zinc-700">{t.has_paid ? '✅' : '❌'}</td>
                         <td className="px-3 py-2 border border-zinc-700">
-                          {t.ticket_code && <QRCodeCanvas value={t.ticket_code} size={48} />}
+                          {t.ticket_code && <OptimizedQRCode value={t.ticket_code} />}
                         </td>
                       </tr>
                     )
@@ -168,11 +188,14 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
           <ul className="text-sm space-y-1 mb-8">
             {rsvps.map((r, i) => (
               <li key={i} className="border border-zinc-700 p-2 rounded bg-zinc-800">
-                <Link href={`/event/${r.event_id}`} className="text-blue-400 hover:underline">{r.title}</Link> — {new Date(r.date).toLocaleDateString()}
+                <Link href={`/event/${r.event_id}`} className="text-blue-400 hover:underline">{r.title}</Link> —{' '}
+                {new Date(r.date).toLocaleDateString()}
               </li>
             ))}
           </ul>
-        ) : <p className="text-gray-400 mb-8">{t('NoRSVPsFound')}</p>}
+        ) : (
+          <p className="text-gray-400 mb-8">{t('NoRSVPsFound')}</p>
+        )}
 
         {/* ADMIN METRICS */}
         {profile?.role === 'admin' && metrics && (
@@ -231,12 +254,15 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
   )
 }
 
-function Metric({ label, value }) {
-  return (
-    <div className="border border-zinc-700 bg-zinc-800 p-3 rounded-lg text-center">
-      <div className="text-lg font-bold">{value ?? '-'}</div>
-      <div className="text-sm text-gray-400">{label}</div>
-    </div>
-  )
-}
+const Metric = ({ label, value }) => (
+  <div className="border border-zinc-700 bg-zinc-800 p-3 rounded-lg text-center">
+    <div className="text-lg font-bold">{value ?? '-'}</div>
+    <div className="text-sm text-gray-400">{label}</div>
+  </div>
+)
+
+// ⚡ QR rendering optimization
+const OptimizedQRCode = React.memo(function OptimizedQRCode({ value }) {
+  return <QRCodeCanvas value={value} size={48} />
+})
 
