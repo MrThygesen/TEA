@@ -14,6 +14,8 @@ export default function EventPage() {
   const [debug, setDebug] = useState(false)
   const [showPerks, setShowPerks] = useState(false)
   const { t } = useTranslation()
+const [showDetails, setShowDetails] = useState(false)
+
 
   useEffect(() => {
     if (!id) return
@@ -151,12 +153,43 @@ export default function EventPage() {
             <p className="text-gray-300 leading-relaxed">{event.description}</p>
           )}
 
-          {/* details */}
-          {event.details && (
-            <div className="bg-zinc-800/40 border border-zinc-700 rounded-xl p-4 text-sm text-gray-400 italic">
-              <p>{event.details}</p>
-            </div>
-          )}
+          {/* HOST & VENUE DETAILS */}
+{event.details && (
+  <div className="border border-zinc-700 rounded-xl overflow-hidden">
+    <button
+      onClick={async () => {
+        setShowDetails((v) => !v)
+        // Optional: record a “host info view” for admin metrics
+        try {
+          const token = localStorage.getItem('token')
+          await fetch('/api/metrics/host-view', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
+            body: JSON.stringify({ eventId: event.id }),
+          })
+        } catch (err) {
+          console.warn('Metrics update failed:', err)
+        }
+      }}
+      className="w-full flex justify-between items-center px-4 py-3 bg-zinc-800/60 hover:bg-zinc-800 transition text-left"
+    >
+      <span className="font-semibold text-lg">🏠 Host & Venue Details</span>
+      <span className="text-gray-400 text-sm">{showDetails ? '▲ Hide' : '▼ Show'}</span>
+    </button>
+
+    <div
+      className="transition-max-h duration-500 ease-in-out overflow-hidden"
+      style={{ maxHeight: showDetails ? '400px' : '0px' }}
+    >
+      <div className="p-4 bg-zinc-900/70 text-gray-300 text-sm leading-relaxed">
+        {event.details.split('\n').map((line, i) => (
+          <p key={i} className="mb-2">{line}</p>
+        ))}
+      </div>
+    </div>
+  </div>
+)}
+
 
           {/* PERKS */}
           <div className="border border-zinc-700 rounded-xl overflow-hidden">
