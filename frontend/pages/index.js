@@ -1,13 +1,12 @@
 //index.js   
 'use client'      
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAccount } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { toast } from 'react-hot-toast'
 import YourAccountModal from '../components/YourAccountModal'
 import Image from 'next/image'
 import { useRouter } from 'next/router'
-//import AdminSBTManager from '../components/AdminSBTManager'
 
 
  // ---------------------------
