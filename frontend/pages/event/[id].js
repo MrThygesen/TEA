@@ -187,7 +187,7 @@ const [showDetails, setShowDetails] = useState(false)
         ))}
       </div>
     </div>
-  </div>
+  </div> 
 )}
 
 
