@@ -1,4 +1,3 @@
-//YourAccountModal.js
 'use client'
 import React, { useState, useEffect } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
@@ -37,21 +36,20 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         if (!rsvpRes.ok) throw new Error('Failed to fetch RSVPs')
 
         const [meData, rsvpDataRaw] = await Promise.all([meRes.json(), rsvpRes.json()])
-
         if (cancelled) return
 
         setProfile(meData.profile ?? null)
         const userTickets = Array.isArray(meData.tickets) ? meData.tickets : []
-        let rsvpData = Array.isArray(rsvpDataRaw) ? rsvpDataRaw : []
+        const rsvpData = Array.isArray(rsvpDataRaw) ? rsvpDataRaw : []
 
-        // Hide RSVPs for events where the user already has a ticket
+        // Filter RSVPs for events where the user already has a ticket
         const eventIdsWithTickets = new Set(userTickets.map((t) => t.event_id))
         const filteredRsvps = rsvpData.filter((r) => !eventIdsWithTickets.has(r.event_id))
 
         setTickets(userTickets)
         setRsvps(filteredRsvps)
 
-        // Fetch metrics in parallel
+        // Fetch metrics in parallel with tickets/rsvps done
         const metricEndpoint = meData.profile?.role === 'admin' ? '/api/admin/stats' : '/api/user/metrics'
         const metricRes = await fetch(metricEndpoint, { headers })
         if (metricRes.ok) {
@@ -66,9 +64,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     }
 
     loadAccount()
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [refreshTrigger])
 
   async function handleEmailUpdate() {
@@ -262,8 +258,29 @@ const Metric = ({ label, value }) => (
   </div>
 )
 
-// ⚡ QR rendering optimization
+// ⚡ Optimized QR with click-to-enlarge
 const OptimizedQRCode = React.memo(function OptimizedQRCode({ value }) {
-  return <QRCodeCanvas value={value} size={48} />
+  const [showModal, setShowModal] = React.useState(false)
+
+  return (
+    <>
+      <div onClick={() => setShowModal(true)} className="cursor-pointer inline-block">
+        <QRCodeCanvas value={value} size={48} />
+      </div>
+      {showModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-zinc-900 p-6 rounded-xl relative">
+            <button
+              onClick={() => setShowModal(false)}
+              className="absolute top-2 right-2 text-white text-xl"
+            >
+              ✕
+            </button>
+            <QRCodeCanvas value={value} size={200} />
+          </div>
+        </div>
+      )}
+    </>
+  )
 })
 
