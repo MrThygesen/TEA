@@ -145,7 +145,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                         <td className="px-3 py-2 border border-zinc-700">{dt.toLocaleDateString()}</td>
                         <td className="px-3 py-2 border border-zinc-700">{dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                         <td className="px-3 py-2 border border-zinc-700">
-                          <Link href={`/events/${t.event_id}`} className="text-blue-400 hover:underline">{t.event_title}</Link>
+                          <Link href={`/event/${t.event_id}`} className="text-blue-400 hover:underline">{t.event_title}</Link>
                         </td>
                         <td className="px-3 py-2 border border-zinc-700">{t.location ?? '-'}</td>
                         <td className="px-3 py-2 border border-zinc-700">{t.event_price ? `${t.event_price} DKK` : t('Free')}</td>
@@ -168,7 +168,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
           <ul className="text-sm space-y-1 mb-8">
             {rsvps.map((r, i) => (
               <li key={i} className="border border-zinc-700 p-2 rounded bg-zinc-800">
-                <Link href={`/events/${r.event_id}`} className="text-blue-400 hover:underline">{r.title}</Link> — {new Date(r.date).toLocaleDateString()}
+                <Link href={`/event/${r.event_id}`} className="text-blue-400 hover:underline">{r.title}</Link> — {new Date(r.date).toLocaleDateString()}
               </li>
             ))}
           </ul>
