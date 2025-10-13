@@ -1,12 +1,17 @@
+//updatePassword.
 
 import bcrypt from 'bcryptjs';
 import { pool } from '../../../lib/postgres.js';
 import { getUserFromJWT } from '../../../lib/auth.js';
+import { auth } from '../../../lib/auth.js'
+
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const user = await getUserFromJWT(req); // identify logged-in user
+  const token = auth.getTokenFromReq(req)
+const user = auth.verifyToken(token)
+
   const { password } = req.body;
 
   if (!password || password.length < 8) return res.status(400).json({ error: 'Password too short' });
