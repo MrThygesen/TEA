@@ -61,6 +61,5 @@ export default async function handler(req, res) {
     console.error('Login error:', err)
     return res.status(500).json({ error: 'Internal server error' })
   }
-
-
+}
 
