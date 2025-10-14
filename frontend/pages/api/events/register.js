@@ -34,6 +34,59 @@ export default async function handler(req, res) {
     if (!eventRows.length) return res.status(404).json({ error: 'Event not found' })
     const event = eventRows[0]
 
+// --- Gender-based seat balancing for "single-dinner-mix"
+if (event.venue_type === 'single-dinner-mix') {
+  // 1. Get user gender
+  let gender = null
+  if (userId) {
+    const { rows: userRows } = await pool.query(
+      'SELECT gender FROM user_profiles WHERE id=$1',
+      [userId]
+    )
+    gender = userRows[0]?.gender
+  }
+
+  if (!gender) {
+    return res.status(400).json({
+      error: 'Gender not specified in your profile. Please update your profile before registering.',
+    })
+  }
+
+  // 2. Count existing gender-based registrations
+  const { rows: regRows } = await pool.query(
+    `SELECT u.gender, COUNT(r.id) AS count
+     FROM registrations r
+     JOIN user_profiles u ON u.id = r.user_id
+     WHERE r.event_id = $1
+     GROUP BY u.gender`,
+    [eventId]
+  )
+
+  const genderCounts = regRows.reduce(
+    (acc, row) => ({ ...acc, [row.gender]: Number(row.count) }),
+    { male: 0, female: 0 }
+  )
+
+  const totalAllowedPerGender = Math.floor(event.max_attendees / 2)
+
+  // 3. Check limits
+  if (gender === 'male' && genderCounts.male >= totalAllowedPerGender) {
+    return res.status(400).json({
+      error: `Sorry, all male seats are taken (${genderCounts.male}/${totalAllowedPerGender}).`,
+    })
+  }
+
+  if (gender === 'female' && genderCounts.female >= totalAllowedPerGender) {
+    return res.status(400).json({
+      error: `Sorry, all female seats are taken (${genderCounts.female}/${totalAllowedPerGender}).`,
+    })
+  }
+
+  console.log(`🧍 Gender seat check passed: ${gender} registered`)
+}
+
+
+
     const maxPerUser = event.tag1 === 'group' ? 5 : 1
 
     // --- Check existing tickets

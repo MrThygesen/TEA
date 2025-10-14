@@ -1,3 +1,5 @@
+//pages/event/[id].js
+
 'use client'
 import { useRouter } from 'next/router'
 import { useEffect, useState } from 'react'
@@ -229,6 +231,19 @@ const [showDetails, setShowDetails] = useState(false)
               </div>
             </div>
           </div>
+
+
+
+{event.tag1 === 'single-dinner-mix' && (
+  <div className="text-sm text-gray-400 mt-2">
+    👩 {event.female_count ?? 0}/{Math.floor(event.max_attendees / 2)} women
+    &nbsp; | &nbsp;
+    👨 {event.male_count ?? 0}/{Math.floor(event.max_attendees / 2)} men
+  </div>
+)}
+
+
+
 
           {/* booking */}
           <div className="border-t border-zinc-700 pt-4">

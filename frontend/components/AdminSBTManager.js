@@ -1,3 +1,4 @@
+//AdminSBTManager.js
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -12,6 +13,7 @@ export default function AdminSBTManager() {
   const { address } = useAccount()
   const publicClient = usePublicClient()
   const { writeContractAsync } = useWriteContract()
+  const isAdmin = address?.toLowerCase() === process.env.NEXT_PUBLIC_ADMIN?.toLowerCase()
 
   const [typeId, setTypeId] = useState(1n)
   const [title, setTitle] = useState('')
@@ -24,30 +26,51 @@ export default function AdminSBTManager() {
   const [availableTemplates, setAvailableTemplates] = useState([])
   const [sbtTypesData, setSbtTypesData] = useState([])
 
-  const isAdmin = address?.toLowerCase() === process.env.NEXT_PUBLIC_ADMIN?.toLowerCase()
-  const previewCache = useRef({}) // cache for GitHub previews
+  const [events, setEvents] = useState([])
+  const [showEventModal, setShowEventModal] = useState(false)
+  const [eventForm, setEventForm] = useState({
+    name: '',
+    city: '',
+    datetime: '',
+    min_attendees: 1,
+    max_attendees: 40,
+    description: '',
+    details: '',
+    venue: '',
+    venue_type: '',
+    basic_perk: '',
+    advanced_perk: '',
+    tag1: '',
+    tag2: '',
+    tag3: '',
+    tag4: '',
+    language: '',
+    price: '',
+    image_url: '',
+  })
+  const previewCache = useRef({})
 
-  const buildUri = (filename) => `https://raw.githubusercontent.com/MrThygesen/TEA/main/data/${filename}`
+  const buildUri = (filename) =>
+    `https://raw.githubusercontent.com/MrThygesen/TEA/main/data/${filename}`
   const formatDisplayName = (filename) =>
     filename.replace('.json', '').replace(/[_-]/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
 
-  // Fetch metadata templates from GitHub
-useEffect(() => {
-  async function fetchTemplates() {
-    try {
-      const res = await fetch('https://api.github.com/repos/MrThygesen/TEA/contents/data')
-      const data = await res.json()
-      const jsonFiles = data.filter((file) => file.name.endsWith('.json')).map((file) => file.name)
-      setAvailableTemplates(jsonFiles)
-    } catch (err) {
-      console.error('Failed to fetch templates from GitHub:', err)
+  // Fetch templates from GitHub
+  useEffect(() => {
+    async function fetchTemplates() {
+      try {
+        const res = await fetch('https://api.github.com/repos/MrThygesen/TEA/contents/data')
+        const data = await res.json()
+        const jsonFiles = data.filter((f) => f.name.endsWith('.json')).map((f) => f.name)
+        setAvailableTemplates(jsonFiles)
+      } catch (err) {
+        console.error('Failed to fetch templates:', err)
+      }
     }
-  }
-  fetchTemplates()
-}, [])
+    fetchTemplates()
+  }, [])
 
-
-  // Fetch SBT types from contract (parallel)
+  // Fetch SBT types
   useEffect(() => {
     if (!publicClient) return
     async function fetchTypes() {
@@ -59,10 +82,8 @@ useEffect(() => {
           args: [i + 1],
         }).catch(() => null)
       )
-
       const typesRaw = await Promise.all(typePromises)
       const types = []
-
       for (let i = 0; i < typesRaw.length; i++) {
         const sbtType = typesRaw[i]
         if (!sbtType) continue
@@ -80,7 +101,6 @@ useEffect(() => {
               previewCache.current[uri] = metadata
             } catch {}
           }
-
           types.push({
             id: i + 1,
             uri,
@@ -99,7 +119,7 @@ useEffect(() => {
     fetchTypes()
   }, [publicClient, loading])
 
-  // --- SBT Creation ---
+  // --- SBT functions ---
   const handlePreview = async () => {
     if (!title) return toast.error('Select a metadata template first')
     const uri = buildUri(title)
@@ -120,7 +140,7 @@ useEffect(() => {
   }
 
   const handleCreateType = async () => {
-    if (!title || !maxSupply || !typeId || !createSbtCity) return toast.error('Fill in all fields')
+    if (!title || !maxSupply || !typeId || !createSbtCity) return toast.error('Fill all fields')
     setLoading(true)
     try {
       const uri = buildUri(title)
@@ -131,7 +151,6 @@ useEffect(() => {
         args: [typeId, uri, BigInt(maxSupply), burnable],
       })
       toast.success('SBT type created')
-      // Optionally post event to DB if typeId <= 4999
       if (typeId <= 4999) {
         await postEventToDB(typeId, title, previewData?.date || new Date().toISOString(), createSbtCity)
       }
@@ -196,36 +215,90 @@ useEffect(() => {
     setLoading(false)
   }
 
-  // --- Post Event to DB ---
-  async function postEventToDB(id, title, datetime, city) {
-    if (!city || !datetime) return toast.error('City and datetime are required')
+  // --- Event API ---
+  async function fetchEvents() {
     try {
-      const res = await fetch('/api/events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: Number(id),
-          name: title,
-          city,
-          datetime: new Date(datetime).toISOString(),
-          min_attendees: 1,
-        }),
-      })
+      const res = await fetch('/api/events')
+      if (!res.ok) throw new Error('Failed to fetch events')
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || `Status ${res.status}`)
-      toast.success('Event registered in database')
-      return data
+      setEvents(data)
     } catch (err) {
-      console.error('Error posting event:', err)
-      toast.error('Failed to register event in database')
+      console.error(err)
+      toast.error('Error fetching events')
     }
   }
 
-  if (!isAdmin) return <div className="text-center text-red-600 font-semibold p-4">You must be the admin to access this panel.</div>
+  useEffect(() => { if (isAdmin) fetchEvents() }, [isAdmin])
+
+  const handleEventChange = (field, value) => {
+    setEventForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const handleCreateEvent = async () => {
+    // auto-confirmed event
+    try {
+      const body = { ...eventForm, is_confirmed: true }
+      const res = await fetch('/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed')
+      toast.success('Event created successfully')
+      setShowEventModal(false)
+      setEventForm({
+        name: '',
+        city: '',
+        datetime: '',
+        min_attendees: 1,
+        max_attendees: 40,
+        description: '',
+        details: '',
+        venue: '',
+        venue_type: '',
+        basic_perk: '',
+        advanced_perk: '',
+        tag1: '',
+        tag2: '',
+        tag3: '',
+        tag4: '',
+        language: '',
+        price: '',
+        image_url: '',
+      })
+      fetchEvents()
+    } catch (err) {
+      console.error(err)
+      toast.error('Error creating event')
+    }
+  }
+
+  const handleModeration = async (eventId, action) => {
+    try {
+      const body = {}
+      if (action === 'approve') body.is_confirmed = true
+      if (action === 'reject') body.is_rejected = true
+      const res = await fetch(`/api/events?id=${eventId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) throw new Error('Moderation failed')
+      toast.success(`${action}d successfully`)
+      fetchEvents()
+    } catch (err) {
+      console.error(err)
+      toast.error('Moderation error')
+    }
+  }
+
+  if (!isAdmin)
+    return <div className="text-center text-red-600 font-semibold p-4">You must be the admin to access this panel.</div>
 
   return (
-    <div className="p-4 border rounded max-w-4xl mx-auto bg-white text-black space-y-6">
-      <h2 className="text-xl font-bold">Admin: Manage SBTs</h2>
+    <div className="p-4 border rounded max-w-5xl mx-auto bg-white text-black space-y-6">
+      <h2 className="text-xl font-bold">Admin: Manage SBTs & Events</h2>
 
       {/* --- Create SBT --- */}
       <div>
@@ -257,34 +330,25 @@ useEffect(() => {
         )}
       </div>
 
-      {/* --- SBT Dashboard --- */}
-      <SbtDashboard sbtTypesData={sbtTypesData} />
+      {/* --- Event Dashboard --- */}
+      <div className="mt-6 p-4 border rounded bg-gray-50">
+        <h3 className="font-semibold mb-2 flex justify-between items-center">
+          Event Moderation
+          <button className="px-3 py-1 bg-blue-600 text-white rounded" onClick={() => setShowEventModal(true)}>+ Create Event</button>
+        </h3>
+        <EventModerationTable events={events} onModerate={handleModeration} />
+      </div>
 
       {/* --- Burn Token --- */}
       <BurnToken handleBurn={handleBurn} burnTokenId={burnTokenId} setBurnTokenId={setBurnTokenId} loading={loading} />
 
-      {/* --- DbDump --- */}
-      <div className="mt-6 p-4 border rounded bg-gray-50">
-        <h3 className="font-semibold mb-2">Database Dump (Render DB)</h3>
-        <DbDump />
-      </div>
-
-      {/* --- Set Role --- */}
-      <div className="mt-6 p-4 border rounded bg-gray-50">
-        <h3 className="font-semibold mb-2">Assign Role to User</h3>
-        <SetRoleForm />
-      </div>
-
-      {/* --- Event Creator --- */}
-      <div className="mt-6 p-4 border rounded bg-gray-50">
-        <h3 className="font-semibold mb-2">Create Event (DB Only)</h3>
-        <EventCreator />
-      </div>
+      {/* --- Event Creation Modal --- */}
+      {showEventModal && <EventModal form={eventForm} setForm={setEventForm} onClose={() => setShowEventModal(false)} onSubmit={handleCreateEvent} />}
     </div>
   )
 }
 
-// ------------------ Subcomponents ------------------
+// -------------------- Subcomponents --------------------
 
 function SbtDashboard({ sbtTypesData }) {
   return (
@@ -321,307 +385,85 @@ function BurnToken({ handleBurn, burnTokenId, setBurnTokenId, loading }) {
   )
 }
 
-function DbDump() {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+function EventModerationTable({ events, onModerate }) {
+  const pending = events.filter(e => !e.is_confirmed && !e.is_rejected)
+  const approved = events.filter(e => e.is_confirmed)
+  const rejected = events.filter(e => e.is_rejected)
 
-  useEffect(() => {
-    async function fetchDump() {
-      setLoading(true)
-      setError(null)
-      try {
-        const res = await fetch('/api/dump')
-        let json = null
-        try { json = await res.json() } catch {}
-        if (!res.ok) throw new Error(json?.error || `Status ${res.status}`)
-        setData(json)
-      } catch (err) {
-        console.error('[DbDump] Fetch failed:', err)
-        setError(err.message || 'Unknown error')
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchDump()
-  }, [])
-
-  if (loading) return <p>Loading database dump...</p>
-  if (error) return <p className="text-red-600">Error loading dump: {error}</p>
-  if (!data) return <p>No data available.</p>
+  const renderRows = (list, status) => list.map(ev => (
+    <tr key={ev.id} className="border-t">
+      <td>{ev.id}</td>
+      <td>{ev.name}</td>
+      <td>{ev.city}</td>
+      <td>{new Date(ev.datetime).toLocaleString()}</td>
+      <td>{status}</td>
+      <td className="space-x-2">
+        {status === 'Pending' && (
+          <>
+            <button onClick={() => onModerate(ev.id, 'approve')} className="px-2 py-1 bg-green-600 text-white rounded">Approve</button>
+            <button onClick={() => onModerate(ev.id, 'reject')} className="px-2 py-1 bg-red-600 text-white rounded">Reject</button>
+          </>
+        )}
+      </td>
+    </tr>
+  ))
 
   return (
-    <pre className="max-h-96 overflow-auto bg-white p-4 rounded border text-xs">
-      {JSON.stringify(data, null, 2)}
-    </pre>
+    <table className="w-full text-sm border text-left">
+      <thead className="bg-gray-100"><tr><th>ID</th><th>Name</th><th>City</th><th>Date</th><th>Status</th><th>Action</th></tr></thead>
+      <tbody>
+        {renderRows(pending, 'Pending')}
+        {renderRows(approved, 'Approved')}
+        {renderRows(rejected, 'Rejected')}
+      </tbody>
+    </table>
   )
 }
 
-function SetRoleForm() {
-  const [email, setEmail] = useState('')
-  const [role, setRole] = useState('user')
-  const [eventId, setEventId] = useState('')
-  const [status, setStatus] = useState('')
-  const [events, setEvents] = useState([])
-  const { address } = useAccount()
- 
-  // Fetch events from DB for dropdown
- useEffect(() => {
-    if (role !== 'organizer') return
-    async function loadEvents() {
-      try {
-        const res = await fetch('/api/events?upcomingOnly=true')
-        const data = await res.json()
-
- if (res.ok) {
-         // API returns an array directly, not { events: [...] }
-         setEvents(Array.isArray(data) ? data : [])
-       } else {
-         console.error('Event fetch failed', data)
-       }
-
-      } catch (err) {
-        console.error('Error fetching events:', err)
-      }
-    }
-    loadEvents()
-  }, [role])
-
-  async function handleSubmit(e) {
-    e.preventDefault()
-    setStatus('')
-
-    try {
-//      const token = localStorage.getItem('token')
-//      if (!token) {
-//        setStatus('❌ Not logged in')
-//        return
-//      }
-
-      const body = { email, role }
-      if (eventId && role === 'organizer') body.event_id = Number(eventId)
-
-      const res = await fetch('/api/setRole', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-  //        Authorization: `Bearer ${token}`,
- 'x-wallet': address, // pass connected wallet 
-
-
-  'x-wallet': address,
-
-       },
-        body: JSON.stringify(body),
-      })
-
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to set role')
-
-      setStatus(`✅ ${data.updated.email} → ${data.updated.role}${eventId ? ` (event ${eventId})` : ''}`)
-      setEmail('')
-      setRole('user')
-      setEventId('')
-    } catch (err) {
-      console.error('[SetRoleForm] error:', err)
-      setStatus(`❌ ${err.message}`)
-    }
-  }
-
+function EventModal({ form, setForm, onClose, onSubmit }) {
+  const handleChange = (field, value) => setForm(prev => ({ ...prev, [field]: value }))
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="bg-zinc-900 p-4 rounded shadow mt-6 flex flex-col gap-3"
-    >
-      <h3 className="font-semibold text-lg">Assign Role</h3>
-      <input
-        type="email"
-        placeholder="User Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        className="p-2 rounded bg-zinc-800 text-white"
-        required
-      />
-      <select
-        value={role}
-        onChange={(e) => setRole(e.target.value)}
-        className="p-2 rounded bg-zinc-800 text-white"
-      >
-        <option value="user">User</option>
-        <option value="organizer">Organizer</option>
-        <option value="admin">Admin</option>
-      </select>
-
-      {/* Only show when assigning organizer */}
-      {role === 'organizer' && (
-        <select
-          value={eventId}
-          onChange={(e) => setEventId(e.target.value)}
-          className="p-2 rounded bg-zinc-800 text-white"
-          required
-        >
-          <option value="">Select Event</option>
-          {events.map(ev => (
-            <option key={ev.id} value={ev.id}>
-              {ev.name} ({new Date(ev.datetime).toLocaleString()})
-            </option>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+        <h3 className="text-lg font-semibold mb-4">Create Event</h3>
+        <div className="space-y-2">
+          {Object.entries(form).map(([key, value]) => (
+            <div key={key}>
+              <label className="block mb-1 capitalize">{key.replace('_', ' ')}</label>
+              <input
+                type={key === 'datetime' ? 'datetime-local' : 'text'}
+                value={value}
+                onChange={(e) => handleChange(key, e.target.value)}
+                className="w-full p-2 border rounded"
+              />
+            </div>
           ))}
-        </select>
-      )}
-
-      <button
-        type="submit"
-        className="bg-blue-600 hover:bg-blue-700 p-2 rounded text-white"
-      >
-        Update Role
-      </button>
-      {status && <p className="text-sm mt-2">{status}</p>}
-    </form>
-  )
-}
-
-function EventCreator() {
-  const [event, setEvent] = useState({
-    id: '',
-    name: '',
-    city: '',
-    datetime: '',
-    min_attendees: 1,
-    max_attendees: 40,
-    is_confirmed: false,
-    description: '',
-    details: '',
-    venue: '',
-    venue_type: '',
-    basic_perk: '',
-    advanced_perk: '',
-    tag1: '',
-    tag2: '',
-    tag3: '',
-    tag4: '',
-    language: '',
-    price: '',
-    image_url: '',
-    admin_email: '', // <-- new field
-  })
-
-  const [errors, setErrors] = useState({})
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState('')
-
-  const handleChange = (field, value) => {
-    setEvent(prev => ({ ...prev, [field]: value }))
-    setErrors(prev => ({ ...prev, [field]: '' }))
-  }
-
-  const validate = (method) => {
-    const newErrors = {}
-    if (method === 'PUT' && !event.id) newErrors.id = 'Event ID is required for update'
-    if (!event.name) newErrors.name = 'Event Name is required'
-    if (!event.city) newErrors.city = 'City is required'
-    if (!event.datetime) newErrors.datetime = 'Date and Time are required'
-    if (method === 'POST' && !event.admin_email) newErrors.admin_email = 'Admin email is required'
-    if (event.min_attendees && isNaN(Number(event.min_attendees))) newErrors.min_attendees = 'Must be a number'
-    if (event.max_attendees && isNaN(Number(event.max_attendees))) newErrors.max_attendees = 'Must be a number'
-    return newErrors
-  }
-
-  const handleSubmit = async (method) => {
-    const fieldErrors = validate(method)
-    if (Object.keys(fieldErrors).length > 0) {
-      setErrors(fieldErrors)
-      setMessage('❌ Please fix the highlighted fields')
-      return
-    }
-
-    setLoading(true)
-    setMessage('')
-    try {
-      const body = {
-        ...event,
-        min_attendees: Number(event.min_attendees),
-        max_attendees: Number(event.max_attendees),
-        datetime: new Date(event.datetime).toISOString()
-      }
-
-      const res = await fetch('/api/events', {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Error saving event')
-
-      setMessage(`✅ Event ${method === 'POST' ? 'created' : 'updated'} successfully`)
-      if (method === 'POST') setEvent(prev => ({ ...prev, id: '' }))
-    } catch (err) {
-      setMessage('❌ ' + err.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const inputClass = (field) =>
-    `w-full p-2 border rounded ${errors[field] ? 'border-red-500' : 'border-gray-300'}`
-
-  return (
-    <div className="space-y-2">
-      <input type="number" placeholder="Event ID (for update only)" value={event.id} onChange={e => handleChange('id', e.target.value)} className={inputClass('id')} />
-      {errors.id && <p className="text-red-500 text-sm">{errors.id}</p>}
-
-      <input type="text" placeholder="Event Name" value={event.name} onChange={e => handleChange('name', e.target.value)} className={inputClass('name')} />
-      {errors.name && <p className="text-red-500 text-sm">{errors.name}</p>}
-
-      <input type="text" placeholder="City" value={event.city} onChange={e => handleChange('city', e.target.value)} className={inputClass('city')} />
-      {errors.city && <p className="text-red-500 text-sm">{errors.city}</p>}
-
-      <input type="datetime-local" value={event.datetime} onChange={e => handleChange('datetime', e.target.value)} className={inputClass('datetime')} />
-      {errors.datetime && <p className="text-red-500 text-sm">{errors.datetime}</p>}
-
-      <input type="email" placeholder="Admin Email" value={event.admin_email} onChange={e => handleChange('admin_email', e.target.value)} className={inputClass('admin_email')} />
-      {errors.admin_email && <p className="text-red-500 text-sm">{errors.admin_email}</p>}
-
-      <input type="number" placeholder="Min Attendees" value={event.min_attendees} onChange={e => handleChange('min_attendees', e.target.value)} className={inputClass('min_attendees')} />
-      <input type="number" placeholder="Max Attendees" value={event.max_attendees} onChange={e => handleChange('max_attendees', e.target.value)} className={inputClass('max_attendees')} />
-
-      <textarea placeholder="Description" value={event.description} onChange={e => handleChange('description', e.target.value)} className={inputClass('description')} />
-      <textarea placeholder="Details" value={event.details} onChange={e => handleChange('details', e.target.value)} className={inputClass('details')} />
-
-      <input type="text" placeholder="Venue" value={event.venue} onChange={e => handleChange('venue', e.target.value)} className={inputClass('venue')} />
-      <select value={event.venue_type} onChange={e => handleChange('venue_type', e.target.value)} className={inputClass('venue_type')}>
-        <option value="">Select Venue Type</option>
-        <option value="Business">Business</option>
-        <option value="Entrepreneur">Entrepreneur</option>
-        <option value="Concerts">Concerts</option>
-        <option value="Romance">Romance</option>
-        <option value="Social">Social</option>
-      </select>
-
-      <input type="text" placeholder="Basic Perk" value={event.basic_perk} onChange={e => handleChange('basic_perk', e.target.value)} className={inputClass('basic_perk')} />
-      <input type="text" placeholder="Advanced Perk" value={event.advanced_perk} onChange={e => handleChange('advanced_perk', e.target.value)} className={inputClass('advanced_perk')} />
-
-      <input type="text" placeholder="Tag1" value={event.tag1} onChange={e => handleChange('tag1', e.target.value)} className={inputClass('tag1')} />
-      <input type="text" placeholder="Tag2" value={event.tag2} onChange={e => handleChange('tag2', e.target.value)} className={inputClass('tag2')} />
-      <input type="text" placeholder="Tag3" value={event.tag3} onChange={e => handleChange('tag3', e.target.value)} className={inputClass('tag3')} />
-      <input type="text" placeholder="Tag4" value={event.tag4} onChange={e => handleChange('tag4', e.target.value)} className={inputClass('tag4')} />
-      <input type="text" placeholder="Language" value={event.language} onChange={e => handleChange('language', e.target.value)} className={inputClass('language')} />
-      <input type="number" placeholder="Price" value={event.price} onChange={e => handleChange('price', e.target.value)} className={inputClass('price')} />
-
-      <input type="text" placeholder="Image URL" value={event.image_url} onChange={e => handleChange('image_url', e.target.value)} className={inputClass('image_url')} />
-
-      <label className="flex items-center">
-        <input type="checkbox" checked={event.is_confirmed} onChange={e => handleChange('is_confirmed', e.target.checked)} className="mr-2" />
-        Confirmed
-      </label>
-
-      <div className="flex gap-2">
-        <button onClick={() => handleSubmit('POST')} disabled={loading} className={`px-4 py-2 rounded text-white ${loading ? 'bg-blue-300' : 'bg-blue-600'}`}>Create</button>
-        <button onClick={() => handleSubmit('PUT')} disabled={loading} className={`px-4 py-2 rounded text-white ${loading ? 'bg-green-300' : 'bg-green-600'}`}>Update</button>
+        </div>
+        <div className="mt-4 flex justify-end space-x-2">
+          <button onClick={onClose} className="px-4 py-2 bg-gray-400 text-white rounded">Cancel</button>
+          <button onClick={onSubmit} className="px-4 py-2 bg-blue-600 text-white rounded">Create Event</button>
+        </div>
       </div>
-
-      {message && <p className="text-sm mt-1">{message}</p>}
     </div>
   )
 }
 
+// Optional: Post new SBT type to DB as event for tracking
+async function postEventToDB(typeId, title, datetime, city) {
+  try {
+    await fetch('/api/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: title,
+        datetime,
+        city,
+        is_confirmed: true,
+        typeId,
+      }),
+    })
+  } catch (err) {
+    console.error('Error posting SBT type as event:', err)
+  }
+}
 
