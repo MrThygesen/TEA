@@ -703,7 +703,13 @@ function CreateEventModal({ open, onClose, handleCreateEvent }) {
           <EventModerationPanel />
         </div>
 
-        <CreateEventModal open={showCreateModal} onClose={() => setShowCreateModal(false)} />
+ <CreateEventModal 
+   open={showCreateModal} 
+   onClose={() => setShowCreateModal(false)} 
+   handleCreateEvent={handleCreateEvent} 
+ />
+
+
       </section>
 
       {/* Role assignment */}
