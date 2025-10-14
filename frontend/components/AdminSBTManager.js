@@ -516,123 +516,166 @@ const handleReject = async (eventId) => {
   }
 
   // --- Event create modal component
-  function CreateEventModal({ open, onClose }) {
-    if (!open) return null
-    const handleField = (k, v) => setEventForm(prev => ({ ...prev, [k]: v }))
+function CreateEventModal({ open, onClose, handleCreateEvent }) {
+  const [eventForm, setEventForm] = useState({
+    name: '',
+    admin_email: '',
+    city: '',
+    datetime: '',
+    min_attendees: '',
+    max_attendees: '',
+    description: '',
+    details: '',
+    venue: '',
+    venue_type: '',
+    basic_perk: '',
+    advanced_perk: '',
+    tag1: '',
+    tag2: '',
+    tag3: '',
+    tag4: '',
+    language: 'en',
+    price: '',
+    image_url: ''
+  })
 
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-<div className="bg-white text-black rounded-lg max-w-3xl w-full p-6 overflow-auto max-h-[90vh]">
-          <h3 className="text-lg font-semibold mb-3">Create Event</h3>
- <button onClick={onClose} className="text-black bg-gray-300 px-2 py-1 rounded hover:bg-gray-400">✕</button>
-          <form onSubmit={(e) => { e.preventDefault(); handleCreateEvent() }} className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm">Event Title</label>
-              <input required value={eventForm.name} onChange={(e) => handleField('name', e.target.value)} className="w-full p-2 border rounded" />
-            </div>
-            <div>
-              <label className="block text-sm">Admin Email (owner)</label>
-              <input required type="email" value={eventForm.admin_email} onChange={(e) => handleField('admin_email', e.target.value)} className="w-full p-2 border rounded" />
-            </div>
+  const [creating, setCreating] = useState(false)
 
-            <div>
-              <label className="block text-sm">City</label>
-              <input required value={eventForm.city} onChange={(e) => handleField('city', e.target.value)} className="w-full p-2 border rounded" />
-            </div>
-            <div>
-              <label className="block text-sm">Date & Time</label>
-              <input required type="datetime-local" value={eventForm.datetime} onChange={(e) => handleField('datetime', e.target.value)} className="w-full p-2 border rounded" />
-            </div>
+  const handleField = (k, v) => setEventForm(prev => ({ ...prev, [k]: v }))
 
-            <div>
-              <label className="block text-sm">Min Attendees</label>
-              <input type="number" value={eventForm.min_attendees} onChange={(e) => handleField('min_attendees', e.target.value)} className="w-full p-2 border rounded" />
-            </div>
-            <div>
-              <label className="block text-sm">Max Attendees</label>
-              <input type="number" value={eventForm.max_attendees} onChange={(e) => handleField('max_attendees', e.target.value)} className="w-full p-2 border rounded" />
-            </div>
+  if (!open) return null
 
-            <div className="md:col-span-2">
-              <label className="block text-sm">Short Description</label>
-              <textarea value={eventForm.description} onChange={(e) => handleField('description', e.target.value)} className="w-full p-2 border rounded" />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-sm">Details (full)</label>
-              <textarea value={eventForm.details} onChange={(e) => handleField('details', e.target.value)} className="w-full p-2 border rounded h-32" />
-            </div>
-
-            <div>
-              <label className="block text-sm">Venue</label>
-              <input value={eventForm.venue} onChange={(e) => handleField('venue', e.target.value)} className="w-full p-2 border rounded" />
-            </div>
-            <div>
-              <label className="block text-sm">Venue Type</label>
-              <select value={eventForm.venue_type} onChange={(e) => handleField('venue_type', e.target.value)} className="w-full p-2 border rounded">
-                <option value="">Select</option>
-                <option>Business</option>
-                <option>Entrepreneur</option>
-                <option>Concerts</option>
-                <option>Romance</option>
-                <option>Social</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm">Basic Perk</label>
-              <input value={eventForm.basic_perk} onChange={(e) => handleField('basic_perk', e.target.value)} className="w-full p-2 border rounded" />
-            </div>
-            <div>
-              <label className="block text-sm">Advanced Perk</label>
-              <input value={eventForm.advanced_perk} onChange={(e) => handleField('advanced_perk', e.target.value)} className="w-full p-2 border rounded" />
-            </div>
-
-            <div>
-              <label className="block text-sm">Tag 1</label>
-              <input value={eventForm.tag1} onChange={(e) => handleField('tag1', e.target.value)} className="w-full p-2 border rounded" />
-            </div>
-            <div>
-              <label className="block text-sm">Tag 2</label>
-              <input value={eventForm.tag2} onChange={(e) => handleField('tag2', e.target.value)} className="w-full p-2 border rounded" />
-            </div>
-
-            <div>
-              <label className="block text-sm">Tag 3</label>
-              <input value={eventForm.tag3} onChange={(e) => handleField('tag3', e.target.value)} className="w-full p-2 border rounded" />
-            </div>
-            <div>
-              <label className="block text-sm">Tag 4</label>
-              <input value={eventForm.tag4} onChange={(e) => handleField('tag4', e.target.value)} className="w-full p-2 border rounded" />
-            </div>
-
-            <div>
-              <label className="block text-sm">Language</label>
-              <select value={eventForm.language} onChange={(e) => handleField('language', e.target.value)} className="w-full p-2 border rounded">
-                <option value="en">English</option>
-                <option value="da">Danish</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm">Price</label>
-              <input type="number" step="0.01" value={eventForm.price} onChange={(e) => handleField('price', e.target.value)} className="w-full p-2 border rounded" />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-sm">Image URL</label>
-              <input value={eventForm.image_url} onChange={(e) => handleField('image_url', e.target.value)} className="w-full p-2 border rounded" />
-            </div>
-
-            <div className="md:col-span-2 flex justify-end gap-2 mt-2">
-              <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-400 rounded">Cancel</button>
-              <button disabled={creating} type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">{creating ? 'Creating...' : 'Create Event'}</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    )
+  const onSubmit = async (e) => {
+    e.preventDefault()
+    setCreating(true)
+    await handleCreateEvent(eventForm)
+    setCreating(false)
   }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white text-black rounded-lg max-w-3xl w-full p-6 overflow-auto max-h-[90vh]">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-lg font-semibold">Create Event</h3>
+          <button onClick={onClose} className="text-black bg-gray-300 px-2 py-1 rounded hover:bg-gray-400">✕</button>
+        </div>
+
+        <form onSubmit={onSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm">Event Title</label>
+            <input required value={eventForm.name} onChange={(e) => handleField('name', e.target.value)} className="w-full p-2 border rounded" />
+          </div>
+
+          <div>
+            <label className="block text-sm">Admin Email (owner)</label>
+            <input required type="email" value={eventForm.admin_email} onChange={(e) => handleField('admin_email', e.target.value)} className="w-full p-2 border rounded" />
+          </div>
+
+          <div>
+            <label className="block text-sm">City</label>
+            <input required value={eventForm.city} onChange={(e) => handleField('city', e.target.value)} className="w-full p-2 border rounded" />
+          </div>
+
+          <div>
+            <label className="block text-sm">Date & Time</label>
+            <input required type="datetime-local" value={eventForm.datetime} onChange={(e) => handleField('datetime', e.target.value)} className="w-full p-2 border rounded" />
+          </div>
+
+          <div>
+            <label className="block text-sm">Min Attendees</label>
+            <input type="number" value={eventForm.min_attendees} onChange={(e) => handleField('min_attendees', e.target.value)} className="w-full p-2 border rounded" />
+          </div>
+
+          <div>
+            <label className="block text-sm">Max Attendees</label>
+            <input type="number" value={eventForm.max_attendees} onChange={(e) => handleField('max_attendees', e.target.value)} className="w-full p-2 border rounded" />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-sm">Short Description</label>
+            <textarea value={eventForm.description} onChange={(e) => handleField('description', e.target.value)} className="w-full p-2 border rounded" />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-sm">Details (full)</label>
+            <textarea value={eventForm.details} onChange={(e) => handleField('details', e.target.value)} className="w-full p-2 border rounded h-32" />
+          </div>
+
+          <div>
+            <label className="block text-sm">Venue</label>
+            <input value={eventForm.venue} onChange={(e) => handleField('venue', e.target.value)} className="w-full p-2 border rounded" />
+          </div>
+
+          <div>
+            <label className="block text-sm">Venue Type</label>
+            <select value={eventForm.venue_type} onChange={(e) => handleField('venue_type', e.target.value)} className="w-full p-2 border rounded">
+              <option value="">Select</option>
+              <option>Business</option>
+              <option>Entrepreneur</option>
+              <option>Concerts</option>
+              <option>Romance</option>
+              <option>Social</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm">Basic Perk</label>
+            <input value={eventForm.basic_perk} onChange={(e) => handleField('basic_perk', e.target.value)} className="w-full p-2 border rounded" />
+          </div>
+
+          <div>
+            <label className="block text-sm">Advanced Perk</label>
+            <input value={eventForm.advanced_perk} onChange={(e) => handleField('advanced_perk', e.target.value)} className="w-full p-2 border rounded" />
+          </div>
+
+          <div>
+            <label className="block text-sm">Tag 1</label>
+            <input value={eventForm.tag1} onChange={(e) => handleField('tag1', e.target.value)} className="w-full p-2 border rounded" />
+          </div>
+
+          <div>
+            <label className="block text-sm">Tag 2</label>
+            <input value={eventForm.tag2} onChange={(e) => handleField('tag2', e.target.value)} className="w-full p-2 border rounded" />
+          </div>
+
+          <div>
+            <label className="block text-sm">Tag 3</label>
+            <input value={eventForm.tag3} onChange={(e) => handleField('tag3', e.target.value)} className="w-full p-2 border rounded" />
+          </div>
+
+          <div>
+            <label className="block text-sm">Tag 4</label>
+            <input value={eventForm.tag4} onChange={(e) => handleField('tag4', e.target.value)} className="w-full p-2 border rounded" />
+          </div>
+
+          <div>
+            <label className="block text-sm">Language</label>
+            <select value={eventForm.language} onChange={(e) => handleField('language', e.target.value)} className="w-full p-2 border rounded">
+              <option value="en">English</option>
+              <option value="da">Danish</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm">Price</label>
+            <input type="number" step="0.01" value={eventForm.price} onChange={(e) => handleField('price', e.target.value)} className="w-full p-2 border rounded" />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-sm">Image URL</label>
+            <input value={eventForm.image_url} onChange={(e) => handleField('image_url', e.target.value)} className="w-full p-2 border rounded" />
+          </div>
+
+          <div className="md:col-span-2 flex justify-end gap-2 mt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-400 rounded">Cancel</button>
+            <button disabled={creating} type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">{creating ? 'Creating...' : 'Create Event'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 
   // ------------------ Render main admin UI ------------------
   if (!isAdmin) {
