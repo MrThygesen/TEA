@@ -516,9 +516,8 @@ const handleReject = async (eventId) => {
   }
 
   // --- Event create modal component
-// --- Create Event logic (inside AdminSBTManager.js)
-
 // ✅ fixed to accept formData, not an event
+// --- Event create handler (unified)
 const handleCreateEvent = async (formData) => {
   if (!formData.name || !formData.city || !formData.datetime || !formData.admin_email) {
     return toast.error('Please fill: name, city, datetime, and admin_email')
@@ -542,6 +541,7 @@ const handleCreateEvent = async (formData) => {
 
     toast.success('✅ Event created successfully (pending approval)')
     setShowCreateModal(false)
+    setEventForm({ ...blankEvent }) // reset form
     fetchEvents()
   } catch (err) {
     console.error('Create event error:', err)
@@ -553,10 +553,9 @@ const handleCreateEvent = async (formData) => {
 
 // --- Event create modal component
 function CreateEventModal({ open, onClose }) {
-  const [localForm, setLocalForm] = useState(eventForm)
+  const [localForm, setLocalForm] = useState({ ...blankEvent })
   const firstInputRef = useRef(null)
 
-  // Autofocus the first input when modal opens
   useEffect(() => {
     if (open && firstInputRef.current) {
       firstInputRef.current.focus()
@@ -576,7 +575,6 @@ function CreateEventModal({ open, onClose }) {
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
       onClick={(e) => {
-        // prevent closing when clicking inside modal
         if (e.target === e.currentTarget) onClose()
       }}
     >
@@ -748,17 +746,17 @@ function CreateEventModal({ open, onClose }) {
             />
           </div>
 
-          <div className="md:col-span-2 flex justify-end gap-2 mt-2">
+          <div className="md:col-span-2 flex justify-end gap-2 mt-4">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-gray-400 rounded text-black hover:bg-gray-500"
+              className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
             >
               Cancel
             </button>
             <button
-              disabled={creating}
               type="submit"
+              disabled={creating}
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
             >
               {creating ? 'Creating...' : 'Create Event'}
