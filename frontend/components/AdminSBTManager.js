@@ -522,7 +522,7 @@ const handleReject = async (eventId) => {
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-  <div className="bg-zinc-900 text-white rounded-lg max-w-3xl w-full p-6 overflow-auto max-h-[90vh]">
+<div className="bg-white text-black rounded-lg max-w-3xl w-full p-6 overflow-auto max-h-[90vh]">
           <h3 className="text-lg font-semibold mb-3">Create Event</h3>
  <button onClick={onClose} className="text-black bg-gray-300 px-2 py-1 rounded hover:bg-gray-400">✕</button>
           <form onSubmit={(e) => { e.preventDefault(); handleCreateEvent() }} className="grid grid-cols-1 md:grid-cols-2 gap-3">
