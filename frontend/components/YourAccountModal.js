@@ -229,108 +229,118 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                 + Suggest New Event
               </button>
             ) : (
-              <form onSubmit={handleCreateEvent} className="mt-4 space-y-3 bg-zinc-800 p-4 rounded-xl">
-                <h3 className="text-lg font-semibold mb-2 text-green-400">Suggest a New Event</h3>
+<form onSubmit={handleCreateEvent} className="mt-4 space-y-3 bg-zinc-800 p-4 rounded-xl">
+  <h3 className="text-lg font-semibold mb-2 text-green-400">Suggest a New Event</h3>
 
-                <input
-                  type="text"
-                  placeholder="Event Name"
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-                  value={eventData.name}
-                  onChange={(e) => setEventData({ ...eventData, name: e.target.value })}
-                  required
-                />
+  <input
+    type="text"
+    placeholder="Event Name"
+    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+    value={eventData.name}
+    onChange={(e) => setEventData({ ...eventData, name: e.target.value })}
+    required
+  />
 
-                <input
-                  type="text"
-                  placeholder="Event Title"
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-                  value={eventData.title}
-                  onChange={(e) => setEventData({ ...eventData, title: e.target.value })}
-                  required
-                />
+  <input
+    type="text"
+    placeholder="Event Title"
+    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+    value={eventData.title}
+    onChange={(e) => setEventData({ ...eventData, title: e.target.value })}
+    required
+  />
 
-                <input
-                  type="text"
-                  placeholder="City"
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-                  value={eventData.city}
-                  onChange={(e) => setEventData({ ...eventData, city: e.target.value })}
-                />
+  <input
+    type="text"
+    placeholder="City"
+    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+    value={eventData.city}
+    onChange={(e) => setEventData({ ...eventData, city: e.target.value })}
+    required
+  />
 
-                <input
-                  type="text"
-                  placeholder="Venue"
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-                  value={eventData.venue}
-                  onChange={(e) => setEventData({ ...eventData, venue: e.target.value })}
-                />
+  <input
+    type="text"
+    placeholder="Venue"
+    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+    value={eventData.venue}
+    onChange={(e) => setEventData({ ...eventData, venue: e.target.value })}
+    required
+  />
 
-                <input
-                  type="datetime-local"
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-                  value={eventData.datetime}
-                  onChange={(e) => setEventData({ ...eventData, datetime: e.target.value })}
-                  required
-                />
+  <input
+    type="datetime-local"
+    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+    value={eventData.datetime}
+    onChange={(e) => setEventData({ ...eventData, datetime: e.target.value })}
+    required
+  />
 
-                <input
-                  type="text"
-                  placeholder="Image file name (e.g. cafe1.jpg)"
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-                  value={eventData.image_name}
-                  onChange={(e) => setEventData({ ...eventData, image_name: e.target.value })}
-                />
+  <input
+    type="email"
+    placeholder="Admin Email"
+    className="w-full bg-zinc-700 border border-zinc-600 rounded px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
+    value={profile?.email || ''}
+    readOnly
+  />
 
-                <textarea
-                  placeholder="Description"
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-                  value={eventData.description}
-                  onChange={(e) => setEventData({ ...eventData, description: e.target.value })}
-                  rows="2"
-                />
+  <input
+    type="text"
+    placeholder="Image file name (e.g. cafe1.jpg)"
+    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+    value={eventData.image_name}
+    onChange={(e) => setEventData({ ...eventData, image_name: e.target.value })}
+  />
 
-                <textarea
-                  placeholder="Details (host, venue, etc.)"
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-                  value={eventData.details}
-                  onChange={(e) => setEventData({ ...eventData, details: e.target.value })}
-                  rows="2"
-                />
+  <textarea
+    placeholder="Description"
+    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+    value={eventData.description}
+    onChange={(e) => setEventData({ ...eventData, description: e.target.value })}
+    rows="2"
+  />
 
-                <input
-                  type="text"
-                  placeholder="Tags (comma-separated)"
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-                  value={eventData.tags}
-                  onChange={(e) => setEventData({ ...eventData, tags: e.target.value })}
-                />
+  <textarea
+    placeholder="Details (host, venue, etc.)"
+    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+    value={eventData.details}
+    onChange={(e) => setEventData({ ...eventData, details: e.target.value })}
+    rows="2"
+  />
 
-                <input
-                  type="number"
-                  placeholder="Ticket Price (optional)"
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-                  value={eventData.price}
-                  onChange={(e) => setEventData({ ...eventData, price: e.target.value })}
-                />
+  <input
+    type="text"
+    placeholder="Tags (comma-separated)"
+    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+    value={eventData.tags}
+    onChange={(e) => setEventData({ ...eventData, tags: e.target.value })}
+  />
 
-                <div className="flex gap-3">
-                  <button
-                    type="submit"
-                    disabled={creatingEvent}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white disabled:opacity-50"
-                  >
-                    {creatingEvent ? 'Submitting...' : 'Submit for Approval'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowEventForm(false)}
-                    className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded text-white"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
+  <input
+    type="number"
+    placeholder="Ticket Price (optional)"
+    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+    value={eventData.price}
+    onChange={(e) => setEventData({ ...eventData, price: e.target.value })}
+  />
+
+  <div className="flex gap-3">
+    <button
+      type="submit"
+      disabled={creatingEvent}
+      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white disabled:opacity-50"
+    >
+      {creatingEvent ? 'Submitting...' : 'Submit for Approval'}
+    </button>
+    <button
+      type="button"
+      onClick={() => setShowEventForm(false)}
+      className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded text-white"
+    >
+      Cancel
+    </button>
+  </div>
+</form>
             )}
           </div>
         )}
