@@ -17,80 +17,87 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-useEffect(() => {
-  let cancelled = false
+  useEffect(() => {
+    let cancelled = false
 
-  async function loadAccount() {
-    setLoading(true)
-    try {
-      const token = localStorage.getItem('token')
-      if (!token) throw new Error('Not logged in')
+    async function loadAccount() {
+      setLoading(true)
+      try {
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('Not logged in')
 
-      const headers = { Authorization: `Bearer ${token}` }
+        const headers = { Authorization: `Bearer ${token}` }
 
-      // Fetch /me, /rsvps, and /events
-      const [meRes, rsvpRes, eventRes] = await Promise.all([
-        fetch('/api/user/me', { headers }),
-        fetch('/api/user/rsvps', { headers }),
-        fetch('/api/events', { headers }),
-      ])
+        const [meRes, rsvpRes, eventRes] = await Promise.all([
+          fetch('/api/user/me', { headers }),
+          fetch('/api/user/rsvps', { headers }),
+          fetch('/api/events', { headers }),
+        ])
 
-      if (!meRes.ok) throw new Error('Failed to fetch user profile')
-      if (!rsvpRes.ok) throw new Error('Failed to fetch RSVPs')
-      if (!eventRes.ok) throw new Error('Failed to fetch events')
+        if (!meRes.ok) throw new Error('Failed to fetch user profile')
+        if (!rsvpRes.ok) throw new Error('Failed to fetch RSVPs')
+        if (!eventRes.ok) throw new Error('Failed to fetch events')
 
-      const [meData, rsvpDataRaw, eventsData] = await Promise.all([
-        meRes.json(),
-        rsvpRes.json(),
-        eventRes.json(),
-      ])
+        const [meData, rsvpDataRaw, eventsData] = await Promise.all([
+          meRes.json(),
+          rsvpRes.json(),
+          eventRes.json(),
+        ])
 
-      if (cancelled) return
+        if (cancelled) return
 
-      setProfile(meData.profile ?? null)
-      const eventArray = Array.isArray(eventsData?.rows)
-        ? eventsData.rows
-        : Array.isArray(eventsData)
-        ? eventsData
-        : []
-      setEvents(eventArray)
+        setProfile(meData.profile ?? null)
 
-      const userTickets = Array.isArray(meData.tickets) ? meData.tickets : []
-      let rsvpData = Array.isArray(rsvpDataRaw) ? rsvpDataRaw : []
+        const eventArray = Array.isArray(eventsData?.rows)
+          ? eventsData.rows
+          : Array.isArray(eventsData)
+          ? eventsData
+          : []
+        setEvents(eventArray)
 
-      // Hide RSVPs for events where user already has a ticket
-      const eventIdsWithTickets = new Set(userTickets.map((t) => t.event_id))
-      const filteredRsvps = rsvpData.filter((r) => !eventIdsWithTickets.has(r.event_id))
+        const userTickets = Array.isArray(meData.tickets) ? meData.tickets : []
+        let rsvpData = Array.isArray(rsvpDataRaw) ? rsvpDataRaw : []
 
-      setTickets(userTickets)
-      setRsvps(filteredRsvps)
+        // Hide RSVPs for events where user already has a ticket
+        const eventIdsWithTickets = new Set(userTickets.map((t) => t.event_id))
+        const filteredRsvps = rsvpData.filter((r) => !eventIdsWithTickets.has(r.event_id))
 
-      // --- Determine if this user is admin_email for any events ---
-      const userEmail = meData.profile?.email
+        setTickets(userTickets)
+        setRsvps(filteredRsvps)
 
-      // Choose correct endpoint for metrics
-      const metricEndpoint =
-        meData.profile?.role === 'admin' || isOwner
-          ? '/api/admin/stats'
-          : '/api/user/metrics'
+        const userEmail = meData.profile?.email
+        const isOwner = eventArray.some((e) => e.admin_email === userEmail)
 
-      const metricRes = await fetch(metricEndpoint, { headers })
-      if (metricRes.ok) {
-        const metricData = await metricRes.json()
-        if (!cancelled) setMetrics(metricData)
+        // Choose correct endpoint for metrics
+        const metricEndpoint =
+          meData.profile?.role === 'admin' || isOwner
+            ? '/api/admin/stats'
+            : '/api/user/metrics'
+
+        const metricRes = await fetch(metricEndpoint, { headers })
+        if (metricRes.ok) {
+          const metricData = await metricRes.json()
+          if (!cancelled) setMetrics(metricData)
+        }
+      } catch (err) {
+        if (!cancelled) setError(err.message)
+      } finally {
+        if (!cancelled) setLoading(false)
       }
-    } catch (err) {
-      if (!cancelled) setError(err.message)
-    } finally {
-      if (!cancelled) setLoading(false)
     }
-  }
 
-  loadAccount()
-  return () => {
-    cancelled = true
-  }
-}, [refreshTrigger])
+    loadAccount()
+    return () => {
+      cancelled = true
+    }
+  }, [refreshTrigger])
+
+  const userEmail = profile?.email
+  const isOwner = Array.isArray(events) && events.some((e) => e.admin_email === userEmail)
+  const isClientOrOwner =
+    profile?.role === 'client' ||
+    profile?.role === 'admin' ||
+    events.some((ev) => ev.admin_email === profile?.email)
 
   async function handleEmailUpdate() {
     if (!newEmail) return
@@ -149,15 +156,6 @@ useEffect(() => {
       </div>
     )
   }
-
-  const userEmail = profile?.email
-const isOwner = Array.isArray(events) && events.some((e) => e.admin_email === userEmail)
-
-const isClientOrOwner =
-  profile?.role === 'client' ||
-  profile?.role === 'admin' ||
-  events.some((ev) => ev.admin_email === profile?.email)
-
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
@@ -227,20 +225,18 @@ const isClientOrOwner =
         )}
 
         {/* ADMIN OR OWNER METRICS */}
-
-      {isClientOrOwner && metrics && (
-  <>
-    <h3 className="text-lg font-semibold text-yellow-400 mb-2">Client / Admin Statistics</h3>
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
-      <Metric label="Tickets Sold" value={metrics.tickets_sold} />
-      <Metric label="RSVP Count" value={metrics.rsvp_count} />
-      <Metric label="Venues Opened" value={metrics.venues_opened} />
-      <Metric label="Host Info Views" value={metrics.host_views} />
-      <Metric label="No Show Rate" value={`${metrics.no_show_rate}%`} />
-    </div>
-  </>
-)}
-
+        {isClientOrOwner && metrics && (
+          <>
+            <h3 className="text-lg font-semibold text-yellow-400 mb-2">Client / Admin Statistics</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
+              <Metric label="Tickets Sold" value={metrics.tickets_sold} />
+              <Metric label="RSVP Count" value={metrics.rsvp_count} />
+              <Metric label="Venues Opened" value={metrics.venues_opened} />
+              <Metric label="Host Info Views" value={metrics.host_views} />
+              <Metric label="No Show Rate" value={`${metrics.no_show_rate}%`} />
+            </div>
+          </>
+        )}
 
         {/* USER METRICS */}
         {profile?.role === 'user' && metrics && !isOwner && (
