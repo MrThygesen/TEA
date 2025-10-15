@@ -17,76 +17,81 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  useEffect(() => {
-    let cancelled = false
+useEffect(() => {
+  let cancelled = false
 
-    async function loadAccount() {
-      setLoading(true)
-      try {
-        const token = localStorage.getItem('token')
-        if (!token) throw new Error('Not logged in')
+  async function loadAccount() {
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('Not logged in')
 
-        const headers = { Authorization: `Bearer ${token}` }
+      const headers = { Authorization: `Bearer ${token}` }
 
-        // Fetch /me, /rsvps, and /events
-        const [meRes, rsvpRes, eventRes] = await Promise.all([
-          fetch('/api/user/me', { headers }),
-          fetch('/api/user/rsvps', { headers }),
-          fetch('/api/events', { headers }),
-        ])
+      // Fetch /me, /rsvps, and /events
+      const [meRes, rsvpRes, eventRes] = await Promise.all([
+        fetch('/api/user/me', { headers }),
+        fetch('/api/user/rsvps', { headers }),
+        fetch('/api/events', { headers }),
+      ])
 
-        if (!meRes.ok) throw new Error('Failed to fetch user profile')
-        if (!rsvpRes.ok) throw new Error('Failed to fetch RSVPs')
-        if (!eventRes.ok) throw new Error('Failed to fetch events')
+      if (!meRes.ok) throw new Error('Failed to fetch user profile')
+      if (!rsvpRes.ok) throw new Error('Failed to fetch RSVPs')
+      if (!eventRes.ok) throw new Error('Failed to fetch events')
 
-        const [meData, rsvpDataRaw, eventsData] = await Promise.all([
-          meRes.json(),
-          rsvpRes.json(),
-          eventRes.json(),
-        ])
+      const [meData, rsvpDataRaw, eventsData] = await Promise.all([
+        meRes.json(),
+        rsvpRes.json(),
+        eventRes.json(),
+      ])
 
-        if (cancelled) return
+      if (cancelled) return
 
-        setProfile(meData.profile ?? null)
-        setEvents(Array.isArray(eventsData) ? eventsData : [])
+      setProfile(meData.profile ?? null)
+      const eventArray = Array.isArray(eventsData?.rows)
+        ? eventsData.rows
+        : Array.isArray(eventsData)
+        ? eventsData
+        : []
+      setEvents(eventArray)
 
-        const userTickets = Array.isArray(meData.tickets) ? meData.tickets : []
-        let rsvpData = Array.isArray(rsvpDataRaw) ? rsvpDataRaw : []
+      const userTickets = Array.isArray(meData.tickets) ? meData.tickets : []
+      let rsvpData = Array.isArray(rsvpDataRaw) ? rsvpDataRaw : []
 
-        // Hide RSVPs for events where user already has a ticket
-        const eventIdsWithTickets = new Set(userTickets.map((t) => t.event_id))
-        const filteredRsvps = rsvpData.filter((r) => !eventIdsWithTickets.has(r.event_id))
+      // Hide RSVPs for events where user already has a ticket
+      const eventIdsWithTickets = new Set(userTickets.map((t) => t.event_id))
+      const filteredRsvps = rsvpData.filter((r) => !eventIdsWithTickets.has(r.event_id))
 
-        setTickets(userTickets)
-        setRsvps(filteredRsvps)
+      setTickets(userTickets)
+      setRsvps(filteredRsvps)
 
-        // --- Determine if this user is admin_email for any events ---
-        const userEmail = meData.profile?.email
-        const isOwner = eventsData.some((ev) => ev.admin_email === userEmail)
+      // --- Determine if this user is admin_email for any events ---
+      const userEmail = meData.profile?.email
+      const isOwner = eventArray.some((ev) => ev.admin_email === userEmail)
 
-        // Choose correct endpoint for metrics
-        const metricEndpoint =
-          meData.profile?.role === 'admin' || isOwner
-            ? '/api/admin/stats'
-            : '/api/user/metrics'
+      // Choose correct endpoint for metrics
+      const metricEndpoint =
+        meData.profile?.role === 'admin' || isOwner
+          ? '/api/admin/stats'
+          : '/api/user/metrics'
 
-        const metricRes = await fetch(metricEndpoint, { headers })
-        if (metricRes.ok) {
-          const metricData = await metricRes.json()
-          if (!cancelled) setMetrics(metricData)
-        }
-      } catch (err) {
-        if (!cancelled) setError(err.message)
-      } finally {
-        if (!cancelled) setLoading(false)
+      const metricRes = await fetch(metricEndpoint, { headers })
+      if (metricRes.ok) {
+        const metricData = await metricRes.json()
+        if (!cancelled) setMetrics(metricData)
       }
+    } catch (err) {
+      if (!cancelled) setError(err.message)
+    } finally {
+      if (!cancelled) setLoading(false)
     }
+  }
 
-    loadAccount()
-    return () => {
-      cancelled = true
-    }
-  }, [refreshTrigger])
+  loadAccount()
+  return () => {
+    cancelled = true
+  }
+}, [refreshTrigger])
 
   async function handleEmailUpdate() {
     if (!newEmail) return
@@ -147,7 +152,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
   }
 
   const userEmail = profile?.email
-  const isOwner = events.some((e) => e.admin_email === userEmail)
+const isOwner = Array.isArray(events) && events.some((e) => e.admin_email === userEmail)
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
