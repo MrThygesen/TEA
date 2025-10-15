@@ -318,80 +318,103 @@ const handleReject = async (eventId) => {
     }
   }
 
-  // --- Role assignment form (SetRoleForm) ---
-  function SetRoleForm() {
-    const [email, setEmail] = useState('')
-    const [role, setRole] = useState('user')
-    const [selectedEvent, setSelectedEvent] = useState('')
-    const [status, setStatus] = useState('')
-    const [eventsForDropdown, setEventsForDropdown] = useState([])
+// --- Role assignment form (SetRoleForm) ---
+function SetRoleForm() {
+  const [email, setEmail] = useState('')
+  const [role, setRole] = useState('user')
+  const [selectedEvent, setSelectedEvent] = useState('')
+  const [status, setStatus] = useState('')
 
-    // when assigning organizer, load events
-    useEffect(() => {
-      if (role !== 'organizer') return
-      async function load() {
-        try {
-          const res = await fetch('/api/events')
-          const data = await res.json()
-          setEventsForDropdown(Array.isArray(data) ? data : [])
-        } catch (err) {
-          console.error('Error loading events for role form', err)
-        }
-      }
-      load()
-    }, [role])
+  // use parent events list (only approved or pending)
+  const availableEvents = events.filter(ev =>
+    ev.approval_status === 'approved' || ev.is_confirmed
+  )
 
-    const handleSubmit = async (e) => {
-      e.preventDefault()
-      setStatus('')
-      try {
-        const body = { email, role }
-        if (role === 'organizer' && selectedEvent) body.event_id = Number(selectedEvent)
-        const res = await fetch('/api/setRole', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-wallet': address || '',
-          },
-          body: JSON.stringify(body),
-        })
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error || 'Failed to set role')
-        setStatus(`Updated ${data.updated.email} -> ${data.updated.role}`)
-        setEmail('')
-        setRole('user')
-        setSelectedEvent('')
-      } catch (err) {
-        console.error('SetRole error', err)
-        setStatus(`Error: ${err.message}`)
-      }
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setStatus('')
+    try {
+      const body = { email, role }
+      if (role === 'organizer' && selectedEvent) body.event_id = Number(selectedEvent)
+      const res = await fetch('/api/setRole', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-wallet': address || '',
+        },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to set role')
+      setStatus(`✅ Updated ${data.updated.email} → ${data.updated.role}`)
+      setEmail('')
+      setRole('user')
+      setSelectedEvent('')
+    } catch (err) {
+      console.error('SetRole error', err)
+      setStatus(`❌ Error: ${err.message}`)
     }
-
-    return (
-      <form onSubmit={handleSubmit} className="bg-zinc-900 p-4 rounded shadow mt-6 flex flex-col gap-3 text-white">
-        <h3 className="font-semibold text-lg">Assign Role</h3>
-        <input value={email} onChange={(e) => setEmail(e.target.value)} required type="email" placeholder="User Email" className="p-2 rounded bg-zinc-800" />
-        <select value={role} onChange={(e) => setRole(e.target.value)} className="p-2 rounded bg-zinc-800">
-          <option value="user">User</option>
-          <option value="organizer">Organizer</option>
-          <option value="admin">Admin</option>
-        </select>
-        {role === 'organizer' && (
-          <select value={selectedEvent} onChange={(e) => setSelectedEvent(e.target.value)} className="p-2 rounded bg-zinc-800">
-            <option value="">Select event to assign (optional)</option>
-            {eventsForDropdown.map(ev => (
-              <option key={ev.id} value={ev.id}>{ev.name} — {new Date(ev.datetime).toLocaleString()}</option>
-            ))}
-          </select>
-        )}
-        <div className="flex gap-2">
-          <button className="px-4 py-2 bg-blue-600 rounded" type="submit">Update Role</button>
-          <button type="button" className="px-4 py-2 bg-gray-500 rounded" onClick={() => { setEmail(''); setRole('user'); setSelectedEvent('') }}>Reset</button>
-        </div>
-        {status && <div className="text-sm mt-2">{status}</div>}
-      </form>
-    )
   }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="bg-zinc-900 p-4 rounded shadow mt-6 flex flex-col gap-3 text-white"
+    >
+      <h3 className="font-semibold text-lg">Assign Role</h3>
+      <input
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        required
+        type="email"
+        placeholder="User Email"
+        className="p-2 rounded bg-zinc-800"
+      />
+      <select
+        value={role}
+        onChange={(e) => setRole(e.target.value)}
+        className="p-2 rounded bg-zinc-800"
+      >
+        <option value="user">User</option>
+        <option value="organizer">Organizer</option>
+        <option value="admin">Admin</option>
+      </select>
+
+      {role === 'organizer' && (
+        <select
+          value={selectedEvent}
+          onChange={(e) => setSelectedEvent(e.target.value)}
+          className="p-2 rounded bg-zinc-800"
+        >
+          <option value="">Select event</option>
+          {availableEvents.map((ev) => (
+            <option key={ev.id} value={ev.id}>
+              {ev.name} — {new Date(ev.datetime).toLocaleString()}
+            </option>
+          ))}
+        </select>
+      )}
+
+      <div className="flex gap-2">
+        <button className="px-4 py-2 bg-blue-600 rounded" type="submit">
+          Update Role
+        </button>
+        <button
+          type="button"
+          className="px-4 py-2 bg-gray-500 rounded"
+          onClick={() => {
+            setEmail('')
+            setRole('user')
+            setSelectedEvent('')
+          }}
+        >
+          Reset
+        </button>
+      </div>
+      {status && <div className="text-sm mt-2">{status}</div>}
+    </form>
+  )
+}
 
   // --- Event list / Moderation table ---
   function EventModerationPanel() {
