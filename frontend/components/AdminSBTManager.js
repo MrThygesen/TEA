@@ -297,39 +297,6 @@ const handleReject = async (eventId) => {
     fetchEvents()
   }, [isAdmin])
 
-  // Create event (admin direct create)
-  const handleCreateEvent = async (e) => {
-    e?.preventDefault?.()
-    // basic validation
-    if (!eventForm.name || !eventForm.city || !eventForm.datetime || !eventForm.admin_email) {
-      return toast.error('Please fill: name, city, datetime and admin_email')
-    }
-
-    setCreating(true)
-    try {
-      // send full event payload; server will insert pending by default (unless you set confirmed)
-      const payload = {
-        ...eventForm,
-        datetime: new Date(eventForm.datetime).toISOString(),
-      }
-      const res = await fetch('/api/events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Create failed')
-      toast.success('Event created (pending)')
-      setShowCreateModal(false)
-      setEventForm({ ...blankEvent })
-      fetchEvents()
-    } catch (err) {
-      console.error('create event error', err)
-      toast.error(err.message || 'Event create failed')
-    } finally {
-      setCreating(false)
-    }
-  }
 
   // Approve/reject (one click)
   const handleModeration = async (id, action) => {
@@ -514,7 +481,7 @@ const handleReject = async (eventId) => {
       </div>
     )
   }
-
+    
   // --- Event create modal component
 // ✅ fixed to accept formData, not an event
 // --- Event create handler (unified)
