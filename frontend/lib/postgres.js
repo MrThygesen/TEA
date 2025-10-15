@@ -11,15 +11,14 @@ if (!global._pgPool) {
     connectionTimeoutMillis: 5000, // retry faster
   })
 
-// optional: keep-alive ping every 10 minutes (Render sleeps connections)
-//  setInterval(async () => {
-//  try {
-//    await global._pgPool.query('SELECT 1')
-//    } catch (err) {
-//     console.warn('Postgres keep-alive failed:', err.message)
-//   }
-//  }, 600000)
-//
+  // optional: keep-alive ping every 10 minutes (Render sleeps connections)
+  setInterval(async () => {
+    try {
+      await global._pgPool.query('SELECT 1')
+    } catch (err) {
+      console.warn('Postgres keep-alive failed:', err.message)
+    }
+  }, 600000)
 }
 
 export const pool = global._pgPool
