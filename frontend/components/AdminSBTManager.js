@@ -518,6 +518,7 @@ const handleReject = async (eventId) => {
   // --- Event create modal component
 // ✅ fixed to accept formData, not an event
 // --- Event create handler (unified)
+// --- Event create handler (unified and final) ---
 const handleCreateEvent = async (formData) => {
   if (!formData.name || !formData.city || !formData.datetime || !formData.admin_email) {
     return toast.error('Please fill: name, city, datetime, and admin_email')
