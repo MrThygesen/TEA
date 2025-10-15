@@ -30,7 +30,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     details: '',
     tags: '',
     price: '',
-    image_name: '',
+    image_url: '',
   })
 
   useEffect(() => {
@@ -182,7 +182,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         details: '',
         tags: '',
         price: '',
-        image_name: '',
+        image_url: '',
       })
       setShowEventForm(false)
     } catch (err) {
@@ -288,8 +288,8 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     type="text"
     placeholder="Image file name (e.g. cafe1.jpg)"
     className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-    value={eventData.image_name}
-    onChange={(e) => setEventData({ ...eventData, image_name: e.target.value })}
+    value={eventData.image_url}
+    onChange={(e) => setEventData({ ...eventData, image_url: e.target.value })}
   />
 
   <textarea
