@@ -326,9 +326,9 @@ function SetRoleForm() {
   const [status, setStatus] = useState('')
 
   // use parent events list (only approved or pending)
-  const availableEvents = events.filter(ev =>
-    ev.approval_status === 'approved' || ev.is_confirmed
-  )
+const availableEvents = events
+  .filter(ev => ev.is_confirmed === true || ev.status === 'approved')
+  .sort((a, b) => new Date(a.datetime) - new Date(b.datetime))
 
   const handleSubmit = async (e) => {
     e.preventDefault()
