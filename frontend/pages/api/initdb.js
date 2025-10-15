@@ -32,21 +32,27 @@ export default async function handler(req, res) {
 
     // USER PROFILES
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS user_profiles (
-        id SERIAL PRIMARY KEY,
-        username TEXT UNIQUE,
-        tier INTEGER DEFAULT 1 CHECK (tier IN (1,2)),
-        email TEXT UNIQUE,
-        wallet_address TEXT,
-        city TEXT DEFAULT 'Copenhagen',
-        role TEXT DEFAULT 'user' CHECK (role IN ('user','organizer','admin')),
-        group_id INTEGER,
-        password_hash TEXT,
-        email_verified BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-      );
-    `)
+  CREATE TABLE IF NOT EXISTS user_profiles (
+    id SERIAL PRIMARY KEY,  
+    name TEXT, 
+    username TEXT UNIQUE,
+    tier INTEGER DEFAULT 1 CHECK (tier IN (1,2)),
+    email TEXT UNIQUE,
+    wallet_address TEXT,
+    city TEXT DEFAULT 'Copenhagen',
+    role TEXT DEFAULT 'user' CHECK (role IN ('user','organizer','client', 'event-organizer', 'admin')),
+    group_id INTEGER,
+    password_hash TEXT,
+    email_verified BOOLEAN DEFAULT FALSE,
+    gender TEXT CHECK (gender IN ('male','female','other')) DEFAULT NULL, -- ✅ NEW
+    birthdate DATE DEFAULT NULL, -- ✅ NEW
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+
+
 
     // EMAIL VERIFICATION TOKENS
     await pool.query(`
@@ -89,7 +95,9 @@ await pool.query(`
     price NUMERIC(10,2) DEFAULT 0,
     image_url TEXT,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    is_rejected BOOLEAN DEFAULT false,
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected'))
   );
 `);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_events_city ON events(LOWER(city));`)
@@ -268,5 +276,3 @@ await pool.query(`CREATE INDEX IF NOT EXISTS idx_favorites_tg ON favorites(teleg
     await pool.end()
   }
 }
-
-
