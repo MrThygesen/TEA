@@ -16,6 +16,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [deletingAccount, setDeletingAccount] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [isOwner, setIsOwner] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -50,13 +51,22 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         setTickets(userTickets)
         setRsvps(filteredRsvps)
 
-        // Fetch metrics
-        const metricEndpoint = meData.profile?.role === 'admin' ? '/api/admin/stats' : '/api/user/metrics'
+        // Determine if user is owner/admin_email for any events
+        const ownsEvents = Array.isArray(meData.events)
+          ? meData.events.some(ev => ev.admin_email === meData.profile.email)
+          : false
+        setIsOwner(ownsEvents)
+
+        // Fetch metrics based on role or ownership
+        const metricEndpoint = (meData.profile?.role === 'admin' || ownsEvents)
+          ? '/api/admin/stats'
+          : '/api/user/metrics'
         const metricRes = await fetch(metricEndpoint, { headers })
         if (metricRes.ok) {
           const metricData = await metricRes.json()
           if (!cancelled) setMetrics(metricData)
         }
+
       } catch (err) {
         if (!cancelled) setError(err.message)
       } finally {
@@ -132,7 +142,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         <button onClick={onClose} className="absolute top-2 right-2 text-gray-400 hover:text-white text-xl">✕</button>
 
         <h2 className="text-2xl font-bold mb-1 text-blue-400">{t('YourAccount')}</h2>
-        {profile?.email && <p className="text-sm text-gray-400 mb-6">Email: {profile.email}</p>}
+        {profile?.email && <p className="text-sm text-gray-400 mb-2">Email: {profile.email}</p>}
         <p className="text-sm text-gray-300 mb-6">Role: {profile?.role}</p>
 
         {/* Tickets */}
@@ -239,6 +249,32 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
               <button type="submit" className="bg-blue-600 hover:bg-blue-700 w-full py-2 rounded text-white">Submit Template</button>
             </form>
           </div>
+        )}
+
+        {/* ADMIN / OWNER METRICS */}
+        {(profile?.role === 'admin' || isOwner) && metrics && (
+          <>
+            <h3 className="text-lg font-semibold text-yellow-400 mb-2">Admin Metrics</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
+              <Metric label="Tickets Sold" value={metrics.tickets_sold} />
+              <Metric label="RSVP Count" value={metrics.rsvp_count} />
+              <Metric label="Venues Opened" value={metrics.venues_opened} />
+              <Metric label="Host Info Views" value={metrics.host_views} />
+              <Metric label="No Show Rate" value={`${metrics.no_show_rate}%`} />
+            </div>
+          </>
+        )}
+
+        {/* USER METRICS */}
+        {profile?.role === 'user' && metrics && (
+          <>
+            <h3 className="text-lg font-semibold text-green-400 mb-2">Your Activity</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
+              <Metric label="Tickets Bought" value={metrics.tickets_bought} />
+              <Metric label="Show-up Rate" value={`${metrics.show_up_rate}%`} />
+              <Metric label="Points Earned" value={metrics.points} />
+            </div>
+          </>
         )}
 
         {/* ACCOUNT MANAGEMENT */}
