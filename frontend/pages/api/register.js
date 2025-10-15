@@ -9,7 +9,8 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' })
   }
 
-  const { email, password, username, eventId, ticketType } = req.body
+  const { email, password, username, eventId, ticketType, role } = req.body
+
   if (!email || !password || !username) {
     return res.status(400).json({ error: 'Username, email and password are required.' })
   }
@@ -17,12 +18,16 @@ export default async function handler(req, res) {
   try {
     const hashedPassword = await bcrypt.hash(password, 10)
 
+    // ✅ Role validation: only allow user/client/admin, default to 'user'
+    const validRoles = ['user', 'client', 'admin']
+    const userRole = validRoles.includes(role) ? role : 'user'
+
     const result = await pool.query(
-      `INSERT INTO user_profiles (email, password_hash, username, email_verified)
-       VALUES ($1, $2, $3, FALSE)
+      `INSERT INTO user_profiles (email, password_hash, username, email_verified, role)
+       VALUES ($1, $2, $3, FALSE, $4)
        ON CONFLICT (email) DO NOTHING
        RETURNING id, email, username, role, tier`,
-      [email, hashedPassword, username]
+      [email, hashedPassword, username, userRole]
     )
 
     if (result.rows.length === 0) {
@@ -31,21 +36,22 @@ export default async function handler(req, res) {
 
     const user = result.rows[0]
 
-    // Verification token
+    // Create a verification token
     const token = crypto.randomBytes(32).toString('hex')
     await pool.query(
       `INSERT INTO email_verification_tokens (user_id, token, expires_at, email)
        VALUES ($1, $2, NOW() + interval '1 day', $3)
-       ON CONFLICT (user_id) DO UPDATE SET token = EXCLUDED.token,
-                                          expires_at = EXCLUDED.expires_at,
-                                          email = EXCLUDED.email`,
+       ON CONFLICT (user_id) DO UPDATE SET
+         token = EXCLUDED.token,
+         expires_at = EXCLUDED.expires_at,
+         email = EXCLUDED.email`,
       [user.id, token, email]
     )
+
     await sendVerificationEmail(email, token)
 
-    // --- Free ticket handling
+    // Optional free ticket
     if (ticketType === 'free' && eventId) {
-      // Insert ticket immediately as booked
       const { rows: ticketRows } = await pool.query(
         `INSERT INTO registrations (event_id, user_id, email, stage, has_paid, ticket_code)
          VALUES ($1, $2, $3, 'book', FALSE, $4)
@@ -54,7 +60,6 @@ export default async function handler(req, res) {
       )
       const ticket = ticketRows[0]
 
-      // Send ticket email
       const { rows: eventRows } = await pool.query('SELECT * FROM events WHERE id=$1', [eventId])
       if (eventRows.length) {
         await sendTicketEmail(email, eventRows[0], user, pool)
@@ -63,8 +68,7 @@ export default async function handler(req, res) {
 
     return res.status(201).json({
       user,
-      message:
-        '✅ Registration successful. Please check your email to verify your account.',
+      message: '✅ Registration successful. Please check your email to verify your account.',
     })
   } catch (err) {
     console.error('❌ User signup error:', err)
