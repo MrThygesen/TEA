@@ -16,7 +16,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [deletingAccount, setDeletingAccount] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [isOwner, setIsOwner] = useState(false)
+  const [ownsEvents, setOwnsEvents] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -51,14 +51,14 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         setTickets(userTickets)
         setRsvps(filteredRsvps)
 
-        // Determine if user is owner/admin_email for any events
-        const ownsEvents = Array.isArray(meData.events)
+        // Check if user owns/admin_email for any events
+        const isOwner = Array.isArray(meData.events)
           ? meData.events.some(ev => ev.admin_email === meData.profile.email)
           : false
-        setIsOwner(ownsEvents)
+        setOwnsEvents(isOwner)
 
-        // Fetch metrics based on role or ownership
-        const metricEndpoint = (meData.profile?.role === 'admin' || ownsEvents)
+        // Determine metrics endpoint
+        const metricEndpoint = (meData.profile?.role === 'admin' || isOwner)
           ? '/api/admin/stats'
           : '/api/user/metrics'
         const metricRes = await fetch(metricEndpoint, { headers })
@@ -194,7 +194,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         ) : <p className="text-gray-400 mb-8">{t('NoRSVPsFound')}</p>}
 
         {/* CLIENT EVENT CREATION */}
-        {profile?.role === 'client' && (
+        {(profile?.role === 'client') && (
           <div className="border border-zinc-700 bg-zinc-800 p-4 rounded-lg mb-8">
             <h3 className="text-lg font-semibold text-blue-400 mb-2">Submit New Event Template</h3>
             <form
@@ -252,7 +252,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         )}
 
         {/* ADMIN / OWNER METRICS */}
-        {(profile?.role === 'admin' || isOwner) && metrics && (
+        {(profile?.role === 'admin' || ownsEvents) && metrics && (
           <>
             <h3 className="text-lg font-semibold text-yellow-400 mb-2">Admin Metrics</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
@@ -315,7 +315,6 @@ const Metric = ({ label, value }) => (
   </div>
 )
 
-// ⚡ Optimized QR with click-to-enlarge
 const OptimizedQRCode = React.memo(function OptimizedQRCode({ value }) {
   const [showModal, setShowModal] = React.useState(false)
 
