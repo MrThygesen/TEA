@@ -541,7 +541,8 @@ async function handleSignup(e) {
     const res = await fetch('/api/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, email, password,  role: selectedRole || 'user',})
+body: JSON.stringify({ username, email, password, role })
+
     })
 
 
