@@ -153,6 +153,12 @@ useEffect(() => {
   const userEmail = profile?.email
 const isOwner = Array.isArray(events) && events.some((e) => e.admin_email === userEmail)
 
+const isClientOrOwner =
+  profile?.role === 'client' ||
+  profile?.role === 'admin' ||
+  events.some((ev) => ev.admin_email === profile?.email)
+
+
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-lg max-w-6xl w-full p-6 text-white relative overflow-y-auto max-h-[90vh]">
@@ -221,12 +227,6 @@ const isOwner = Array.isArray(events) && events.some((e) => e.admin_email === us
         )}
 
         {/* ADMIN OR OWNER METRICS */}
-
-const isClientOrOwner =
-  profile?.role === 'client' ||
-  profile?.role === 'admin' ||
-  events.some((ev) => ev.admin_email === profile?.email)
-
 
       {isClientOrOwner && metrics && (
   <>
