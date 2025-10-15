@@ -541,7 +541,7 @@ async function handleSignup(e) {
     const res = await fetch('/api/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, email, password, role: 'client',}) // <-- include role
+      body: JSON.stringify({ username, email, password,  role: selectedRole || 'user',})
     })
 
 
@@ -759,7 +759,6 @@ setRefreshTrigger={setRefreshTrigger}
           <div className="bg-zinc-900 rounded-lg max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-bold mb-4">Sign Up</h2>
             {authError && <p className="text-red-500 text-sm mb-2">{authError}</p>}
-
 
 <form onSubmit={handleSignup} className="flex flex-col gap-2">
   <input name="username" placeholder="Username" className="p-2 rounded bg-zinc-800 text-white" />
