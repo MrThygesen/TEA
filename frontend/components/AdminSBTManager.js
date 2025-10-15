@@ -543,20 +543,50 @@ const handleCreateEvent = async (formData) => {
 }
 
 // --- Event create modal component
-function CreateEventModal({ open, onClose }) {
+function CreateEventModal({ open, onClose, handleCreateEvent, creating }) {
+  const blankEvent = {
+    id: '',
+    admin_email: '',
+    group_id: '',
+    name: '',
+    city: '',
+    datetime: '',
+    min_attendees: 1,
+    max_attendees: 40,
+    is_confirmed: false,
+    is_rejected: false,
+    description: '',
+    details: '',
+    venue: '',
+    venue_type: '',
+    basic_perk: '',
+    advanced_perk: '',
+    tag1: '',
+    tag2: '',
+    tag3: '',
+    tag4: '',
+    language: 'en',
+    price: 0,
+    image_url: '',
+  }
+
   const [localForm, setLocalForm] = useState({ ...blankEvent })
   const firstInputRef = useRef(null)
 
   useEffect(() => {
-    if (open && firstInputRef.current) {
-      firstInputRef.current.focus()
+    if (open) {
+      setLocalForm({ ...blankEvent })
+      if (firstInputRef.current) firstInputRef.current.focus()
     }
   }, [open])
 
-  const handleField = (k, v) => setLocalForm((prev) => ({ ...prev, [k]: v }))
+  const handleField = (key, value) => {
+    setLocalForm(prev => ({ ...prev, [key]: value }))
+  }
 
   const onSubmit = async (e) => {
     e.preventDefault()
+    if (!handleCreateEvent) return
     await handleCreateEvent(localForm)
   }
 
@@ -581,12 +611,13 @@ function CreateEventModal({ open, onClose }) {
         </div>
 
         <form onSubmit={onSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
           <div>
             <label className="block text-sm font-medium mb-1">Event Title</label>
             <input
               ref={firstInputRef}
               required
-              value={localForm.name || ''}
+              value={localForm.name}
               onChange={(e) => handleField('name', e.target.value)}
               className="w-full p-2 border rounded"
             />
@@ -597,7 +628,7 @@ function CreateEventModal({ open, onClose }) {
             <input
               required
               type="email"
-              value={localForm.admin_email || ''}
+              value={localForm.admin_email}
               onChange={(e) => handleField('admin_email', e.target.value)}
               className="w-full p-2 border rounded"
             />
@@ -607,7 +638,7 @@ function CreateEventModal({ open, onClose }) {
             <label className="block text-sm font-medium mb-1">City</label>
             <input
               required
-              value={localForm.city || ''}
+              value={localForm.city}
               onChange={(e) => handleField('city', e.target.value)}
               className="w-full p-2 border rounded"
             />
@@ -618,7 +649,7 @@ function CreateEventModal({ open, onClose }) {
             <input
               required
               type="datetime-local"
-              value={localForm.datetime || ''}
+              value={localForm.datetime}
               onChange={(e) => handleField('datetime', e.target.value)}
               className="w-full p-2 border rounded"
             />
@@ -628,7 +659,7 @@ function CreateEventModal({ open, onClose }) {
             <label className="block text-sm font-medium mb-1">Min Attendees</label>
             <input
               type="number"
-              value={localForm.min_attendees || ''}
+              value={localForm.min_attendees}
               onChange={(e) => handleField('min_attendees', e.target.value)}
               className="w-full p-2 border rounded"
             />
@@ -638,7 +669,7 @@ function CreateEventModal({ open, onClose }) {
             <label className="block text-sm font-medium mb-1">Max Attendees</label>
             <input
               type="number"
-              value={localForm.max_attendees || ''}
+              value={localForm.max_attendees}
               onChange={(e) => handleField('max_attendees', e.target.value)}
               className="w-full p-2 border rounded"
             />
@@ -647,7 +678,7 @@ function CreateEventModal({ open, onClose }) {
           <div className="md:col-span-2">
             <label className="block text-sm font-medium mb-1">Short Description</label>
             <textarea
-              value={localForm.description || ''}
+              value={localForm.description}
               onChange={(e) => handleField('description', e.target.value)}
               className="w-full p-2 border rounded"
             />
@@ -656,7 +687,7 @@ function CreateEventModal({ open, onClose }) {
           <div className="md:col-span-2">
             <label className="block text-sm font-medium mb-1">Details (full)</label>
             <textarea
-              value={localForm.details || ''}
+              value={localForm.details}
               onChange={(e) => handleField('details', e.target.value)}
               className="w-full p-2 border rounded h-32"
             />
@@ -665,7 +696,7 @@ function CreateEventModal({ open, onClose }) {
           <div>
             <label className="block text-sm font-medium mb-1">Venue</label>
             <input
-              value={localForm.venue || ''}
+              value={localForm.venue}
               onChange={(e) => handleField('venue', e.target.value)}
               className="w-full p-2 border rounded"
             />
@@ -674,7 +705,7 @@ function CreateEventModal({ open, onClose }) {
           <div>
             <label className="block text-sm font-medium mb-1">Venue Type</label>
             <select
-              value={localForm.venue_type || ''}
+              value={localForm.venue_type}
               onChange={(e) => handleField('venue_type', e.target.value)}
               className="w-full p-2 border rounded"
             >
@@ -690,7 +721,7 @@ function CreateEventModal({ open, onClose }) {
           <div>
             <label className="block text-sm font-medium mb-1">Basic Perk</label>
             <input
-              value={localForm.basic_perk || ''}
+              value={localForm.basic_perk}
               onChange={(e) => handleField('basic_perk', e.target.value)}
               className="w-full p-2 border rounded"
             />
@@ -699,54 +730,28 @@ function CreateEventModal({ open, onClose }) {
           <div>
             <label className="block text-sm font-medium mb-1">Advanced Perk</label>
             <input
-              value={localForm.advanced_perk || ''}
+              value={localForm.advanced_perk}
               onChange={(e) => handleField('advanced_perk', e.target.value)}
               className="w-full p-2 border rounded"
             />
           </div>
 
-          {/* --- TAG FIELDS --- */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Tag 1</label>
-            <input
-              value={localForm.tag1 || ''}
-              onChange={(e) => handleField('tag1', e.target.value)}
-              className="w-full p-2 border rounded"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Tag 2</label>
-            <input
-              value={localForm.tag2 || ''}
-              onChange={(e) => handleField('tag2', e.target.value)}
-              className="w-full p-2 border rounded"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Tag 3</label>
-            <input
-              value={localForm.tag3 || ''}
-              onChange={(e) => handleField('tag3', e.target.value)}
-              className="w-full p-2 border rounded"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Tag 4</label>
-            <input
-              value={localForm.tag4 || ''}
-              onChange={(e) => handleField('tag4', e.target.value)}
-              className="w-full p-2 border rounded"
-            />
-          </div>
-
+          {/* --- TAGS --- */}
+          {['tag1','tag2','tag3','tag4'].map((t, i) => (
+            <div key={t}>
+              <label className="block text-sm font-medium mb-1">Tag {i+1}</label>
+              <input
+                value={localForm[t]}
+                onChange={(e) => handleField(t, e.target.value)}
+                className="w-full p-2 border rounded"
+              />
+            </div>
+          ))}
 
           <div>
             <label className="block text-sm font-medium mb-1">Language</label>
             <select
-              value={localForm.language || 'en'}
+              value={localForm.language}
               onChange={(e) => handleField('language', e.target.value)}
               className="w-full p-2 border rounded"
             >
@@ -760,7 +765,7 @@ function CreateEventModal({ open, onClose }) {
             <input
               type="number"
               step="0.01"
-              value={localForm.price || ''}
+              value={localForm.price}
               onChange={(e) => handleField('price', e.target.value)}
               className="w-full p-2 border rounded"
             />
@@ -769,7 +774,7 @@ function CreateEventModal({ open, onClose }) {
           <div className="md:col-span-2">
             <label className="block text-sm font-medium mb-1">Image URL</label>
             <input
-              value={localForm.image_url || ''}
+              value={localForm.image_url}
               onChange={(e) => handleField('image_url', e.target.value)}
               className="w-full p-2 border rounded"
             />
@@ -796,7 +801,6 @@ function CreateEventModal({ open, onClose }) {
     </div>
   )
 }
-
 
   // ------------------ Render main admin UI ------------------
   if (!isAdmin) {
