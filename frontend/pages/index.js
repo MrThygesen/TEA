@@ -541,8 +541,11 @@ async function handleSignup(e) {
     const res = await fetch('/api/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, email, password, role }) // <-- include role
+      body: JSON.stringify({ username, email, password, role: 'client',}) // <-- include role
     })
+
+
+
 
     if (!res.ok) {
       const j = await res.json().catch(() => ({}))
