@@ -705,6 +705,44 @@ function CreateEventModal({ open, onClose }) {
             />
           </div>
 
+          {/* --- TAG FIELDS --- */}
+          <div>
+            <label className="block text-sm font-medium mb-1">Tag 1</label>
+            <input
+              value={localForm.tag1 || ''}
+              onChange={(e) => handleField('tag1', e.target.value)}
+              className="w-full p-2 border rounded"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Tag 2</label>
+            <input
+              value={localForm.tag2 || ''}
+              onChange={(e) => handleField('tag2', e.target.value)}
+              className="w-full p-2 border rounded"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Tag 3</label>
+            <input
+              value={localForm.tag3 || ''}
+              onChange={(e) => handleField('tag3', e.target.value)}
+              className="w-full p-2 border rounded"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Tag 4</label>
+            <input
+              value={localForm.tag4 || ''}
+              onChange={(e) => handleField('tag4', e.target.value)}
+              className="w-full p-2 border rounded"
+            />
+          </div>
+
+
           <div>
             <label className="block text-sm font-medium mb-1">Language</label>
             <select
