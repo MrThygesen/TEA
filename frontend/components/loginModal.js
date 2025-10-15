@@ -27,7 +27,10 @@ export default function LoginModal({ onClose, onLogin }) {
       if (!res.ok) throw new Error(data.error || 'Login failed')
 
       // Save JWT token
-      localStorage.setItem('auth_token', data.token)
+localStorage.setItem('token', data.token)
+localStorage.setItem('user_role', data.user?.role || 'user')
+localStorage.setItem('user_email', data.user?.email || '')
+
 
       if (onLogin) onLogin(data) // pass user/token back to parent
       if (onClose) onClose()

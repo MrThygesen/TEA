@@ -67,7 +67,6 @@ useEffect(() => {
 
       // --- Determine if this user is admin_email for any events ---
       const userEmail = meData.profile?.email
-      const isOwner = eventArray.some((ev) => ev.admin_email === userEmail)
 
       // Choose correct endpoint for metrics
       const metricEndpoint =
@@ -222,18 +221,26 @@ const isOwner = Array.isArray(events) && events.some((e) => e.admin_email === us
         )}
 
         {/* ADMIN OR OWNER METRICS */}
-        {(profile?.role === 'admin' || isOwner) && metrics && (
-          <>
-            <h3 className="text-lg font-semibold text-yellow-400 mb-2">Client / Admin Statistics</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
-              <Metric label="Tickets Sold" value={metrics.tickets_sold} />
-              <Metric label="RSVP Count" value={metrics.rsvp_count} />
-              <Metric label="Venues Opened" value={metrics.venues_opened} />
-              <Metric label="Host Info Views" value={metrics.host_views} />
-              <Metric label="No Show Rate" value={`${metrics.no_show_rate}%`} />
-            </div>
-          </>
-        )}
+
+const isClientOrOwner =
+  profile?.role === 'client' ||
+  profile?.role === 'admin' ||
+  events.some((ev) => ev.admin_email === profile?.email)
+
+
+      {isClientOrOwner && metrics && (
+  <>
+    <h3 className="text-lg font-semibold text-yellow-400 mb-2">Client / Admin Statistics</h3>
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
+      <Metric label="Tickets Sold" value={metrics.tickets_sold} />
+      <Metric label="RSVP Count" value={metrics.rsvp_count} />
+      <Metric label="Venues Opened" value={metrics.venues_opened} />
+      <Metric label="Host Info Views" value={metrics.host_views} />
+      <Metric label="No Show Rate" value={`${metrics.no_show_rate}%`} />
+    </div>
+  </>
+)}
+
 
         {/* USER METRICS */}
         {profile?.role === 'user' && metrics && !isOwner && (
