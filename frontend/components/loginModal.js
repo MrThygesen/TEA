@@ -1,4 +1,4 @@
-//loginModal.js
+//components/loginModal.js
 'use client'
 
 import { useState } from 'react'
@@ -26,13 +26,14 @@ export default function LoginModal({ onClose, onLogin }) {
 
       if (!res.ok) throw new Error(data.error || 'Login failed')
 
-      // Save JWT token
-localStorage.setItem('token', data.token)
-localStorage.setItem('user_role', data.user?.role || 'user')
-localStorage.setItem('user_email', data.user?.email || '')
+      if (!data?.token) throw new Error('No token returned from server')
 
+      // ✅ Store safely
+      localStorage.setItem('token', data.token)
+      localStorage.setItem('user_role', data.user?.role || 'user')
+      localStorage.setItem('user_email', data.user?.email || '')
 
-      if (onLogin) onLogin(data) // pass user/token back to parent
+      if (onLogin) onLogin(data)
       if (onClose) onClose()
     } catch (err) {
       console.error('Login failed:', err)
@@ -43,14 +44,28 @@ localStorage.setItem('user_email', data.user?.email || '')
   }
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.5)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 1000
-    }}>
-      <div style={{ background: '#fff', padding: '1rem', borderRadius: '8px', width: '300px' }}>
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0,0,0,0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+      }}
+    >
+      <div
+        style={{
+          background: '#fff',
+          padding: '1rem',
+          borderRadius: '8px',
+          width: '300px',
+        }}
+      >
         <h2>Login</h2>
         <form onSubmit={handleLogin}>
           <input

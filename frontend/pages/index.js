@@ -431,6 +431,7 @@ export default function Home() {
   const [selectedCity, setSelectedCity] = useState('')
   const [selectedVenueType, setSelectedVenueType] = useState('')
   const [viewMode, setViewMode] = useState('grid')
+  const [role, setRole] = useState('user') // default to regular user
 
   const [authUser, setAuthUser] = useState(loadAuth())
   const [showLoginModal, setShowLoginModal] = useState(false)
@@ -527,36 +528,37 @@ useEffect(() => {
     }
   }
 
-  async function handleSignup(e) {
-    e.preventDefault()
-    setAuthError('')
-    const form = new FormData(e.currentTarget)
-    const username = form.get('username')?.toString().trim()
-    const email = form.get('email')?.toString().trim()
-    const password = form.get('password')?.toString()
-    if (!username || !email || !password) return setAuthError('All fields are required.')
+async function handleSignup(e) {
+  e.preventDefault()
+  setAuthError('')
+  const form = new FormData(e.currentTarget)
+  const username = form.get('username')?.toString().trim()
+  const email = form.get('email')?.toString().trim()
+  const password = form.get('password')?.toString()
+  if (!username || !email || !password) return setAuthError('All fields are required.')
 
-    try {
-      const res = await fetch('/api/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, email, password })
-      })
+  try {
+    const res = await fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, email, password, role }) // <-- include role
+    })
 
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
-        return setAuthError(j.error || 'Sign up failed')
-      }
-
-      const user = await res.json()
-      setAuthUser(user)
-      saveAuth(user)
-      localStorage.setItem('token', user.token)
-      setShowSignupModal(false)
-    } catch (err) {
-      setAuthError('Network error')
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      return setAuthError(j.error || 'Sign up failed')
     }
+
+    const user = await res.json()
+    setAuthUser(user)
+    saveAuth(user)
+    localStorage.setItem('token', user.token)
+    setShowSignupModal(false)
+  } catch (err) {
+    setAuthError('Network error')
   }
+}
+
 
   function handleLogout() {
     clearAuth()
@@ -754,15 +756,32 @@ setRefreshTrigger={setRefreshTrigger}
           <div className="bg-zinc-900 rounded-lg max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-bold mb-4">Sign Up</h2>
             {authError && <p className="text-red-500 text-sm mb-2">{authError}</p>}
-            <form onSubmit={handleSignup} className="flex flex-col gap-2">
-              <input name="username" placeholder="Username" className="p-2 rounded bg-zinc-800 text-white" />
-              <input name="email" type="email" placeholder="Email" className="p-2 rounded bg-zinc-800 text-white" />
-              <input name="password" type="password" placeholder="Password" className="p-2 rounded bg-zinc-800 text-white" />
-              <button type="submit" className="mt-3 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">Sign Up</button>
-            </form>
+
+
+<form onSubmit={handleSignup} className="flex flex-col gap-2">
+  <input name="username" placeholder="Username" className="p-2 rounded bg-zinc-800 text-white" />
+  <input name="email" type="email" placeholder="Email" className="p-2 rounded bg-zinc-800 text-white" />
+  <input name="password" type="password" placeholder="Password" className="p-2 rounded bg-zinc-800 text-white" />
+
+  {/* Role Selection */}
+  <select
+    value={role}
+    onChange={(e) => setRole(e.target.value)}
+    className="p-2 rounded bg-zinc-800 text-white"
+  >
+    <option value="user">Regular User</option>
+    <option value="client">Event Creator</option>
+  </select>
+
+  <button type="submit" className="mt-3 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">Sign Up</button>
+</form>
           </div>
         </div>
       )}
+
+
+
+
 
       {/* Event Preview Modal */}
       {showEventModal && selectedEvent && (
