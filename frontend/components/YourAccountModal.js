@@ -25,6 +25,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     title: '',
     city: '',
     venue: '',
+    venue_type: '',
     datetime: '',
     description: '',
     details: '',
@@ -267,6 +268,22 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     onChange={(e) => setEventData({ ...eventData, venue: e.target.value })}
     required
   />
+
+<select
+  className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+  value={eventData.venue_type}
+  onChange={(e) => setEventData({ ...eventData, venue_type: e.target.value })}
+  required
+>
+  <option value="">Select Venue Type</option>
+  <option value="cafe">Cafe</option>
+  <option value="bar">Bar</option>
+  <option value="gallery">Gallery</option>
+  <option value="restaurant">Restaurant</option>
+  <option value="other">Other</option>
+</select>
+
+
 
   <input
     type="datetime-local"
