@@ -202,13 +202,15 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         e.preventDefault()
         const form = e.target
         const eventData = {
-          name: form.title.value,           // map title -> name
+          name: form.title.value,
           description: form.description.value,
           details: form.details.value,
           city: form.city.value,
           datetime: form.datetime.value,
           venue: form.venue.value,
           venue_type: form.venue_type.value,
+          basic_perk: form.basic_perk.value,
+          advanced_perk: form.advanced_perk.value,
           image_url: form.image_url.value,
           admin_email: profile?.email || '',
           tag1: form.tag1.value,
@@ -246,6 +248,8 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         <option value="club">Club</option>
         <option value="other">Other</option>
       </select>
+      <input name="basic_perk" placeholder="Basic Perk (optional)" className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+      <input name="advanced_perk" placeholder="Advanced Perk (optional)" className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
       <input name="image_url" placeholder="Image URL" className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
       <div className="flex gap-2">
         <input name="tag1" placeholder="Tag 1" className="input flex-1 p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
@@ -262,7 +266,6 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     </form>
   </div>
 )}
-
         {/* ADMIN / OWNER METRICS */}
         {(profile?.role === 'admin' || ownsEvents) && metrics && (
           <>
