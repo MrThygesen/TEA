@@ -9,905 +9,313 @@ import { toast } from 'react-hot-toast'
 const CONTRACT_ADDRESS = '0xA508A0f5733bcfcf6eA0b41ca9344c27855FeEF0'
 const MAX_TYPES = 100
 
+
 export default function AdminSBTManager() {
-  const { address } = useAccount()
-  const publicClient = usePublicClient()
-  const { writeContractAsync } = useWriteContract()
-  const previewCache = useRef({})
-
-  // admin gating (superadmin wallet)
-  const isAdmin = address?.toLowerCase() === process.env.NEXT_PUBLIC_ADMIN?.toLowerCase()
-
-  // --- SBT state (kept from your original)
-  const [typeId, setTypeId] = useState(1n)
-  const [title, setTitle] = useState('')
-  const [burnable, setBurnable] = useState(false)
-  const [maxSupply, setMaxSupply] = useState('')
-  const [createSbtCity, setCreateSbtCity] = useState('')
-  const [previewData, setPreviewData] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [burnTokenId, setBurnTokenId] = useState('')
-  const [availableTemplates, setAvailableTemplates] = useState([])
-  const [sbtTypesData, setSbtTypesData] = useState([])
-
-  // --- Event & moderation state
   const [events, setEvents] = useState([])
-  const [activeTab, setActiveTab] = useState('pending') // 'pending' | 'approved' | 'rejected'
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [creating, setCreating] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [editingEvent, setEditingEvent] = useState(null)
+  const [authEmail, setAuthEmail] = useState('')
 
-  // Event form contains all DB columns you referenced
-  const blankEvent = {
-    id: '',
-    admin_email: '',
-    group_id: '',
-    name: '',
-    city: '',
-    datetime: '',
-    min_attendees: 1,
-    max_attendees: 40,
-    is_confirmed: false,
-    is_rejected: false,
-    description: '',
-    details: '',
-    venue: '',
-    venue_type: '',
-    basic_perk: '',
-    advanced_perk: '',
-    tag1: '',
-    tag2: '',
-    tag3: '',
-    tag4: '',
-    language: 'en',
-    price: 0,
-    image_url: '',
-  }
-  const [eventForm, setEventForm] = useState({ ...blankEvent })
-
-  // helpers for metadata templates
-  const buildUri = (filename) => `https://raw.githubusercontent.com/MrThygesen/TEA/main/data/${filename}`
-  const formatDisplayName = (filename) =>
-    filename.replace('.json', '').replace(/[_-]/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
-
-  // --- Fetch template list from GitHub
-  useEffect(() => {
-    async function fetchTemplates() {
-      try {
-        const res = await fetch('https://api.github.com/repos/MrThygesen/TEA/contents/data')
-        const data = await res.json()
-        const jsonFiles = Array.isArray(data) ? data.filter((f) => f.name?.endsWith('.json')).map((f) => f.name) : []
-        setAvailableTemplates(jsonFiles)
-      } catch (err) {
-        console.error('Failed to fetch templates:', err)
-      }
+  // Load events
+  const fetchEvents = async () => {
+    try {
+      setLoading(true)
+      const res = await fetch('/api/events')
+      const data = await res.json()
+      setEvents(data.events || [])
+    } catch (err) {
+      toast.error('Failed to load events')
+    } finally {
+      setLoading(false)
     }
-    fetchTemplates()
+  }
+
+  useEffect(() => {
+    fetchEvents()
   }, [])
 
-  // --- Fetch SBT types (kept from your original)
+  // Load admin email from localStorage token data (if stored)
   useEffect(() => {
-    if (!publicClient) return
-    let mounted = true
-    async function fetchTypes() {
-      const typePromises = Array.from({ length: MAX_TYPES }, (_, i) =>
-        publicClient.readContract({
-          address: CONTRACT_ADDRESS,
-          abi: WebAccessSBTV33_ABI,
-          functionName: 'sbtTypes',
-          args: [i + 1],
-        }).catch(() => null)
-      )
-      const typesRaw = await Promise.all(typePromises)
-      const types = []
-      for (let i = 0; i < typesRaw.length; i++) {
-        const sbtType = typesRaw[i]
-        if (!sbtType) continue
-        try {
-          const [uri, active, maxSupplyBig, mintedBig, , burnableFlag] = sbtType
-          if (!uri) continue
-          let typeTitle = ''
-          if (previewCache.current[uri]) {
-            typeTitle = previewCache.current[uri].name
-          } else {
-            try {
-              const res = await fetch(uri)
-              const metadata = await res.json()
-              typeTitle = metadata?.name || ''
-              previewCache.current[uri] = metadata
-            } catch {}
-          }
-          types.push({
-            id: i + 1,
-            uri,
-            active,
-            burnable: burnableFlag,
-            maxSupply: Number(maxSupplyBig),
-            minted: Number(mintedBig),
-            title: typeTitle,
-          })
-        } catch (err) {
-          console.error('Error parsing SBT type:', err)
-        }
-      }
-      if (mounted) setSbtTypesData(types)
-    }
-    fetchTypes()
-    return () => { mounted = false }
-  }, [publicClient, loading])
+    const userEmail = localStorage.getItem('email')
+    if (userEmail) setAuthEmail(userEmail)
+  }, [])
 
-  // --- SBT handlers (kept)
-  const handlePreview = async () => {
-    if (!title) return toast.error('Select a metadata template first')
-    const uri = buildUri(title)
-    if (previewCache.current[uri]) {
-      setPreviewData(previewCache.current[uri])
-      toast.success(`🔍 Preview: ${previewCache.current[uri].name}`)
-      return
-    }
-    try {
-      const res = await fetch(uri)
-      const metadata = await res.json()
-      setPreviewData(metadata)
-      previewCache.current[uri] = metadata
-      toast.success(`🔍 Preview: ${metadata.name}`)
-    } catch {
-      toast.error('Preview failed')
-    }
-  }
-
-  const handleCreateType = async () => {
-    if (!title || !maxSupply || !typeId || !createSbtCity) return toast.error('Fill in all fields')
-    setLoading(true)
-    try {
-      const uri = buildUri(title)
-      await writeContractAsync({
-        address: CONTRACT_ADDRESS,
-        abi: WebAccessSBTV33_ABI,
-        functionName: 'createType',
-        args: [typeId, uri, BigInt(maxSupply), burnable],
-      })
-      toast.success('SBT type created')
-      if (typeId <= 4999) {
-        await postEventFromSbt(typeId, title, previewData?.date || new Date().toISOString(), createSbtCity)
-      }
-    } catch (err) {
-      console.error(err)
-      toast.error('Failed to create SBT type')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleActivate = async () => {
-    if (!typeId) return toast.error('Select Type ID')
-    setLoading(true)
-    try {
-      await writeContractAsync({
-        address: CONTRACT_ADDRESS,
-        abi: WebAccessSBTV33_ABI,
-        functionName: 'setTypeStatus',
-        args: [typeId, true],
-      })
-      toast.success('SBT type activated')
-    } catch (err) {
-      console.error(err)
-      toast.error('Activation failed')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleDeactivate = async () => {
-    if (!typeId) return toast.error('Select Type ID')
-    setLoading(true)
-    try {
-      await writeContractAsync({
-        address: CONTRACT_ADDRESS,
-        abi: WebAccessSBTV33_ABI,
-        functionName: 'setTypeStatus',
-        args: [typeId, false],
-      })
-      toast.success('SBT type deactivated')
-    } catch (err) {
-      console.error(err)
-      toast.error('Deactivation failed')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleBurn = async () => {
-    if (!burnTokenId) return toast.error('Missing Token ID')
-    setLoading(true)
-    try {
-      await writeContractAsync({
-        address: CONTRACT_ADDRESS,
-        abi: WebAccessSBTV33_ABI,
-        functionName: 'burn',
-        args: [BigInt(burnTokenId)],
-      })
-      toast.success('Token burned')
-    } catch (err) {
-      console.error(err)
-      toast.error('Burn failed')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-const handleApprove = async (eventId) => {
-  await fetch('/api/events', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id: eventId, approval_status: 'approved' })
-  })
-  fetchEvents() // refresh
-}
-
-const handleReject = async (eventId) => {
-  await fetch('/api/events', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id: eventId, approval_status: 'rejected' })
-  })
-  fetchEvents() // refresh
-}
-
-
-
-  async function postEventFromSbt(typeId, title, datetime, city) {
-    try {
-      await fetch('/api/events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          admin_email: process.env.NEXT_PUBLIC_ADMIN_EMAIL || '', // if you want a default admin email
-          name: title,
-          city,
-          datetime,
-          min_attendees: 1,
-        }),
-      })
-    } catch (err) {
-      console.error('Error posting SBT type as event:', err)
-    }
-  }
-
-  // ------------------ Events APIs ------------------
-
-  async function fetchEvents() {
-    try {
-      const res = await fetch('/api/events')
-      if (!res.ok) throw new Error('Failed to fetch events')
-      const data = await res.json()
-      if (!Array.isArray(data)) {
-        // if API returns object, try to adapt
-        setEvents(data?.rows ?? [])
-      } else {
-        setEvents(data)
-      }
-    } catch (err) {
-      console.error('fetchEvents error', err)
-      toast.error('Failed to load events')
-    }
-  }
-
-  useEffect(() => {
-    if (!isAdmin) return
-    fetchEvents()
-  }, [isAdmin])
-
-
-  // Approve/reject (one click)
-  const handleModeration = async (id, action) => {
-    if (!id) return
-    const approval_status = action === 'approve' ? 'approved' : 'rejected'
+  const handleDelete = async (id) => {
+    if (!confirm('Are you sure you want to delete this event?')) return
     try {
       const res = await fetch('/api/events', {
-        method: 'PUT', // your api expects PUT with approval_status
+        method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, approval_status }),
+        body: JSON.stringify({ id }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Moderation failed')
-      toast.success(`${approval_status}`)
+      if (!res.ok) throw new Error(data.error)
+      toast.success('Event deleted')
       fetchEvents()
     } catch (err) {
-      console.error('Moderation error', err)
-      toast.error(err.message || 'Moderation failed')
+      toast.error(err.message)
     }
   }
 
-// --- Role assignment form (SetRoleForm) ---
-function SetRoleForm() {
-  const [email, setEmail] = useState('')
-  const [role, setRole] = useState('user')
-  const [selectedEvent, setSelectedEvent] = useState('')
-  const [status, setStatus] = useState('')
+  return (
+    <div className="w-full max-w-5xl mx-auto px-4 py-6 text-gray-200">
+      <h2 className="text-2xl font-bold mb-6 text-green-400">Admin Event Manager</h2>
 
-  // use parent events list (only approved or pending)
-const availableEvents = events
-  .filter(ev => ev.is_confirmed === true || ev.status === 'approved')
-  .sort((a, b) => new Date(a.datetime) - new Date(b.datetime))
+      {/* --- CREATE / EDIT FORM --- */}
+      {showForm ? (
+        <AdminEventForm
+          selectedEvent={editingEvent}
+          adminEmail={authEmail}
+          onSaved={() => {
+            setShowForm(false)
+            setEditingEvent(null)
+            fetchEvents()
+          }}
+          onCancel={() => {
+            setShowForm(false)
+            setEditingEvent(null)
+          }}
+        />
+      ) : (
+        <button
+          onClick={() => setShowForm(true)}
+          className="px-4 py-2 mb-6 bg-green-600 hover:bg-green-700 rounded-xl text-white"
+        >
+          + Create New Event
+        </button>
+      )}
+
+      {/* --- EVENT TABLE --- */}
+      <div className="overflow-x-auto">
+        {loading ? (
+          <p>Loading events...</p>
+        ) : (
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="bg-zinc-800 text-left">
+                <th className="p-3 border-b border-zinc-700">Title</th>
+                <th className="p-3 border-b border-zinc-700">City</th>
+                <th className="p-3 border-b border-zinc-700">Venue</th>
+                <th className="p-3 border-b border-zinc-700">Date/Time</th>
+                <th className="p-3 border-b border-zinc-700">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {events.map((ev) => (
+                <tr key={ev.id} className="border-b border-zinc-800 hover:bg-zinc-900">
+                  <td className="p-3">{ev.title}</td>
+                  <td className="p-3">{ev.city}</td>
+                  <td className="p-3">{ev.venue}</td>
+                  <td className="p-3">
+                    {new Date(ev.datetime).toLocaleString('da-DK', {
+                      dateStyle: 'short',
+                      timeStyle: 'short',
+                    })}
+                  </td>
+                  <td className="p-3 flex gap-2">
+                    <button
+                      onClick={() => {
+                        setEditingEvent(ev)
+                        setShowForm(true)
+                      }}
+                      className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 rounded text-white"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(ev.id)}
+                      className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-white"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {events.length === 0 && !loading && (
+                <tr>
+                  <td colSpan="5" className="text-center p-4 text-gray-500">
+                    No events found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------
+   INLINE EVENT CREATION / EDIT FORM
+-------------------------------------------------------------------*/
+function AdminEventForm({ selectedEvent, adminEmail, onSaved, onCancel }) {
+  const [eventData, setEventData] = useState({
+    id: selectedEvent?.id || '',
+    name: selectedEvent?.name || '',
+    title: selectedEvent?.title || '',
+    city: selectedEvent?.city || '',
+    venue: selectedEvent?.venue || '',
+    datetime: selectedEvent?.datetime
+      ? new Date(selectedEvent.datetime).toISOString().slice(0, 16)
+      : '',
+    description: selectedEvent?.description || '',
+    details: selectedEvent?.details || '',
+    tags: selectedEvent?.tags || '',
+    price: selectedEvent?.price || '',
+    image_url: selectedEvent?.image_url || '',
+    admin_email: selectedEvent?.admin_email || adminEmail || '',
+  })
+  const [saving, setSaving] = useState(false)
+  const isEditing = !!selectedEvent?.id
+
+  const handleChange = (field, value) => {
+    setEventData((prev) => ({ ...prev, [field]: value }))
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setStatus('')
+    setSaving(true)
     try {
-      const body = { email, role }
-      if (role === 'organizer' && selectedEvent) body.event_id = Number(selectedEvent)
-      const res = await fetch('/api/setRole', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-wallet': address || '',
-        },
-        body: JSON.stringify(body),
+      const payload = {
+        ...eventData,
+        datetime: new Date(eventData.datetime).toISOString(),
+      }
+
+      const res = await fetch('/api/events', {
+        method: isEditing ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       })
+
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to set role')
-      setStatus(`✅ Updated ${data.updated.email} → ${data.updated.role}`)
-      setEmail('')
-      setRole('user')
-      setSelectedEvent('')
+      if (!res.ok) throw new Error(data.error || 'Failed to save event')
+      toast.success(isEditing ? '✅ Event updated' : '✅ Event created')
+
+      onSaved?.()
     } catch (err) {
-      console.error('SetRole error', err)
-      setStatus(`❌ Error: ${err.message}`)
+      toast.error(`❌ ${err.message}`)
+    } finally {
+      setSaving(false)
     }
   }
 
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-zinc-900 p-4 rounded shadow mt-6 flex flex-col gap-3 text-white"
+      className="mb-8 bg-zinc-800 p-5 rounded-2xl shadow-lg text-sm space-y-3 border border-zinc-700"
     >
-      <h3 className="font-semibold text-lg">Assign Role</h3>
+      <h3 className="text-lg font-semibold text-green-400 mb-2">
+        {isEditing ? 'Edit Event' : 'Create New Event'}
+      </h3>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <input
+          type="text"
+          placeholder="Event Name"
+          className="bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2"
+          value={eventData.name}
+          onChange={(e) => handleChange('name', e.target.value)}
+          required
+        />
+        <input
+          type="text"
+          placeholder="Event Title"
+          className="bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2"
+          value={eventData.title}
+          onChange={(e) => handleChange('title', e.target.value)}
+          required
+        />
+        <input
+          type="text"
+          placeholder="City"
+          className="bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2"
+          value={eventData.city}
+          onChange={(e) => handleChange('city', e.target.value)}
+          required
+        />
+        <input
+          type="text"
+          placeholder="Venue"
+          className="bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2"
+          value={eventData.venue}
+          onChange={(e) => handleChange('venue', e.target.value)}
+          required
+        />
+        <input
+          type="datetime-local"
+          className="bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2"
+          value={eventData.datetime}
+          onChange={(e) => handleChange('datetime', e.target.value)}
+          required
+        />
+        <input
+          type="email"
+          placeholder="Admin Email"
+          readOnly
+          className="bg-zinc-700 border border-zinc-600 rounded-xl px-3 py-2 text-gray-400 cursor-not-allowed"
+          value={eventData.admin_email}
+        />
+      </div>
+
       <input
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        required
-        type="email"
-        placeholder="User Email"
-        className="p-2 rounded bg-zinc-800"
+        type="text"
+        placeholder="Image file name (e.g. cafe1.jpg)"
+        className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2"
+        value={eventData.image_url}
+        onChange={(e) => handleChange('image_url', e.target.value)}
       />
-      <select
-        value={role}
-        onChange={(e) => setRole(e.target.value)}
-        className="p-2 rounded bg-zinc-800"
-      >
-        <option value="user">User</option>
-        <option value="organizer">Organizer</option>
-        <option value="admin">Admin</option>
-      </select>
 
-      {role === 'organizer' && (
-        <select
-          value={selectedEvent}
-          onChange={(e) => setSelectedEvent(e.target.value)}
-          className="p-2 rounded bg-zinc-800"
+      <textarea
+        placeholder="Description"
+        className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2"
+        rows="2"
+        value={eventData.description}
+        onChange={(e) => handleChange('description', e.target.value)}
+      />
+      <textarea
+        placeholder="Host and Venue Details"
+        className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2"
+        rows="2"
+        value={eventData.details}
+        onChange={(e) => handleChange('details', e.target.value)}
+      />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <input
+          type="text"
+          placeholder="Tags (comma-separated)"
+          className="bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2"
+          value={eventData.tags}
+          onChange={(e) => handleChange('tags', e.target.value)}
+        />
+        <input
+          type="number"
+          placeholder="Ticket Price (optional)"
+          className="bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2"
+          value={eventData.price}
+          onChange={(e) => handleChange('price', e.target.value)}
+        />
+      </div>
+
+      <div className="flex gap-3 pt-2">
+        <button
+          type="submit"
+          disabled={saving}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-xl text-white disabled:opacity-50"
         >
-          <option value="">Select event</option>
-          {availableEvents.map((ev) => (
-            <option key={ev.id} value={ev.id}>
-              {ev.name} — {new Date(ev.datetime).toLocaleString()}
-            </option>
-          ))}
-        </select>
-      )}
-
-      <div className="flex gap-2">
-        <button className="px-4 py-2 bg-blue-600 rounded" type="submit">
-          Update Role
+          {saving ? 'Saving...' : isEditing ? 'Save Changes' : 'Submit for Approval'}
         </button>
         <button
           type="button"
-          className="px-4 py-2 bg-gray-500 rounded"
-          onClick={() => {
-            setEmail('')
-            setRole('user')
-            setSelectedEvent('')
-          }}
+          onClick={onCancel}
+          className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-xl text-white"
         >
-          Reset
+          Cancel
         </button>
       </div>
-      {status && <div className="text-sm mt-2">{status}</div>}
     </form>
-  )
-}
-
-  // --- Event list / Moderation table ---
-  function EventModerationPanel() {
-    // prefer explicit detection fields; some API/DB variants use approval_status, is_confirmed, is_rejected
-    const pending = events.filter(ev => {
-      if (ev.approval_status) return ev.approval_status === 'pending'
-      if (typeof ev.is_confirmed !== 'undefined' || typeof ev.is_rejected !== 'undefined') {
-        return (!ev.is_confirmed && !ev.is_rejected)
-      }
-      if (ev.status) return ev.status === 'pending'
-      return true
-    })
-    const approved = events.filter(ev => {
-      if (ev.approval_status) return ev.approval_status === 'approved'
-      if (typeof ev.is_confirmed !== 'undefined') return !!ev.is_confirmed
-      if (ev.status) return ev.status === 'approved'
-      return false
-    })
-    const rejected = events.filter(ev => {
-      if (ev.approval_status) return ev.approval_status === 'rejected'
-      if (typeof ev.is_rejected !== 'undefined') return !!ev.is_rejected
-      if (ev.status) return ev.status === 'rejected'
-      return false
-    })
-
-    const shown = activeTab === 'pending' ? pending : activeTab === 'approved' ? approved : rejected
-
-    return (
-      <div>
-        <div className="flex gap-2 mb-3">
-          <button onClick={() => setActiveTab('pending')} className={`px-3 py-1 rounded ${activeTab === 'pending' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>Pending ({pending.length})</button>
-          <button onClick={() => setActiveTab('approved')} className={`px-3 py-1 rounded ${activeTab === 'approved' ? 'bg-green-600 text-white' : 'bg-gray-200'}`}>Approved ({approved.length})</button>
-          <button onClick={() => setActiveTab('rejected')} className={`px-3 py-1 rounded ${activeTab === 'rejected' ? 'bg-red-600 text-white' : 'bg-gray-200'}`}>Rejected ({rejected.length})</button>
-          <button onClick={fetchEvents} className="ml-auto px-3 py-1 bg-gray-800 text-white rounded">Refresh</button>
-        </div>
-
-        <div className="overflow-auto max-h-96 border rounded">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="p-2 text-left">ID</th>
-                <th className="p-2 text-left">Name</th>
-                <th className="p-2 text-left">City</th>
-                <th className="p-2 text-left">Date</th>
-                <th className="p-2 text-left">Admin Email</th>
-                <th className="p-2 text-left">Venue</th>
-                <th className="p-2 text-left">Tags</th>
-                <th className="p-2 text-left">Price</th>
-                <th className="p-2 text-left">Status</th>
-                <th className="p-2 text-left">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map(ev => (
-                <tr key={ev.id} className="border-t">
-                  <td className="p-2 align-top">{ev.id}</td>
-                  <td className="p-2 align-top">
-                    <div className="font-semibold">{ev.name}</div>
-                    <div className="text-xs text-gray-600 mt-1">{ev.description}</div>
-                    {ev.details && <details className="text-xs mt-1"><summary className="cursor-pointer text-blue-600">Details</summary><div className="mt-1 text-xs whitespace-pre-wrap">{ev.details}</div></details>}
-                  </td>
-                  <td className="p-2 align-top">{ev.city}</td>
-                  <td className="p-2 align-top">{ev.datetime ? new Date(ev.datetime).toLocaleString() : '-'}</td>
-                  <td className="p-2 align-top">{ev.admin_email}</td>
-                  <td className="p-2 align-top">{ev.venue ?? '-'}</td>
-                  <td className="p-2 align-top">
-                    {[ev.tag1, ev.tag2, ev.tag3, ev.tag4].filter(Boolean).map((t, i) => <span key={i} className="text-xs mr-1 px-1 bg-gray-200 rounded">{t}</span>)}
-                  </td>
-                  <td className="p-2 align-top">{ev.price ? `${ev.price}` : 'Free'}</td>
-                  <td className="p-2 align-top">
-                    {ev.approval_status ?? (ev.is_confirmed ? 'approved' : ev.is_rejected ? 'rejected' : 'pending')}
-                  </td>
-                  <td className="p-2 align-top space-x-1">
-                    {(!ev.is_confirmed && !ev.is_rejected && (ev.approval_status === 'pending' || !ev.approval_status)) && (
-                      <>
-                        <button onClick={() => handleModeration(ev.id, 'approve')} className="px-2 py-1 bg-green-600 text-white rounded">Approve</button>
-                        <button onClick={() => handleModeration(ev.id, 'reject')} className="px-2 py-1 bg-red-600 text-white rounded">Reject</button>
-                      </>
-                    )}
-                    <button onClick={() => navigator.clipboard?.writeText(JSON.stringify(ev))} className="px-2 py-1 bg-gray-300 rounded">Copy</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    )
-  }
-    
-  // --- Event create modal component
-// ✅ fixed to accept formData, not an event
-// --- Event create handler (unified)
-// --- Event create handler (unified and final) ---
-const handleCreateEvent = async (formData) => {
-  if (!formData.name || !formData.city || !formData.datetime || !formData.admin_email) {
-    return toast.error('Please fill: name, city, datetime, and admin_email')
-  }
-
-  setCreating(true)
-  try {
-    const payload = {
-      ...formData,
-      datetime: new Date(formData.datetime).toISOString(),
-    }
-
-    const res = await fetch('/api/events', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || 'Failed to create event')
-
-    toast.success('✅ Event created successfully (pending approval)')
-    setShowCreateModal(false)
-    setEventForm({ ...blankEvent }) // reset form
-    fetchEvents()
-  } catch (err) {
-    console.error('Create event error:', err)
-    toast.error(err.message || 'Error creating event')
-  } finally {
-    setCreating(false)
-  }
-}
-
-// --- Event create modal component
-function CreateEventModal({ open, onClose, handleCreateEvent, creating }) {
-  const blankEvent = {
-    id: '',
-    admin_email: '',
-    group_id: '',
-    name: '',
-    city: '',
-    datetime: '',
-    min_attendees: 1,
-    max_attendees: 40,
-    is_confirmed: false,
-    is_rejected: false,
-    description: '',
-    details: '',
-    venue: '',
-    venue_type: '',
-    basic_perk: '',
-    advanced_perk: '',
-    tag1: '',
-    tag2: '',
-    tag3: '',
-    tag4: '',
-    language: 'en',
-    price: 0,
-    image_url: '',
-  }
-
-  const [localForm, setLocalForm] = useState({ ...blankEvent })
-  const firstInputRef = useRef(null)
-
-  useEffect(() => {
-    if (open) {
-      setLocalForm({ ...blankEvent })
-      if (firstInputRef.current) firstInputRef.current.focus()
-    }
-  }, [open])
-
-  const handleField = (key, value) => {
-    setLocalForm(prev => ({ ...prev, [key]: value }))
-  }
-
-  const onSubmit = async (e) => {
-    e.preventDefault()
-    if (!handleCreateEvent) return
-    await handleCreateEvent(localForm)
-  }
-
-  if (!open) return null
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
-    >
-      <div className="bg-white text-black rounded-lg max-w-3xl w-full p-6 overflow-auto max-h-[90vh] shadow-lg">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-semibold">Create Event</h3>
-          <button
-            onClick={onClose}
-            className="text-black bg-gray-300 px-2 py-1 rounded hover:bg-gray-400"
-          >
-            ✕
-          </button>
-        </div>
-
-        <form onSubmit={onSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-3">
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Event Title</label>
-            <input
-              ref={firstInputRef}
-              required
-              value={localForm.name}
-              onChange={(e) => handleField('name', e.target.value)}
-              className="w-full p-2 border rounded"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Admin Email (owner)</label>
-            <input
-              required
-              type="email"
-              value={localForm.admin_email}
-              onChange={(e) => handleField('admin_email', e.target.value)}
-              className="w-full p-2 border rounded"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">City</label>
-            <input
-              required
-              value={localForm.city}
-              onChange={(e) => handleField('city', e.target.value)}
-              className="w-full p-2 border rounded"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Date & Time</label>
-            <input
-              required
-              type="datetime-local"
-              value={localForm.datetime}
-              onChange={(e) => handleField('datetime', e.target.value)}
-              className="w-full p-2 border rounded"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Min Attendees</label>
-            <input
-              type="number"
-              value={localForm.min_attendees}
-              onChange={(e) => handleField('min_attendees', e.target.value)}
-              className="w-full p-2 border rounded"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Max Attendees</label>
-            <input
-              type="number"
-              value={localForm.max_attendees}
-              onChange={(e) => handleField('max_attendees', e.target.value)}
-              className="w-full p-2 border rounded"
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium mb-1">Short Description</label>
-            <textarea
-              value={localForm.description}
-              onChange={(e) => handleField('description', e.target.value)}
-              className="w-full p-2 border rounded"
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium mb-1">Details (full)</label>
-            <textarea
-              value={localForm.details}
-              onChange={(e) => handleField('details', e.target.value)}
-              className="w-full p-2 border rounded h-32"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Venue</label>
-            <input
-              value={localForm.venue}
-              onChange={(e) => handleField('venue', e.target.value)}
-              className="w-full p-2 border rounded"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Venue Type</label>
-            <select
-              value={localForm.venue_type}
-              onChange={(e) => handleField('venue_type', e.target.value)}
-              className="w-full p-2 border rounded"
-            >
-              <option value="">Select</option>
-              <option>Business</option>
-              <option>Entrepreneur</option>
-              <option>Concerts</option>
-              <option>Romance</option>
-              <option>Social</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Basic Perk</label>
-            <input
-              value={localForm.basic_perk}
-              onChange={(e) => handleField('basic_perk', e.target.value)}
-              className="w-full p-2 border rounded"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Advanced Perk</label>
-            <input
-              value={localForm.advanced_perk}
-              onChange={(e) => handleField('advanced_perk', e.target.value)}
-              className="w-full p-2 border rounded"
-            />
-          </div>
-
-          {/* --- TAGS --- */}
-          {['tag1','tag2','tag3','tag4'].map((t, i) => (
-            <div key={t}>
-              <label className="block text-sm font-medium mb-1">Tag {i+1}</label>
-              <input
-                value={localForm[t]}
-                onChange={(e) => handleField(t, e.target.value)}
-                className="w-full p-2 border rounded"
-              />
-            </div>
-          ))}
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Language</label>
-            <select
-              value={localForm.language}
-              onChange={(e) => handleField('language', e.target.value)}
-              className="w-full p-2 border rounded"
-            >
-              <option value="en">English</option>
-              <option value="da">Danish</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Price</label>
-            <input
-              type="number"
-              step="0.01"
-              value={localForm.price}
-              onChange={(e) => handleField('price', e.target.value)}
-              className="w-full p-2 border rounded"
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium mb-1">Image URL</label>
-            <input
-              value={localForm.image_url}
-              onChange={(e) => handleField('image_url', e.target.value)}
-              className="w-full p-2 border rounded"
-            />
-          </div>
-
-          <div className="md:col-span-2 flex justify-end gap-2 mt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={creating}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              {creating ? 'Creating...' : 'Create Event'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
-  // ------------------ Render main admin UI ------------------
-  if (!isAdmin) {
-    return <div className="text-center text-red-600 font-semibold p-4">You must be the admin to access this panel.</div>
-  }
-
-  return (
-    <div className="p-4 max-w-6xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">Super Admin — SBT & Events</h1>
-
-      {/* Event creation & moderation section (above SBT) */}
-      <section className="p-4 bg-white rounded shadow">
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">Events — Create & Moderate</h2>
-            <p className="text-sm text-gray-500">Create events (admin-created) and moderate pending events submitted by clients.</p>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={() => { setShowCreateModal(true) }} className="px-3 py-1 bg-blue-600 text-white rounded">+ Create Event</button>
-            <button onClick={fetchEvents} className="px-3 py-1 bg-gray-800 text-white rounded">Refresh</button>
-          </div>
-        </div>
-
-        <div className="mt-4">
-          <EventModerationPanel />
-        </div>
-
- <CreateEventModal 
-   open={showCreateModal} 
-   onClose={() => setShowCreateModal(false)} 
-   handleCreateEvent={handleCreateEvent} 
- />
-
-
-      </section>
-
-      {/* Role assignment */}
-      <section className="p-4 bg-white rounded shadow">
-        <SetRoleForm />
-      </section>
-
-      {/* SBT Management */}
-      <section className="p-4 bg-white rounded shadow">
-        <h2 className="text-lg font-semibold mb-2">SBT Management</h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm">Type ID</label>
-            <input type="number" value={typeId.toString()} onChange={(e) => setTypeId(e.target.value ? BigInt(e.target.value) : 0n)} className="w-full p-2 border rounded mb-2" />
-            <label className="block text-sm">Metadata Template</label>
-            <select value={title} onChange={(e) => setTitle(e.target.value)} className="w-full p-2 border rounded mb-2">
-              <option value="">Select metadata template</option>
-              {availableTemplates.map((file, i) => <option key={i} value={file}>{formatDisplayName(file)}</option>)}
-            </select>
-            <input placeholder="City" value={createSbtCity} onChange={(e) => setCreateSbtCity(e.target.value)} className="w-full p-2 border rounded mb-2" />
-            <input placeholder="Max Supply" type="number" value={maxSupply} onChange={(e) => setMaxSupply(e.target.value)} className="w-full p-2 border rounded mb-2" />
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={burnable} onChange={(e) => setBurnable(e.target.checked)} />Burnable</label>
-            <div className="mt-3 flex gap-2">
-              <button onClick={handleCreateType} className="px-3 py-1 bg-blue-600 text-white rounded">Create SBT Type</button>
-              <button onClick={handleActivate} className="px-3 py-1 bg-green-600 text-white rounded">Activate</button>
-              <button onClick={handleDeactivate} className="px-3 py-1 bg-yellow-600 text-white rounded">Deactivate</button>
-              <button onClick={handlePreview} className="px-3 py-1 bg-gray-600 text-white rounded">Preview</button>
-            </div>
-          </div>
-
-          <div>
-            <h3 className="font-semibold mb-2">SBT Types</h3>
-            <div className="overflow-auto max-h-64 border rounded">
-              <table className="min-w-full text-sm">
-                <thead className="bg-gray-100">
-                  <tr><th className="p-2">ID</th><th className="p-2">Title</th><th className="p-2">Max</th><th className="p-2">Minted</th><th className="p-2">Active</th><th className="p-2">Burnable</th></tr>
-                </thead>
-                <tbody>
-                  {sbtTypesData.map(t => (
-                    <tr key={t.id} className="border-t">
-                      <td className="p-2">{t.id}</td>
-                      <td className="p-2">{t.title || `Type ${t.id}`}</td>
-                      <td className="p-2">{t.maxSupply}</td>
-                      <td className="p-2">{t.minted}</td>
-                      <td className="p-2">{t.active ? '✅' : '❌'}</td>
-                      <td className="p-2">{t.burnable ? '🔥' : '🚫'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="mt-3">
-              <h4 className="font-semibold">Burn Token</h4>
-              <div className="flex gap-2 mt-2">
-                <input placeholder="Token ID" value={burnTokenId} onChange={(e) => setBurnTokenId(e.target.value)} className="p-2 border rounded flex-1" />
-                <button onClick={handleBurn} className="px-3 py-1 bg-red-600 text-white rounded">Burn</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {previewData && (
-          <div className="mt-4 p-3 border rounded">
-            <h4 className="font-semibold">{previewData.name}</h4>
-            {previewData.image && <img src={previewData.image} alt={previewData.name} className="w-full max-w-xs h-48 object-cover rounded mb-2" />}
-            <p>{previewData.description}</p>
-          </div>
-        )}
-      </section>
-
-    </div>
   )
 }
 
