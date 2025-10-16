@@ -267,7 +267,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
   </div>
 )}
         {/* ADMIN / OWNER METRICS */}
-        {(profile?.role === 'admin' || ownsEvents) && metrics && (
+        {(profile?.role === 'client' || ownsEvents) && metrics && (
           <>
             <h3 className="text-lg font-semibold text-yellow-400 mb-2">Admin Metrics</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
