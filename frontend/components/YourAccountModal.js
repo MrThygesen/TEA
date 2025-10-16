@@ -17,6 +17,8 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [ownsEvents, setOwnsEvents] = useState(false)
+  const [events, setEvents] = useState([])
+
 
 useEffect(() => {
   let cancelled = false
@@ -235,15 +237,21 @@ useEffect(() => {
           language: form.language.value,
           status: 'pending',
         }
+
         const res = await fetch('/api/events', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(eventData),
         })
+
         const data = await res.json()
         if (!res.ok) return alert(`❌ ${data.error || 'Event submission failed'}`)
+
         alert('✅ Event submitted for admin review!')
         form.reset()
+
+        // refresh local list instantly
+        setEvents((prev) => [...prev, { ...eventData, id: data.id || Date.now() }])
       }}
       className="space-y-2"
     >
@@ -253,7 +261,7 @@ useEffect(() => {
       <input name="city" placeholder="City" required className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
       <input name="datetime" type="datetime-local" required className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
       <input name="venue" placeholder="Venue Name" className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
-      <select name="venue_type" className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white">
+      <select name="venue_type" required className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white">
         <option value="">Select Venue Type</option>
         <option value="cafe">Cafe</option>
         <option value="bar">Bar</option>
@@ -278,8 +286,28 @@ useEffect(() => {
       </select>
       <button type="submit" className="bg-blue-600 hover:bg-blue-700 w-full py-2 rounded text-white">Submit Template</button>
     </form>
+
+    {/* 🟢 List of Submitted Events */}
+    {events.length > 0 && (
+      <div className="mt-6">
+        <h4 className="text-md font-semibold text-yellow-400 mb-2">Your Submitted Events</h4>
+        <ul className="space-y-2 text-sm">
+          {events
+            .filter(ev => ev.admin_email === profile?.email)
+            .map((ev, i) => (
+              <li key={i} className="border border-zinc-700 rounded p-2 bg-zinc-900 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <span className="font-semibold">{ev.name}</span> — {new Date(ev.datetime).toLocaleDateString()} ({ev.venue_type})
+                </div>
+                <span className="text-xs text-gray-400 mt-1 sm:mt-0">Status: {ev.status || 'pending'}</span>
+              </li>
+            ))}
+        </ul>
+      </div>
+    )}
   </div>
 )}
+
         {/* ADMIN / OWNER METRICS */}
         {(profile?.role === 'client' || ownsEvents) && metrics && (
           <>
