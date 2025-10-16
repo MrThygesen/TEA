@@ -193,63 +193,75 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
           </ul>
         ) : <p className="text-gray-400 mb-8">{t('NoRSVPsFound')}</p>}
 
-        {/* CLIENT EVENT CREATION */}
-        {(profile?.role === 'client') && (
-          <div className="border border-zinc-700 bg-zinc-800 p-4 rounded-lg mb-8">
-            <h3 className="text-lg font-semibold text-blue-400 mb-2">Submit New Event Template</h3>
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault()
-                const form = e.target
-                const eventData = {
-                  title: form.title.value,
-                  description: form.description.value,
-                  details: form.details.value,
-                  city: form.city.value,
-                  datetime: form.datetime.value,
-                  image_url: form.image_url.value,
-                  admin_email: profile?.email || '',
-                  tag1: form.tag1.value,
-                  tag2: form.tag2.value,
-                  tag3: form.tag3.value,
-                  tag4: form.tag4.value,
-                  price: form.price.value,
-                  language: form.language.value,
-                  status: 'pending',
-                }
-                const res = await fetch('/api/events', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(eventData),
-                })
-                const data = await res.json()
-                if (!res.ok) return alert(`❌ ${data.error || 'Event submission failed'}`)
-                alert('✅ Event submitted for admin review!')
-                form.reset()
-              }}
-              className="space-y-2"
-            >
-              <input name="title" placeholder="Event Title" required className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
-              <textarea name="description" placeholder="Short Description" required className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
-              <textarea name="details" placeholder="Full Event Details" className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
-              <input name="city" placeholder="City" required className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
-              <input name="datetime" type="datetime-local" required className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
-              <input name="image_url" placeholder="Image URL" className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
-              <div className="flex gap-2">
-                <input name="tag1" placeholder="Tag 1" className="input flex-1 p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
-                <input name="tag2" placeholder="Tag 2" className="input flex-1 p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
-                <input name="tag3" placeholder="Tag 3" className="input flex-1 p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
-                <input name="tag4" placeholder="Tag 4" className="input flex-1 p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
-              </div>
-              <input name="price" placeholder="Price (DKK)" type="number" className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
-              <select name="language" className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white">
-                <option value="en">English</option>
-                <option value="da">Danish</option>
-              </select>
-              <button type="submit" className="bg-blue-600 hover:bg-blue-700 w-full py-2 rounded text-white">Submit Template</button>
-            </form>
-          </div>
-        )}
+{/* CLIENT EVENT CREATION */}
+{profile?.role === 'client' && (
+  <div className="border border-zinc-700 bg-zinc-800 p-4 rounded-lg mb-8">
+    <h3 className="text-lg font-semibold text-blue-400 mb-2">Submit New Event Template</h3>
+    <form
+      onSubmit={async (e) => {
+        e.preventDefault()
+        const form = e.target
+        const eventData = {
+          name: form.title.value,           // map title -> name
+          description: form.description.value,
+          details: form.details.value,
+          city: form.city.value,
+          datetime: form.datetime.value,
+          venue: form.venue.value,
+          venue_type: form.venue_type.value,
+          image_url: form.image_url.value,
+          admin_email: profile?.email || '',
+          tag1: form.tag1.value,
+          tag2: form.tag2.value,
+          tag3: form.tag3.value,
+          tag4: form.tag4.value,
+          price: form.price.value,
+          language: form.language.value,
+          status: 'pending',
+        }
+        const res = await fetch('/api/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(eventData),
+        })
+        const data = await res.json()
+        if (!res.ok) return alert(`❌ ${data.error || 'Event submission failed'}`)
+        alert('✅ Event submitted for admin review!')
+        form.reset()
+      }}
+      className="space-y-2"
+    >
+      <input name="title" placeholder="Event Title" required className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+      <textarea name="description" placeholder="Short Description" required className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+      <textarea name="details" placeholder="Full Event Details" className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+      <input name="city" placeholder="City" required className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+      <input name="datetime" type="datetime-local" required className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+      <input name="venue" placeholder="Venue Name" className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+      <select name="venue_type" className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white">
+        <option value="">Select Venue Type</option>
+        <option value="cafe">Cafe</option>
+        <option value="bar">Bar</option>
+        <option value="restaurant">Restaurant</option>
+        <option value="gallery">Gallery</option>
+        <option value="club">Club</option>
+        <option value="other">Other</option>
+      </select>
+      <input name="image_url" placeholder="Image URL" className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+      <div className="flex gap-2">
+        <input name="tag1" placeholder="Tag 1" className="input flex-1 p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+        <input name="tag2" placeholder="Tag 2" className="input flex-1 p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+        <input name="tag3" placeholder="Tag 3" className="input flex-1 p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+        <input name="tag4" placeholder="Tag 4" className="input flex-1 p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+      </div>
+      <input name="price" placeholder="Price (DKK)" type="number" className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+      <select name="language" className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white">
+        <option value="en">English</option>
+        <option value="da">Danish</option>
+      </select>
+      <button type="submit" className="bg-blue-600 hover:bg-blue-700 w-full py-2 rounded text-white">Submit Template</button>
+    </form>
+  </div>
+)}
 
         {/* ADMIN / OWNER METRICS */}
         {(profile?.role === 'admin' || ownsEvents) && metrics && (
