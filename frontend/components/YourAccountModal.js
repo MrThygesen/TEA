@@ -308,19 +308,50 @@ useEffect(() => {
   </div>
 )}
 
-        {/* ADMIN / OWNER METRICS */}
-        {(profile?.role === 'client' || ownsEvents) && metrics && (
-          <>
-            <h3 className="text-lg font-semibold text-yellow-400 mb-2">Admin Metrics</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
-              <Metric label="Tickets Sold" value={metrics.tickets_sold} />
-              <Metric label="RSVP Count" value={metrics.rsvp_count} />
-              <Metric label="Venues Opened" value={metrics.venues_opened} />
-              <Metric label="Host Info Views" value={metrics.host_views} />
-              <Metric label="No Show Rate" value={`${metrics.no_show_rate}%`} />
-            </div>
-          </>
-        )}
+{/* ADMIN / OWNER METRICS */}
+{(profile?.role === 'client' || ownsEvents) && metrics && (
+  <>
+    <h3 className="text-lg font-semibold text-yellow-400 mb-2">Overall Metrics</h3>
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+      <Metric label="Total Tickets Sold" value={metrics.tickets_sold} />
+      <Metric label="Total RSVPs" value={metrics.rsvp_count} />
+      <Metric label="Venues Opened" value={metrics.venues_opened} />
+      <Metric label="Host Info Views" value={metrics.host_views} />
+      <Metric label="No-Show Rate" value={`${metrics.no_show_rate ?? 0}%`} />
+    </div>
+
+    {/* 🔹 Per-Event Metrics (if available) */}
+    {Array.isArray(metrics.eventStats) && metrics.eventStats.length > 0 && (
+      <div className="mb-8">
+        <h4 className="text-md font-semibold text-yellow-300 mb-2">Per-Event Metrics</h4>
+        <div className="overflow-x-auto">
+          <table className="min-w-full border-collapse border border-zinc-700 text-sm">
+            <thead>
+              <tr className="bg-zinc-800 text-gray-300">
+                <th className="px-3 py-2 border border-zinc-700 text-left">Event</th>
+                <th className="px-3 py-2 border border-zinc-700 text-left">RSVPs</th>
+                <th className="px-3 py-2 border border-zinc-700 text-left">Tickets Sold</th>
+                <th className="px-3 py-2 border border-zinc-700 text-left">Show Rate</th>
+                <th className="px-3 py-2 border border-zinc-700 text-left">Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {metrics.eventStats.map((ev, i) => (
+                <tr key={i} className="bg-zinc-900 hover:bg-zinc-800">
+                  <td className="px-3 py-2 border border-zinc-700">{ev.name}</td>
+                  <td className="px-3 py-2 border border-zinc-700">{ev.rsvp_count}</td>
+                  <td className="px-3 py-2 border border-zinc-700">{ev.tickets_sold}</td>
+                  <td className="px-3 py-2 border border-zinc-700">{ev.show_rate ?? '-'}%</td>
+                  <td className="px-3 py-2 border border-zinc-700">{ev.revenue ? `${ev.revenue} DKK` : '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )}
+  </>
+)}
 
         {/* USER METRICS */}
         {profile?.role === 'user' && metrics && (
