@@ -17,7 +17,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // 🟢 New: event creation
+  // 🟢 Event creation state
   const [showEventForm, setShowEventForm] = useState(false)
   const [creatingEvent, setCreatingEvent] = useState(false)
   const [eventData, setEventData] = useState({
@@ -29,13 +29,17 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     datetime: '',
     description: '',
     details: '',
-    tags: '',
+    tag1: '',
+    tag2: '',
+    tag3: '',
+    tag4: '',
     price: '',
     image_url: '',
   })
 
   useEffect(() => {
     let cancelled = false
+
     async function loadAccount() {
       setLoading(true)
       try {
@@ -96,6 +100,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         if (!cancelled) setLoading(false)
       }
     }
+
     loadAccount()
     return () => {
       cancelled = true
@@ -155,10 +160,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     setCreatingEvent(true)
     try {
       const token = localStorage.getItem('token')
-      const headers = {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      }
+      const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
       const payload = {
         ...eventData,
         admin_email: profile?.email,
@@ -178,10 +180,14 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         title: '',
         city: '',
         venue: '',
+        venue_type: '',
         datetime: '',
         description: '',
         details: '',
-        tags: '',
+        tag1: '',
+        tag2: '',
+        tag3: '',
+        tag4: '',
         price: '',
         image_url: '',
       })
@@ -230,139 +236,185 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                 + Suggest New Event
               </button>
             ) : (
-<form onSubmit={handleCreateEvent} className="mt-4 space-y-3 bg-zinc-800 p-4 rounded-xl">
-  <h3 className="text-lg font-semibold mb-2 text-green-400">Suggest a New Event</h3>
+              <form onSubmit={handleCreateEvent} className="mt-4 space-y-3 bg-zinc-800 p-4 rounded-xl">
+                <h3 className="text-lg font-semibold mb-2 text-green-400">Suggest a New Event</h3>
 
-  <input
-    type="text"
-    placeholder="Event Name"
-    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-    value={eventData.name}
-    onChange={(e) => setEventData({ ...eventData, name: e.target.value })}
-    required
-  />
+                <input type="text" placeholder="Event Name" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+                  value={eventData.name} onChange={(e) => setEventData({ ...eventData, name: e.target.value })} required />
 
-  <input
-    type="text"
-    placeholder="Event Title"
-    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-    value={eventData.title}
-    onChange={(e) => setEventData({ ...eventData, title: e.target.value })}
-    required
-  />
+                <input type="text" placeholder="Event Title" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+                  value={eventData.title} onChange={(e) => setEventData({ ...eventData, title: e.target.value })} required />
 
-  <input
-    type="text"
-    placeholder="City"
-    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-    value={eventData.city}
-    onChange={(e) => setEventData({ ...eventData, city: e.target.value })}
-    required
-  />
+                <input type="text" placeholder="City" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+                  value={eventData.city} onChange={(e) => setEventData({ ...eventData, city: e.target.value })} required />
 
-  <input
-    type="text"
-    placeholder="Venue"
-    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-    value={eventData.venue}
-    onChange={(e) => setEventData({ ...eventData, venue: e.target.value })}
-    required
-  />
+                <input type="text" placeholder="Venue" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+                  value={eventData.venue} onChange={(e) => setEventData({ ...eventData, venue: e.target.value })} required />
 
-<select
-  className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-  value={eventData.venue_type}
-  onChange={(e) => setEventData({ ...eventData, venue_type: e.target.value })}
-  required
->
-  <option value="">Select Venue Type</option>
-  <option value="cafe">Cafe</option>
-  <option value="bar">Bar</option>
-  <option value="gallery">Gallery</option>
-  <option value="restaurant">Restaurant</option>
-  <option value="other">Other</option>
-</select>
+                <select className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+                  value={eventData.venue_type} onChange={(e) => setEventData({ ...eventData, venue_type: e.target.value })} required>
+                  <option value="">Select Venue Type</option>
+                  <option value="cafe">Cafe</option>
+                  <option value="bar">Bar</option>
+                  <option value="gallery">Gallery</option>
+                  <option value="restaurant">Restaurant</option>
+                  <option value="other">Other</option>
+                </select>
 
+                <input type="datetime-local" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+                  value={eventData.datetime} onChange={(e) => setEventData({ ...eventData, datetime: e.target.value })} required />
 
+                <input type="email" placeholder="Admin Email" className="w-full bg-zinc-700 border border-zinc-600 rounded px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
+                  value={profile?.email || ''} readOnly />
 
-  <input
-    type="datetime-local"
-    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-    value={eventData.datetime}
-    onChange={(e) => setEventData({ ...eventData, datetime: e.target.value })}
-    required
-  />
+                <input type="text" placeholder="Image file name (e.g. cafe1.jpg)" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+                  value={eventData.image_url} onChange={(e) => setEventData({ ...eventData, image_url: e.target.value })} />
 
-  <input
-    type="email"
-    placeholder="Admin Email"
-    className="w-full bg-zinc-700 border border-zinc-600 rounded px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
-    value={profile?.email || ''}
-    readOnly
-  />
+                <textarea placeholder="Description" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+                  value={eventData.description} onChange={(e) => setEventData({ ...eventData, description: e.target.value })} rows="2" />
 
-  <input
-    type="text"
-    placeholder="Image file name (e.g. cafe1.jpg)"
-    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-    value={eventData.image_url}
-    onChange={(e) => setEventData({ ...eventData, image_url: e.target.value })}
-  />
+                <textarea placeholder="Details (host, venue, etc.)" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+                  value={eventData.details} onChange={(e) => setEventData({ ...eventData, details: e.target.value })} rows="2" />
 
-  <textarea
-    placeholder="Description"
-    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-    value={eventData.description}
-    onChange={(e) => setEventData({ ...eventData, description: e.target.value })}
-    rows="2"
-  />
+                <input type="text" placeholder="Tag 1" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+                  value={eventData.tag1} onChange={(e) => setEventData({ ...eventData, tag1: e.target.value })} />
 
-  <textarea
-    placeholder="Details (host, venue, etc.)"
-    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-    value={eventData.details}
-    onChange={(e) => setEventData({ ...eventData, details: e.target.value })}
-    rows="2"
-  />
+                <input type="text" placeholder="Tag 2" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+                  value={eventData.tag2} onChange={(e) => setEventData({ ...eventData, tag2: e.target.value })} />
 
-  <input
-    type="text"
-    placeholder="Tags (comma-separated)"
-    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-    value={eventData.tags}
-    onChange={(e) => setEventData({ ...eventData, tags: e.target.value })}
-  />
+                <input type="text" placeholder="Tag 3" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+                  value={eventData.tag3} onChange={(e) => setEventData({ ...eventData, tag3: e.target.value })} />
 
-  <input
-    type="number"
-    placeholder="Ticket Price (optional)"
-    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-    value={eventData.price}
-    onChange={(e) => setEventData({ ...eventData, price: e.target.value })}
-  />
+                <input type="text" placeholder="Tag 4" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+                  value={eventData.tag4} onChange={(e) => setEventData({ ...eventData, tag4: e.target.value })} />
 
-  <div className="flex gap-3">
-    <button
-      type="submit"
-      disabled={creatingEvent}
-      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white disabled:opacity-50"
-    >
-      {creatingEvent ? 'Submitting...' : 'Submit for Approval'}
-    </button>
-    <button
-      type="button"
-      onClick={() => setShowEventForm(false)}
-      className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded text-white"
-    >
-      Cancel
-    </button>
-  </div>
-</form>
+                <input type="number" placeholder="Price (DKK)" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
+                  value={eventData.price} onChange={(e) => setEventData({ ...eventData, price: e.target.value })} />
+
+                <div className="flex gap-3 mt-2">
+                  <button type="submit" disabled={creatingEvent} className="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded text-white">
+                    {creatingEvent ? 'Creating...' : 'Submit'}
+                  </button>
+                  <button type="button" onClick={() => setShowEventForm(false)} className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded text-white">
+                    Cancel
+                  </button>
+                </div>
+              </form>
             )}
           </div>
         )}
 
-        {/* ... all other sections (Tickets, RSVPs, metrics, settings) remain unchanged ... */}
+        {/* Tickets */}
+        {tickets.length > 0 && (
+          <>
+            <h3 className="text-lg font-semibold mb-2">{t('YourTickets')}</h3>
+            <div className="overflow-x-auto mb-8">
+              <table className="min-w-full border-collapse border border-zinc-700 text-sm">
+                <thead>
+                  <tr className="bg-zinc-800 text-gray-300">
+                    {['Date', 'Time', 'Event', 'Location', 'Price', 'Paid', 'QR'].map((h) => (
+                      <th key={h} className="px-3 py-2 border border-zinc-700 text-left">{t(h)}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {tickets.map((t, i) => {
+                    const dt = new Date(t.event_date)
+                    return (
+                      <tr key={i} className="bg-zinc-800 hover:bg-zinc-700">
+                        <td className="px-3 py-2 border border-zinc-700">{dt.toLocaleDateString()}</td>
+                        <td className="px-3 py-2 border border-zinc-700">
+                          {dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td className="px-3 py-2 border border-zinc-700">
+                          <Link href={`/event/${t.event_id}`} className="text-blue-400 hover:underline">
+                            {t.event_title}
+                          </Link>
+                        </td>
+                        <td className="px-3 py-2 border border-zinc-700">{t.location ?? '-'}</td>
+                        <td className="px-3 py-2 border border-zinc-700">
+                          {t.event_price ? `${t.event_price} DKK` : t('Free')}
+                        </td>
+                        <td className="px-3 py-2 border border-zinc-700">{t.has_paid ? '✅' : '❌'}</td>
+                        <td className="px-3 py-2 border border-zinc-700">
+                          {t.ticket_code && <OptimizedQRCode value={t.ticket_code} />}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {/* RSVPs */}
+        <h3 className="text-lg font-semibold mb-2">{t('YourRSVPs')}</h3>
+        {rsvps.length > 0 ? (
+          <ul className="text-sm space-y-1 mb-8">
+            {rsvps.map((r, i) => (
+              <li key={i} className="border border-zinc-700 p-2 rounded bg-zinc-800">
+                <Link href={`/event/${r.event_id}`} className="text-blue-400 hover:underline">{r.title}</Link> —{' '}
+                {new Date(r.date).toLocaleDateString()}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-gray-400 mb-8">{t('NoRSVPsFound')}</p>
+        )}
+
+        {/* ADMIN OR OWNER METRICS */}
+        {isClientOrOwner && metrics && (
+          <>
+            <h3 className="text-lg font-semibold text-yellow-400 mb-2">Client / Admin Statistics</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
+              <Metric label="Tickets Sold" value={metrics.tickets_sold} />
+              <Metric label="RSVP Count" value={metrics.rsvp_count} />
+              <Metric label="Venues Opened" value={metrics.venues_opened} />
+              <Metric label="Host Info Views" value={metrics.host_views} />
+              <Metric label="No Show Rate" value={`${metrics.no_show_rate}%`} />
+            </div>
+          </>
+        )}
+
+        {/* USER METRICS */}
+        {profile?.role === 'user' && metrics && !isOwner && (
+          <>
+            <h3 className="text-lg font-semibold text-green-400 mb-2">Your Activity</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
+              <Metric label="Tickets Bought" value={metrics.tickets_bought} />
+              <Metric label="Show-up Rate" value={`${metrics.show_up_rate}%`} />
+              <Metric label="Points Earned" value={metrics.points} />
+            </div>
+          </>
+        )}
+
+        {/* ACCOUNT MANAGEMENT */}
+        <h3 className="text-lg font-semibold mb-3">{t('AccountSettings')}</h3>
+        <div className="flex flex-col sm:flex-row gap-3 items-center mb-6">
+          <input
+            type="email"
+            placeholder="New email address"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            className="bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm flex-1"
+          />
+          <button
+            onClick={handleEmailUpdate}
+            disabled={updatingEmail}
+            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm disabled:opacity-50"
+          >
+            {updatingEmail ? 'Updating...' : 'Update Email'}
+          </button>
+        </div>
+
+        <button
+          onClick={handleDeleteAccount}
+          disabled={deletingAccount}
+          className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded text-sm text-white disabled:opacity-50"
+        >
+          {deletingAccount ? 'Deleting...' : 'Delete Account'}
+        </button>
       </div>
     </div>
   )
