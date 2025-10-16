@@ -18,65 +18,79 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [error, setError] = useState(null)
   const [ownsEvents, setOwnsEvents] = useState(false)
 
-  useEffect(() => {
-    let cancelled = false
+useEffect(() => {
+  let cancelled = false
 
-    async function loadAccount() {
-      setLoading(true)
-      try {
-        const token = localStorage.getItem('token')
-        if (!token) throw new Error('Not logged in')
+  async function loadAccount() {
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('Not logged in')
 
-        const headers = { Authorization: `Bearer ${token}` }
+      const headers = { Authorization: `Bearer ${token}` }
 
-        const [meRes, rsvpRes] = await Promise.all([
-          fetch('/api/user/me', { headers }),
-          fetch('/api/user/rsvps', { headers }),
-        ])
+      // Fetch profile, RSVPs, and events
+      const [meRes, rsvpRes, eventRes] = await Promise.all([
+        fetch('/api/user/me', { headers }),
+        fetch('/api/user/rsvps', { headers }),
+        fetch('/api/events', { headers }),
+      ])
 
-        if (!meRes.ok) throw new Error('Failed to fetch user profile')
-        if (!rsvpRes.ok) throw new Error('Failed to fetch RSVPs')
+      if (!meRes.ok) throw new Error('Failed to fetch user profile')
+      if (!rsvpRes.ok) throw new Error('Failed to fetch RSVPs')
+      if (!eventRes.ok) throw new Error('Failed to fetch events')
 
-        const [meData, rsvpDataRaw] = await Promise.all([meRes.json(), rsvpRes.json()])
-        if (cancelled) return
+      const [meData, rsvpDataRaw, eventsData] = await Promise.all([
+        meRes.json(),
+        rsvpRes.json(),
+        eventRes.json(),
+      ])
+      if (cancelled) return
 
-        setProfile(meData.profile ?? null)
-        const userTickets = Array.isArray(meData.tickets) ? meData.tickets : []
-        const rsvpData = Array.isArray(rsvpDataRaw) ? rsvpDataRaw : []
+      setProfile(meData.profile ?? null)
+      const userTickets = Array.isArray(meData.tickets) ? meData.tickets : []
+      const rsvpData = Array.isArray(rsvpDataRaw) ? rsvpDataRaw : []
+      const eventArray = Array.isArray(eventsData?.rows)
+        ? eventsData.rows
+        : Array.isArray(eventsData)
+        ? eventsData
+        : []
 
-        // Filter RSVPs for events where the user already has a ticket
-        const eventIdsWithTickets = new Set(userTickets.map((t) => t.event_id))
-        const filteredRsvps = rsvpData.filter((r) => !eventIdsWithTickets.has(r.event_id))
+      setEvents(eventArray)
 
-        setTickets(userTickets)
-        setRsvps(filteredRsvps)
+      // Filter RSVPs for events where the user already has a ticket
+      const eventIdsWithTickets = new Set(userTickets.map((t) => t.event_id))
+      const filteredRsvps = rsvpData.filter((r) => !eventIdsWithTickets.has(r.event_id))
 
-        // Check if user owns/admin_email for any events
-        const isOwner = Array.isArray(meData.events)
-          ? meData.events.some(ev => ev.admin_email === meData.profile.email)
-          : false
-        setOwnsEvents(isOwner)
+      setTickets(userTickets)
+      setRsvps(filteredRsvps)
 
-        // Determine metrics endpoint
-        const metricEndpoint = (meData.profile?.role === 'admin' || isOwner)
-          ? '/api/admin/stats'
-          : '/api/user/metrics'
-        const metricRes = await fetch(metricEndpoint, { headers })
-        if (metricRes.ok) {
-          const metricData = await metricRes.json()
-          if (!cancelled) setMetrics(metricData)
-        }
+      // Check if user owns/admin_email for any events
+      const isOwner = eventArray.some(ev => ev.admin_email === meData.profile?.email)
+      setOwnsEvents(isOwner)
 
-      } catch (err) {
-        if (!cancelled) setError(err.message)
-      } finally {
-        if (!cancelled) setLoading(false)
+      // Determine if the user should fetch admin metrics
+      const isAdminOrClient = ['admin', 'client'].includes(meData.profile?.role)
+      const metricEndpoint = isAdminOrClient || isOwner
+        ? '/api/admin/stats'
+        : '/api/user/metrics'
+
+      const metricRes = await fetch(metricEndpoint, { headers })
+      if (metricRes.ok) {
+        const metricData = await metricRes.json()
+        if (!cancelled) setMetrics(metricData)
       }
-    }
 
-    loadAccount()
-    return () => { cancelled = true }
-  }, [refreshTrigger])
+    } catch (err) {
+      if (!cancelled) setError(err.message)
+    } finally {
+      if (!cancelled) setLoading(false)
+    }
+  }
+
+  loadAccount()
+  return () => { cancelled = true }
+}, [refreshTrigger])
 
   async function handleEmailUpdate() {
     if (!newEmail) return
