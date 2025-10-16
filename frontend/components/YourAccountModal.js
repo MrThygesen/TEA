@@ -1,5 +1,6 @@
 // components/YourAccountModal.js
 'use client'
+
 import React, { useState, useEffect } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
 import Link from 'next/link'
@@ -10,32 +11,12 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [tickets, setTickets] = useState([])
   const [rsvps, setRsvps] = useState([])
   const [metrics, setMetrics] = useState(null)
-  const [events, setEvents] = useState([])
   const [newEmail, setNewEmail] = useState('')
   const [updatingEmail, setUpdatingEmail] = useState(false)
   const [deletingAccount, setDeletingAccount] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-
-  // 🟢 Event creation state
-  const [showEventForm, setShowEventForm] = useState(false)
-  const [creatingEvent, setCreatingEvent] = useState(false)
-  const [eventData, setEventData] = useState({
-    name: '',
-    title: '',
-    city: '',
-    venue: '',
-    venue_type: '',
-    datetime: '',
-    description: '',
-    details: '',
-    tag1: '',
-    tag2: '',
-    tag3: '',
-    tag4: '',
-    price: '',
-    image_url: '',
-  })
+  const [ownsEvents, setOwnsEvents] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -45,55 +26,47 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
       try {
         const token = localStorage.getItem('token')
         if (!token) throw new Error('Not logged in')
+
         const headers = { Authorization: `Bearer ${token}` }
 
-        const [meRes, rsvpRes, eventRes] = await Promise.all([
+        const [meRes, rsvpRes] = await Promise.all([
           fetch('/api/user/me', { headers }),
           fetch('/api/user/rsvps', { headers }),
-          fetch('/api/events', { headers }),
         ])
 
         if (!meRes.ok) throw new Error('Failed to fetch user profile')
         if (!rsvpRes.ok) throw new Error('Failed to fetch RSVPs')
-        if (!eventRes.ok) throw new Error('Failed to fetch events')
 
-        const [meData, rsvpDataRaw, eventsData] = await Promise.all([
-          meRes.json(),
-          rsvpRes.json(),
-          eventRes.json(),
-        ])
+        const [meData, rsvpDataRaw] = await Promise.all([meRes.json(), rsvpRes.json()])
         if (cancelled) return
 
         setProfile(meData.profile ?? null)
-
-        const eventArray = Array.isArray(eventsData?.rows)
-          ? eventsData.rows
-          : Array.isArray(eventsData)
-          ? eventsData
-          : []
-        setEvents(eventArray)
-
         const userTickets = Array.isArray(meData.tickets) ? meData.tickets : []
-        let rsvpData = Array.isArray(rsvpDataRaw) ? rsvpDataRaw : []
+        const rsvpData = Array.isArray(rsvpDataRaw) ? rsvpDataRaw : []
 
+        // Filter RSVPs for events where the user already has a ticket
         const eventIdsWithTickets = new Set(userTickets.map((t) => t.event_id))
         const filteredRsvps = rsvpData.filter((r) => !eventIdsWithTickets.has(r.event_id))
+
         setTickets(userTickets)
         setRsvps(filteredRsvps)
 
-        const userEmail = meData.profile?.email
-        const isOwner = eventArray.some((e) => e.admin_email === userEmail)
+        // Check if user owns/admin_email for any events
+        const isOwner = Array.isArray(meData.events)
+          ? meData.events.some(ev => ev.admin_email === meData.profile.email)
+          : false
+        setOwnsEvents(isOwner)
 
-        const metricEndpoint =
-          meData.profile?.role === 'admin' || isOwner
-            ? '/api/admin/stats'
-            : '/api/user/metrics'
-
+        // Determine metrics endpoint
+        const metricEndpoint = (meData.profile?.role === 'admin' || isOwner)
+          ? '/api/admin/stats'
+          : '/api/user/metrics'
         const metricRes = await fetch(metricEndpoint, { headers })
         if (metricRes.ok) {
           const metricData = await metricRes.json()
           if (!cancelled) setMetrics(metricData)
         }
+
       } catch (err) {
         if (!cancelled) setError(err.message)
       } finally {
@@ -102,17 +75,8 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     }
 
     loadAccount()
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [refreshTrigger])
-
-  const userEmail = profile?.email
-  const isOwner = Array.isArray(events) && events.some((e) => e.admin_email === userEmail)
-  const isClientOrOwner =
-    profile?.role === 'client' ||
-    profile?.role === 'admin' ||
-    events.some((ev) => ev.admin_email === profile?.email)
 
   async function handleEmailUpdate() {
     if (!newEmail) return
@@ -154,51 +118,6 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
     }
   }
 
-  // 🟢 Event creation handler
-  async function handleCreateEvent(e) {
-    e.preventDefault()
-    setCreatingEvent(true)
-    try {
-      const token = localStorage.getItem('token')
-      const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
-      const payload = {
-        ...eventData,
-        admin_email: profile?.email,
-        approval_status: 'pending',
-        datetime: new Date(eventData.datetime).toISOString(),
-      }
-      const res = await fetch('/api/events', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to create event')
-      alert('✅ Event suggested for approval!')
-      setEventData({
-        name: '',
-        title: '',
-        city: '',
-        venue: '',
-        venue_type: '',
-        datetime: '',
-        description: '',
-        details: '',
-        tag1: '',
-        tag2: '',
-        tag3: '',
-        tag4: '',
-        price: '',
-        image_url: '',
-      })
-      setShowEventForm(false)
-    } catch (err) {
-      alert(`❌ ${err.message}`)
-    } finally {
-      setCreatingEvent(false)
-    }
-  }
-
   if (loading || error) {
     return (
       <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
@@ -223,86 +142,8 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         <button onClick={onClose} className="absolute top-2 right-2 text-gray-400 hover:text-white text-xl">✕</button>
 
         <h2 className="text-2xl font-bold mb-1 text-blue-400">{t('YourAccount')}</h2>
-        {profile?.email && <p className="text-sm text-gray-400 mb-6">Email: {profile.email}</p>}
-
-        {/* 🟢 Event Suggestion Section */}
-        {(profile?.role === 'client' || profile?.role === 'admin') && (
-          <div className="mb-8">
-            {!showEventForm ? (
-              <button
-                onClick={() => setShowEventForm(true)}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-white"
-              >
-                + Suggest New Event
-              </button>
-            ) : (
-              <form onSubmit={handleCreateEvent} className="mt-4 space-y-3 bg-zinc-800 p-4 rounded-xl">
-                <h3 className="text-lg font-semibold mb-2 text-green-400">Suggest a New Event</h3>
-
-                <input type="text" placeholder="Event Name" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-                  value={eventData.name} onChange={(e) => setEventData({ ...eventData, name: e.target.value })} required />
-
-                <input type="text" placeholder="Event Title" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-                  value={eventData.title} onChange={(e) => setEventData({ ...eventData, title: e.target.value })} required />
-
-                <input type="text" placeholder="City" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-                  value={eventData.city} onChange={(e) => setEventData({ ...eventData, city: e.target.value })} required />
-
-                <input type="text" placeholder="Venue" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-                  value={eventData.venue} onChange={(e) => setEventData({ ...eventData, venue: e.target.value })} required />
-
-                <select className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-                  value={eventData.venue_type} onChange={(e) => setEventData({ ...eventData, venue_type: e.target.value })} required>
-                  <option value="">Select Venue Type</option>
-                  <option value="cafe">Cafe</option>
-                  <option value="bar">Bar</option>
-                  <option value="gallery">Gallery</option>
-                  <option value="restaurant">Restaurant</option>
-                  <option value="other">Other</option>
-                </select>
-
-                <input type="datetime-local" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-                  value={eventData.datetime} onChange={(e) => setEventData({ ...eventData, datetime: e.target.value })} required />
-
-                <input type="email" placeholder="Admin Email" className="w-full bg-zinc-700 border border-zinc-600 rounded px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
-                  value={profile?.email || ''} readOnly />
-
-                <input type="text" placeholder="Image file name (e.g. cafe1.jpg)" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-                  value={eventData.image_url} onChange={(e) => setEventData({ ...eventData, image_url: e.target.value })} />
-
-                <textarea placeholder="Description" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-                  value={eventData.description} onChange={(e) => setEventData({ ...eventData, description: e.target.value })} rows="2" />
-
-                <textarea placeholder="Details (host, venue, etc.)" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-                  value={eventData.details} onChange={(e) => setEventData({ ...eventData, details: e.target.value })} rows="2" />
-
-                <input type="text" placeholder="Tag 1" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-                  value={eventData.tag1} onChange={(e) => setEventData({ ...eventData, tag1: e.target.value })} />
-
-                <input type="text" placeholder="Tag 2" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-                  value={eventData.tag2} onChange={(e) => setEventData({ ...eventData, tag2: e.target.value })} />
-
-                <input type="text" placeholder="Tag 3" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-                  value={eventData.tag3} onChange={(e) => setEventData({ ...eventData, tag3: e.target.value })} />
-
-                <input type="text" placeholder="Tag 4" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-                  value={eventData.tag4} onChange={(e) => setEventData({ ...eventData, tag4: e.target.value })} />
-
-                <input type="number" placeholder="Price (DKK)" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm"
-                  value={eventData.price} onChange={(e) => setEventData({ ...eventData, price: e.target.value })} />
-
-                <div className="flex gap-3 mt-2">
-                  <button type="submit" disabled={creatingEvent} className="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded text-white">
-                    {creatingEvent ? 'Creating...' : 'Submit'}
-                  </button>
-                  <button type="button" onClick={() => setShowEventForm(false)} className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded text-white">
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        )}
+        {profile?.email && <p className="text-sm text-gray-400 mb-2">Email: {profile.email}</p>}
+        <p className="text-sm text-gray-300 mb-6">Role: {profile?.role}</p>
 
         {/* Tickets */}
         {tickets.length > 0 && (
@@ -323,22 +164,14 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
                     return (
                       <tr key={i} className="bg-zinc-800 hover:bg-zinc-700">
                         <td className="px-3 py-2 border border-zinc-700">{dt.toLocaleDateString()}</td>
+                        <td className="px-3 py-2 border border-zinc-700">{dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                         <td className="px-3 py-2 border border-zinc-700">
-                          {dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </td>
-                        <td className="px-3 py-2 border border-zinc-700">
-                          <Link href={`/event/${t.event_id}`} className="text-blue-400 hover:underline">
-                            {t.event_title}
-                          </Link>
+                          <Link href={`/event/${t.event_id}`} className="text-blue-400 hover:underline">{t.event_title}</Link>
                         </td>
                         <td className="px-3 py-2 border border-zinc-700">{t.location ?? '-'}</td>
-                        <td className="px-3 py-2 border border-zinc-700">
-                          {t.event_price ? `${t.event_price} DKK` : t('Free')}
-                        </td>
+                        <td className="px-3 py-2 border border-zinc-700">{t.event_price ? `${t.event_price} DKK` : t('Free')}</td>
                         <td className="px-3 py-2 border border-zinc-700">{t.has_paid ? '✅' : '❌'}</td>
-                        <td className="px-3 py-2 border border-zinc-700">
-                          {t.ticket_code && <OptimizedQRCode value={t.ticket_code} />}
-                        </td>
+                        <td className="px-3 py-2 border border-zinc-700">{t.ticket_code && <OptimizedQRCode value={t.ticket_code} />}</td>
                       </tr>
                     )
                   })}
@@ -354,19 +187,74 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
           <ul className="text-sm space-y-1 mb-8">
             {rsvps.map((r, i) => (
               <li key={i} className="border border-zinc-700 p-2 rounded bg-zinc-800">
-                <Link href={`/event/${r.event_id}`} className="text-blue-400 hover:underline">{r.title}</Link> —{' '}
-                {new Date(r.date).toLocaleDateString()}
+                <Link href={`/event/${r.event_id}`} className="text-blue-400 hover:underline">{r.title}</Link> — {new Date(r.date).toLocaleDateString()}
               </li>
             ))}
           </ul>
-        ) : (
-          <p className="text-gray-400 mb-8">{t('NoRSVPsFound')}</p>
+        ) : <p className="text-gray-400 mb-8">{t('NoRSVPsFound')}</p>}
+
+        {/* CLIENT EVENT CREATION */}
+        {(profile?.role === 'client') && (
+          <div className="border border-zinc-700 bg-zinc-800 p-4 rounded-lg mb-8">
+            <h3 className="text-lg font-semibold text-blue-400 mb-2">Submit New Event Template</h3>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault()
+                const form = e.target
+                const eventData = {
+                  title: form.title.value,
+                  description: form.description.value,
+                  details: form.details.value,
+                  city: form.city.value,
+                  datetime: form.datetime.value,
+                  image_url: form.image_url.value,
+                  admin_email: profile?.email || '',
+                  tag1: form.tag1.value,
+                  tag2: form.tag2.value,
+                  tag3: form.tag3.value,
+                  tag4: form.tag4.value,
+                  price: form.price.value,
+                  language: form.language.value,
+                  status: 'pending',
+                }
+                const res = await fetch('/api/events', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(eventData),
+                })
+                const data = await res.json()
+                if (!res.ok) return alert(`❌ ${data.error || 'Event submission failed'}`)
+                alert('✅ Event submitted for admin review!')
+                form.reset()
+              }}
+              className="space-y-2"
+            >
+              <input name="title" placeholder="Event Title" required className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+              <textarea name="description" placeholder="Short Description" required className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+              <textarea name="details" placeholder="Full Event Details" className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+              <input name="city" placeholder="City" required className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+              <input name="datetime" type="datetime-local" required className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+              <input name="image_url" placeholder="Image URL" className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+              <div className="flex gap-2">
+                <input name="tag1" placeholder="Tag 1" className="input flex-1 p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+                <input name="tag2" placeholder="Tag 2" className="input flex-1 p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+                <input name="tag3" placeholder="Tag 3" className="input flex-1 p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+                <input name="tag4" placeholder="Tag 4" className="input flex-1 p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+              </div>
+              <input name="price" placeholder="Price (DKK)" type="number" className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+              <select name="language" className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white">
+                <option value="en">English</option>
+                <option value="da">Danish</option>
+              </select>
+              <button type="submit" className="bg-blue-600 hover:bg-blue-700 w-full py-2 rounded text-white">Submit Template</button>
+            </form>
+          </div>
         )}
 
-        {/* ADMIN OR OWNER METRICS */}
-        {isClientOrOwner && metrics && (
+        {/* ADMIN / OWNER METRICS */}
+        {(profile?.role === 'admin' || ownsEvents) && metrics && (
           <>
-            <h3 className="text-lg font-semibold text-yellow-400 mb-2">Client / Admin Statistics</h3>
+            <h3 className="text-lg font-semibold text-yellow-400 mb-2">Admin Metrics</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
               <Metric label="Tickets Sold" value={metrics.tickets_sold} />
               <Metric label="RSVP Count" value={metrics.rsvp_count} />
@@ -378,7 +266,7 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
         )}
 
         {/* USER METRICS */}
-        {profile?.role === 'user' && metrics && !isOwner && (
+        {profile?.role === 'user' && metrics && (
           <>
             <h3 className="text-lg font-semibold text-green-400 mb-2">Your Activity</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
@@ -428,6 +316,27 @@ const Metric = ({ label, value }) => (
 )
 
 const OptimizedQRCode = React.memo(function OptimizedQRCode({ value }) {
-  return <QRCodeCanvas value={value} size={48} />
+  const [showModal, setShowModal] = React.useState(false)
+
+  return (
+    <>
+      <div onClick={() => setShowModal(true)} className="cursor-pointer inline-block">
+        <QRCodeCanvas value={value} size={48} />
+      </div>
+      {showModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-zinc-900 p-6 rounded-xl relative">
+            <button
+              onClick={() => setShowModal(false)}
+              className="absolute top-2 right-2 text-white text-xl"
+            >
+              ✕
+            </button>
+            <QRCodeCanvas value={value} size={200} />
+          </div>
+        </div>
+      )}
+    </>
+  )
 })
 
