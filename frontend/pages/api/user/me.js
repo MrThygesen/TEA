@@ -59,7 +59,7 @@ export default async function handler(req, res) {
       LEFT JOIN (
         SELECT event_id, COUNT(*) AS count
         FROM registrations
-        WHERE stage = 'book'
+        WHERE stage IN ('book', 'prebook')
         GROUP BY event_id
       ) global_count ON global_count.event_id = e.id
       WHERE r.user_id = $1
@@ -68,6 +68,8 @@ export default async function handler(req, res) {
       `,
       [payload.id]
     )
+
+
 
     // Fetch ALL events (for global popularity display)
     const allEventsResult = await pool.query(`
@@ -92,7 +94,7 @@ export default async function handler(req, res) {
       LEFT JOIN (
         SELECT event_id, COUNT(*) AS count
         FROM registrations
-        WHERE stage = 'book'
+        WHERE stage IN ('book', 'prebook')
         GROUP BY event_id
       ) global_count ON global_count.event_id = e.id
       ORDER BY e.datetime DESC

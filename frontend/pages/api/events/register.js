@@ -167,6 +167,12 @@ if (event.venue_type === 'single-dinner-mix') {
       inserted.push(rows[0])
     }
 
+// --- Update global total (booked + prebooked)
+await pool.query(
+  'UPDATE events SET total_booked = COALESCE(total_booked, 0) + $1 WHERE id = $2',
+  [quantity, eventId]
+)
+
     // --- Fetch user info for email
     let user = { id: userId, email }
     if (userId) {
