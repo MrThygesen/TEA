@@ -7,6 +7,7 @@ import { toast } from 'react-hot-toast'
 import YourAccountModal from '../components/YourAccountModal'
 import Image from 'next/image'
 import { useRouter } from 'next/router'
+import { pool } from '../lib/postgres'
 
 
  // ---------------------------
@@ -327,13 +328,14 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
           </button>
         )}
 
-        <span>
-          👥 {totalBooked} / {event.max_attendees || '∞'}
-        </span>
+<span>👥 {event.popularity} / {event.max_attendees || '∞'}</span>
+
       </div>
     </div>
   )
 }
+
+
 
 /////////////////////////////// VIDEO ///////
 function VideoHero() {
