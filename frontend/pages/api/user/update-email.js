@@ -1,8 +1,5 @@
-import pkg from 'pg'
-import dotenv from 'dotenv'
-dotenv.config()
-const { Pool } = pkg
-
+// pages/api/user/update-email.js
+import { pool } from '../../../lib/postgres.js'
 import { auth } from '../../../lib/auth.js'
 import { sendVerificationEmail } from '../../../lib/email.js'
 
@@ -11,26 +8,21 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
-  })
+  const token = auth.getTokenFromReq(req)
+  if (!token) return res.status(401).json({ error: 'Unauthorized' })
+
+  let payload
+  try {
+    payload = auth.verifyToken(token)
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid token' })
+  }
+
+  const { email: newEmail } = req.body
+  if (!newEmail) return res.status(400).json({ error: 'Missing newEmail' })
 
   try {
-    const token = auth.getTokenFromReq(req)
-    if (!token) return res.status(401).json({ error: 'Unauthorized' })
-
-    let payload
-    try {
-      payload = auth.verifyToken(token)
-    } catch (err) {
-      return res.status(401).json({ error: 'Invalid token' })
-    }
-
-    const { email: newEmail } = req.body
-    if (!newEmail) return res.status(400).json({ error: 'Missing newEmail' })
-
-    // Update main profile: set email and mark as unverified
+    // Update user profile
     const result = await pool.query(
       `UPDATE user_profiles 
        SET email = $1, email_verified = FALSE, updated_at = NOW()
@@ -38,12 +30,11 @@ export default async function handler(req, res) {
        RETURNING id, username, email, email_verified, updated_at`,
       [newEmail, payload.id]
     )
-
     if (result.rowCount === 0) {
       return res.status(404).json({ error: 'User not found' })
     }
 
-    // Upsert into user_emails table
+    // Upsert into user_emails
     await pool.query(
       `INSERT INTO user_emails (user_id, email, subscribed_at)
        VALUES ($1, $2, NOW())
@@ -52,7 +43,7 @@ export default async function handler(req, res) {
       [payload.id, newEmail]
     )
 
-    // Create verification token (same behavior as register.js / login flow)
+    // Create token
     const crypto = await import('crypto')
     const verificationToken = crypto.randomBytes(32).toString('hex')
 
@@ -65,7 +56,6 @@ export default async function handler(req, res) {
       [payload.id, verificationToken, newEmail]
     )
 
-    // Send verification email
     await sendVerificationEmail(newEmail, verificationToken)
 
     res.status(200).json({
@@ -74,10 +64,8 @@ export default async function handler(req, res) {
       user: result.rows[0],
     })
   } catch (err) {
-    console.error('❌ Update email error:', err)
+    console.error('❌ update-email.js error:', err)
     res.status(500).json({ error: 'Server error', details: err.message })
-  } finally {
-    await pool.end()
   }
 }
 

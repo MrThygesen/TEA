@@ -1,18 +1,16 @@
-import pkg from 'pg'
-import dotenv from 'dotenv'
+// pages/api/user/metrics.js
 import jwt from 'jsonwebtoken'
+import { pool } from '../../../lib/postgres.js'
 
-dotenv.config()
-const { Pool } = pkg
 const TOKEN_KEY = process.env.JWT_SECRET || 'dev_secret'
 
 export default async function handler(req, res) {
-  const auth = req.headers.authorization
-  if (!auth) {
+  const authHeader = req.headers.authorization
+  if (!authHeader) {
     return res.status(401).json({ error: 'Missing authorization header' })
   }
 
-  const [, token] = auth.split(' ')
+  const [, token] = authHeader.split(' ')
   let userId
   try {
     const decoded = jwt.verify(token, TOKEN_KEY)
@@ -21,14 +19,7 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Invalid token' })
   }
 
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
-  })
-
   try {
-    // 🧠 Main logic:
-    // Count RSVPs, Favorites, Arrivals, and Tickets (paid or free)
     const [rsvpCount, ticketCount, arrivedCount, favoritesCount] = await Promise.all([
       pool.query(`SELECT COUNT(*) FROM rsvps WHERE user_id = $1`, [userId]),
       pool.query(
@@ -52,8 +43,6 @@ export default async function handler(req, res) {
     const favorites = parseInt(favoritesCount.rows[0].count || 0)
 
     const showUpRate = ticketsBought > 0 ? Math.round((arrivals / ticketsBought) * 100) : 0
-
-    // 🪙 Loyalty logic
     const points = arrivals
     const freeRewards = Math.floor(points / 9)
     const pointsTowardNextFree = points % 9
@@ -68,10 +57,8 @@ export default async function handler(req, res) {
       points_toward_next_free: pointsTowardNextFree,
     })
   } catch (err) {
-    console.error('❌ User metrics error:', err)
+    console.error('❌ metrics.js error:', err)
     res.status(500).json({ error: 'Server error', details: err.message })
-  } finally {
-    await pool.end()
   }
 }
 

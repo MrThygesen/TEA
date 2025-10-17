@@ -1,7 +1,6 @@
-import pkg from 'pg'
+// pages/api/user/rsvps.js
+import { pool } from '../../../lib/postgres.js'
 import { auth } from '../../../lib/auth.js'
-
-const { Pool } = pkg
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -17,11 +16,6 @@ export default async function handler(req, res) {
   } catch (err) {
     return res.status(401).json({ error: 'Invalid token' })
   }
-
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
-  })
 
   try {
     const rsvpResult = await pool.query(
@@ -39,7 +33,7 @@ export default async function handler(req, res) {
       LEFT JOIN (
         SELECT event_id, COUNT(*) AS count
         FROM registrations
-        WHERE has_paid = true 
+        WHERE has_paid = TRUE 
            OR event_id IN (SELECT id FROM events WHERE price IS NULL OR price = 0)
         GROUP BY event_id
       ) reg_count ON reg_count.event_id = e.id
@@ -53,8 +47,6 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error('❌ rsvps.js error:', err)
     res.status(500).json({ error: 'Server error', details: err.message })
-  } finally {
-    await pool.end()
   }
 }
 
