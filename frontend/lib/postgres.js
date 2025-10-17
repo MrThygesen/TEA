@@ -2,23 +2,26 @@
 import pkg from 'pg'
 const { Pool } = pkg
 
+// ✅ Use Neon pooled endpoint (with ?sslmode=require)
+const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL
+
 if (!global._pgPool) {
   global._pgPool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
-    max: 10, // fewer clients to avoid hitting limits on Render free plan
-    idleTimeoutMillis: 10000, // close idle clients quickly
-    connectionTimeoutMillis: 5000, // retry faster
+    connectionString,
+    ssl: { rejectUnauthorized: false }, // Neon requires SSL
+    max: 10, // keep small for serverless, each is expensive
+    idleTimeoutMillis: 10000,
+    connectionTimeoutMillis: 5000,
   })
 
-  // optional: keep-alive ping every 10 minutes (Render sleeps connections)
+  // 💤 keep-alive ping (avoids Neon cold-start timeouts)
   setInterval(async () => {
     try {
       await global._pgPool.query('SELECT 1')
     } catch (err) {
       console.warn('Postgres keep-alive failed:', err.message)
     }
-  }, 600000)
+  }, 600000) // every 10 minutes
 }
 
 export const pool = global._pgPool

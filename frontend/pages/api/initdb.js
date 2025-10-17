@@ -1,4 +1,4 @@
-// pages/api/initdb.js
+// frontend/pages/api/initdb.js
 import pkg from 'pg'
 import dotenv from 'dotenv'
 dotenv.config()
@@ -8,10 +8,15 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' })
   }
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
-  })
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }, // ✅ required for Neon
+  max: 5, // ✅ lower max helps on serverless Neon
+  idleTimeoutMillis: 5000, // ✅ release idle connections faster
+})
+
+
 
   try {
     console.log('🔹 Initializing database...')
