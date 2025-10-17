@@ -10,6 +10,7 @@
   "dependencies": {
     "@getbrevo/brevo": "^2.5.0",
     "@graphprotocol/graph-ts": "^0.38.1",
+    "@neondatabase/serverless": "^1.0.2",
     "@openzeppelin/contracts": "^4.9.5",
     "@openzeppelin/contracts-upgradeable": "^4.9.5",
     "@rainbow-me/rainbowkit": "^2.2.8",
