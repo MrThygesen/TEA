@@ -63,43 +63,46 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
 
   // --- fetch user tickets & totalBooked (global popularity supported) ---
   useEffect(() => {
-    if (!authUser) return
-    async function fetchFromMe() {
-      try {
-        const token = localStorage.getItem('token')
-        if (!token || token.split('.').length !== 3) return
+  if (!authUser) return;
 
-        const res = await fetch('/api/user/me', {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        if (!res.ok) return
-        const data = await res.json()
+  async function fetchTotalBooked() {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token || token.split('.').length !== 3) return;
 
-        const myTickets = Array.isArray(data.tickets)
-          ? data.tickets.filter((t) => t.event_id === event.id)
-          : []
-        const total = myTickets.reduce((sum, t) => sum + (t.quantity || 1), 0)
-        setUserTickets(total)
-        setMaxPerUser(event.tag1 === 'group' ? 5 : 1)
+      const res = await fetch('/api/user/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
 
-        const ticketRow = (Array.isArray(data.tickets) ? data.tickets : []).find(
-          (t) => Number(t.event_id) === Number(event.id)
-        )
+      const data = await res.json();
 
-        if (ticketRow && ticketRow.popularity !== undefined && ticketRow.popularity !== null) {
-          setTotalBooked(Number(ticketRow.popularity) || 0)
-        } else {
-          const fallbackTotal = (Array.isArray(data.tickets) ? data.tickets : [])
-            .filter((t) => Number(t.event_id) === Number(event.id))
-            .reduce((sum, t) => sum + (t.quantity || 1), 0)
-          setTotalBooked(fallbackTotal)
-        }
-      } catch (err) {
-        console.error('fetchFromMe error:', err)
-      }
+      // Find the event in allEvents for global popularity
+      const globalEvent = (data.allEvents || []).find(
+        (e) => Number(e.id) === Number(event.id)
+      );
+
+      setTotalBooked(globalEvent ? Number(globalEvent.popularity || 0) : 0);
+
+      // User tickets (still needed for maxPerUser, etc.)
+      const myTickets = (data.tickets || []).filter(
+        (t) => Number(t.event_id) === Number(event.id)
+      );
+      const totalUserTickets = myTickets.reduce(
+        (sum, t) => sum + (t.quantity || 1),
+        0
+      );
+      setUserTickets(totalUserTickets);
+      setMaxPerUser(event.tag1 === 'group' ? 5 : 1);
+
+    } catch (err) {
+      console.error('fetchTotalBooked error:', err);
     }
-    fetchFromMe()
-  }, [authUser, event.id, event.tag1, refreshTrigger])
+  }
+
+  fetchTotalBooked();
+}, [authUser, event.id, event.tag1, refreshTrigger]);
+
 
   // --- booking handler ---
   async function handleBooking() {
@@ -328,8 +331,7 @@ export function DynamicEventCard({ event, authUser, setShowAccountModal, refresh
           </button>
         )}
 
-<span>👥 {event.popularity} / {event.max_attendees || '∞'}</span>
-
+<span>👥 {totalBooked} / {event.max_attendees || '∞'}</span>
       </div>
     </div>
   )
