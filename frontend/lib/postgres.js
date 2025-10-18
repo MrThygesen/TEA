@@ -1,39 +1,51 @@
 // lib/postgres.js
-let neon
+import { neon } from '@neondatabase/serverless'
+import pkg from 'pg'
+
+// ✅ Use Neon if available, else fallback to pg.Pool
+const connectionString = process.env.DATABASE_URL
+
+let useNeon = true
+let sql, pool
+
 try {
-  // ✅ Works for both dev + production
-  ;({ neon } = await import('@neondatabase/serverless'))
-} catch (err) {
-  console.error('⚠️ Neon driver not found, falling back to pg.Pool:', err.message)
-  const pkg = await import('pg')
+  if (!connectionString?.includes('neon.tech')) useNeon = false
+} catch {
+  useNeon = false
+}
+
+if (useNeon) {
+  // ✅ Neon serverless (Edge-compatible)
+  sql = neon(connectionString)
+
+  // pg-like wrapper for compatibility
+  pool = {
+    query: async (text, params = []) => {
+      const query = text.replace(/\$(\d+)/g, (_, i) =>
+        typeof params[i - 1] === 'string'
+          ? `'${params[i - 1].replace(/'/g, "''")}'`
+          : params[i - 1]
+      )
+      const result = await sql.unsafe(query)
+      return { rows: result }
+    },
+  }
+} else {
+  // ✅ Standard Postgres Pool (fallback)
   const { Pool } = pkg
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+  const pgPool = new Pool({
+    connectionString,
     ssl: { rejectUnauthorized: false },
   })
-  export const sql = {
+
+  pool = pgPool
+  sql = {
     unsafe: async (query) => {
-      const res = await pool.query(query)
+      const res = await pgPool.query(query)
       return res.rows
     },
   }
-  export const poolCompat = pool
-  return
 }
 
-const connectionString = process.env.DATABASE_URL
-export const sql = neon(connectionString)
-
-// ✅ pg-like wrapper for compatibility
-export const pool = {
-  query: async (text, params = []) => {
-    const query = text.replace(/\$(\d+)/g, (_, i) =>
-      typeof params[i - 1] === 'string'
-        ? `'${params[i - 1].replace(/'/g, "''")}'`
-        : params[i - 1]
-    )
-    const result = await sql.unsafe(query)
-    return { rows: result }
-  },
-}
+export { sql, pool }
 
