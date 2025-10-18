@@ -3,6 +3,14 @@ import { sql } from '../../lib/postgres.js'
 import dotenv from 'dotenv'
 dotenv.config()
 
+const exec = sql?.unsafe
+  ? sql.unsafe
+  : async (q) => {
+      const { pool } = await import('../../lib/postgres.js')
+      const r = await pool.query(q)
+      return r.rows
+    }
+
 export default async function handler(req, res) {
   if (req.method !== 'POST')
     return res.status(405).json({ error: 'Method not allowed. Use POST.' })
