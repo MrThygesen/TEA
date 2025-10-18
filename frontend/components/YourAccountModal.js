@@ -19,14 +19,6 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [ownsEvents, setOwnsEvents] = useState(false)
   const [events, setEvents] = useState([])
 
-
-
-const [profile, setProfile] = useState(null)
-const [tickets, setTickets] = useState([])
-const [rsvps, setRsvps] = useState([])
-const [metrics, setMetrics] = useState(null)
-const [events, setEvents] = useState([])
-
 useEffect(() => {
   async function loadDashboard() {
     const token = localStorage.getItem('token')
