@@ -2,23 +2,14 @@
 import { neon } from '@neondatabase/serverless'
 import pkg from 'pg'
 
-// ✅ Use Neon if available, else fallback to pg.Pool
+const { Pool } = pkg
 const connectionString = process.env.DATABASE_URL
 
-let useNeon = true
-let sql, pool
+let pool
 
-try {
-  if (!connectionString?.includes('neon.tech')) useNeon = false
-} catch {
-  useNeon = false
-}
-
-if (useNeon) {
-  // ✅ Neon serverless (Edge-compatible)
-  sql = neon(connectionString)
-
-  // pg-like wrapper for compatibility
+if (process.env.NEON_DRIVER === 'true') {
+  console.log('🚀 Using Neon serverless driver')
+  const sql = neon(connectionString)
   pool = {
     query: async (text, params = []) => {
       const query = text.replace(/\$(\d+)/g, (_, i) =>
@@ -31,21 +22,12 @@ if (useNeon) {
     },
   }
 } else {
-  // ✅ Standard Postgres Pool (fallback)
-  const { Pool } = pkg
-  const pgPool = new Pool({
+  console.log('💾 Using local pg.Pool driver')
+  pool = new Pool({
     connectionString,
     ssl: { rejectUnauthorized: false },
   })
-
-  pool = pgPool
-  sql = {
-    unsafe: async (query) => {
-      const res = await pgPool.query(query)
-      return res.rows
-    },
-  }
 }
 
-export { sql, pool }
+export { pool }
 
