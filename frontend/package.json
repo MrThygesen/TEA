@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@getbrevo/brevo": "^3.0.1",
+    "@neondatabase/serverless": "^1.0.2",
     "@rainbow-me/rainbowkit": "^2.2.8",
     "@reown/appkit": "^1.7.15",
     "@reown/appkit-controllers": "^1.7.15",
