@@ -1,4 +1,4 @@
-// components/AdminSBTManager.js
+// frontend/components/AdminSBTManager.js
 'use client'
 
 import React, { useEffect, useState, useRef } from 'react'
@@ -361,6 +361,8 @@ export default function AdminSBTManager() {
         ...formData,
         admin_email: formData.admin_email || profile?.email || '',
         datetime: new Date(formData.datetime).toISOString(),
+ min_attendees: Number(formData.min_attendees || 1),
+  max_attendees: Number(formData.max_attendees || 40),
       }
 
       const res = await fetch('/api/events', {
@@ -524,6 +526,12 @@ export default function AdminSBTManager() {
           </select>
 
           <textarea placeholder="Details (host, venue, etc.)" className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm" rows={3} value={local.details} onChange={e => handleField('details', e.target.value)} />
+
+  <div className="flex gap-2">
+      <input name="min_attendees" type="number" placeholder="Min attendees" min={1} defaultValue={1} className="flex-1 p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+      <input name="max_attendees" type="number" placeholder="Max attendees" min={1} defaultValue={40} className="flex-1 p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
+    </div>
+
 
           <div className="grid md:grid-cols-4 gap-2">
             <input name="tag1" placeholder="Tag 1" className="p-2 bg-zinc-900 border border-zinc-700 rounded text-sm" value={local.tag1} onChange={e => handleField('tag1', e.target.value)} />

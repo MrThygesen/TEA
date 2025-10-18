@@ -1,4 +1,4 @@
-// components/YourAccountModal.js
+// frontend/components/YourAccountModal.js
 'use client'
 
 import React, { useState, useEffect } from 'react'
@@ -20,78 +20,29 @@ export default function YourAccountModal({ onClose, refreshTrigger }) {
   const [events, setEvents] = useState([])
 
 
+
+const [profile, setProfile] = useState(null)
+const [tickets, setTickets] = useState([])
+const [rsvps, setRsvps] = useState([])
+const [metrics, setMetrics] = useState(null)
+const [events, setEvents] = useState([])
+
 useEffect(() => {
-  let cancelled = false
-
-  async function loadAccount() {
-    setLoading(true)
-    try {
-      const token = localStorage.getItem('token')
-      if (!token) throw new Error('Not logged in')
-
-      const headers = { Authorization: `Bearer ${token}` }
-
-      // Fetch profile, RSVPs, and events
-      const [meRes, rsvpRes, eventRes] = await Promise.all([
-        fetch('/api/user/me', { headers }),
-        fetch('/api/user/rsvps', { headers }),
-        fetch('/api/events', { headers }),
-      ])
-
-      if (!meRes.ok) throw new Error('Failed to fetch user profile')
-      if (!rsvpRes.ok) throw new Error('Failed to fetch RSVPs')
-      if (!eventRes.ok) throw new Error('Failed to fetch events')
-
-      const [meData, rsvpDataRaw, eventsData] = await Promise.all([
-        meRes.json(),
-        rsvpRes.json(),
-        eventRes.json(),
-      ])
-      if (cancelled) return
-
-      setProfile(meData.profile ?? null)
-      const userTickets = Array.isArray(meData.tickets) ? meData.tickets : []
-      const rsvpData = Array.isArray(rsvpDataRaw) ? rsvpDataRaw : []
-      const eventArray = Array.isArray(eventsData?.rows)
-        ? eventsData.rows
-        : Array.isArray(eventsData)
-        ? eventsData
-        : []
-
-      setEvents(eventArray)
-
-      // Filter RSVPs for events where the user already has a ticket
-      const eventIdsWithTickets = new Set(userTickets.map((t) => t.event_id))
-      const filteredRsvps = rsvpData.filter((r) => !eventIdsWithTickets.has(r.event_id))
-
-      setTickets(userTickets)
-      setRsvps(filteredRsvps)
-
-      // Check if user owns/admin_email for any events
-      const isOwner = eventArray.some(ev => ev.admin_email === meData.profile?.email)
-      setOwnsEvents(isOwner)
-
-      // Determine if the user should fetch admin metrics
-      const isAdminOrClient = ['admin', 'client'].includes(meData.profile?.role)
-      const metricEndpoint = isAdminOrClient || isOwner
-        ? '/api/admin/stats'
-        : '/api/user/metrics'
-
-      const metricRes = await fetch(metricEndpoint, { headers })
-      if (metricRes.ok) {
-        const metricData = await metricRes.json()
-        if (!cancelled) setMetrics(metricData)
-      }
-
-    } catch (err) {
-      if (!cancelled) setError(err.message)
-    } finally {
-      if (!cancelled) setLoading(false)
+  async function loadDashboard() {
+    const token = localStorage.getItem('token')
+    const res = await fetch('/api/dashboard', { headers: { Authorization: `Bearer ${token}` } })
+    const data = await res.json()
+    if (res.ok) {
+      setProfile(data.profile)
+      setTickets(data.tickets)
+      setRsvps(data.rsvps)
+      setMetrics(data.metrics)
+      setEvents(data.events)
+    } else {
+      console.error('Dashboard error:', data.error)
     }
   }
-
-  loadAccount()
-  return () => { cancelled = true }
+  loadDashboard()
 }, [refreshTrigger])
 
   async function handleEmailUpdate() {
@@ -214,29 +165,32 @@ useEffect(() => {
   <div className="border border-zinc-700 bg-zinc-800 p-4 rounded-lg mb-8">
     <h3 className="text-lg font-semibold text-blue-400 mb-2">Submit New Event Template</h3>
     <form
-      onSubmit={async (e) => {
-        e.preventDefault()
-        const form = e.target
-        const eventData = {
-          name: form.title.value,
-          description: form.description.value,
-          details: form.details.value,
-          city: form.city.value,
-          datetime: form.datetime.value,
-          venue: form.venue.value,
-          venue_type: form.venue_type.value,
-          basic_perk: form.basic_perk.value,
-          advanced_perk: form.advanced_perk.value,
-          image_url: form.image_url.value,
-          admin_email: profile?.email || '',
-          tag1: form.tag1.value,
-          tag2: form.tag2.value,
-          tag3: form.tag3.value,
-          tag4: form.tag4.value,
-          price: form.price.value,
-          language: form.language.value,
-          status: 'pending',
-        }
+  onSubmit={async (e) => {
+    e.preventDefault()
+    const form = e.target
+    const eventData = {
+      name: form.title.value,
+      description: form.description.value,
+      details: form.details.value,
+      city: form.city.value,
+      datetime: form.datetime.value,
+      venue: form.venue.value,
+      venue_type: form.venue_type.value,
+      basic_perk: form.basic_perk.value,
+      advanced_perk: form.advanced_perk.value,
+      image_url: form.image_url.value,
+      admin_email: profile?.email || '',
+      tag1: form.tag1.value,
+      tag2: form.tag2.value,
+      tag3: form.tag3.value,
+      tag4: form.tag4.value,
+      price: form.price.value,
+      min_attendees: Number(form.min_attendees.value || 1),
+      max_attendees: Number(form.max_attendees.value || 40),
+      language: form.language.value,
+      status: 'pending',
+    }
+
 
         const res = await fetch('/api/events', {
           method: 'POST',
@@ -280,7 +234,28 @@ useEffect(() => {
         <input name="tag4" placeholder="Tag 4" className="input flex-1 p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
       </div>
       <input name="price" placeholder="Price (DKK)" type="number" className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white" />
-      <select name="language" className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white">
+<div className="flex gap-2">
+  <input
+    name="min_attendees"
+    type="number"
+    placeholder="Min attendees"
+    min={1}
+    defaultValue={1}
+    className="input flex-1 p-2 rounded border border-zinc-700 bg-zinc-800 text-white"
+  />
+  <input
+    name="max_attendees"
+    type="number"
+    placeholder="Max attendees"
+    min={1}
+    defaultValue={40}
+    className="input flex-1 p-2 rounded border border-zinc-700 bg-zinc-800 text-white"
+  />
+</div>
+ 
+
+
+     <select name="language" className="input w-full p-2 rounded border border-zinc-700 bg-zinc-800 text-white">
         <option value="en">English</option>
         <option value="da">Danish</option>
       </select>
@@ -358,7 +333,7 @@ useEffect(() => {
           <>
             <h3 className="text-lg font-semibold text-green-400 mb-2">Your Activity</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
-              <Metric label="Tickets Bought" value={metrics.tickets_bought} />
+              <Metric label="Tickets Bought" value={metrics.tickets_total} />
               <Metric label="Show-up Rate" value={`${metrics.show_up_rate}%`} />
               <Metric label="Points Earned" value={metrics.points} />
             </div>
