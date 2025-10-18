@@ -76,7 +76,7 @@ await sql.unsafe(`
     max_attendees INTEGER DEFAULT 40,
     is_confirmed BOOLEAN DEFAULT FALSE,
     description TEXT,
-    details TEXT,F
+    details TEXT,
     venue TEXT,
     venue_type TEXT,
     basic_perk TEXT,
