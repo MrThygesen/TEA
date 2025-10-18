@@ -12,7 +12,7 @@ export default async function handler(req, res) {
 
 
     // TELEGRAM USER PROFILES
-    await sql.unsafe(`
+    await exec(`
       CREATE TABLE IF NOT EXISTS telegram_user_profiles (
         id SERIAL PRIMARY KEY,
         username TEXT UNIQUE,
@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     `)
 
     // USER PROFILES
-    await sql.unsafe(`
+    await exec(`
   CREATE TABLE IF NOT EXISTS user_profiles (
     id SERIAL PRIMARY KEY,  
     name TEXT, 
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
 
 
     // EMAIL VERIFICATION TOKENS
-    await sql.unsafe(`
+    await exec(`
       CREATE TABLE IF NOT EXISTS email_verification_tokens (
         token TEXT PRIMARY KEY,
         user_id INTEGER REFERENCES user_profiles(id) ON DELETE CASCADE,
@@ -58,13 +58,13 @@ export default async function handler(req, res) {
         expires_at TIMESTAMPTZ NOT NULL
       );
     `)
-    await sql.unsafe(`
+    await exec(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verif_userid
       ON email_verification_tokens(user_id);
     `)
 
     // EVENTS
-await sql.unsafe(`
+await exec(`
   CREATE TABLE IF NOT EXISTS events (
     id SERIAL PRIMARY KEY,
     admin_email TEXT NOT NULL REFERENCES user_profiles(email),
@@ -94,10 +94,10 @@ await sql.unsafe(`
     status TEXT DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected'))
   );
 `);
-    await sql.unsafe(`CREATE INDEX IF NOT EXISTS idx_events_city ON events(LOWER(city));`)
+    await exec(`CREATE INDEX IF NOT EXISTS idx_events_city ON events(LOWER(city));`)
 
     // REGISTRATIONS
-    await sql.unsafe(`
+    await exec(`
       CREATE TABLE IF NOT EXISTS registrations (
         id SERIAL PRIMARY KEY,
         event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
@@ -126,12 +126,12 @@ await sql.unsafe(`
     `)
 
     // ❌ REMOVE these unique constraints (we allow multiple rows per user)
-    // await sql.unsafe(`CREATE UNIQUE INDEX IF NOT EXISTS idx_registrations_event_user ...`)
-    // await sql.unsafe(`CREATE UNIQUE INDEX IF NOT EXISTS idx_registrations_event_tguser ...`)
+    // await exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_registrations_event_user ...`)
+    // await exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_registrations_event_tguser ...`)
 
 
 // EVENT ORGANIZERS (many-to-many between events and user_profiles)
-await sql.unsafe(`
+await exec(`
   CREATE TABLE IF NOT EXISTS event_organizers (
     id SERIAL PRIMARY KEY,
     event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
@@ -144,7 +144,7 @@ await sql.unsafe(`
 
 
     // INVITATIONS
-    await sql.unsafe(`
+    await exec(`
       CREATE TABLE IF NOT EXISTS invitations (
         id SERIAL PRIMARY KEY,
         event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
@@ -158,7 +158,7 @@ await sql.unsafe(`
     `)
 
     // USER EMAILS
-    await sql.unsafe(`
+    await exec(`
       CREATE TABLE IF NOT EXISTS user_emails (
         user_id INTEGER PRIMARY KEY REFERENCES user_profiles(id) ON DELETE CASCADE,
         email TEXT NOT NULL,
@@ -167,7 +167,7 @@ await sql.unsafe(`
     `)
 
 // FAVORITES
-await sql.unsafe(`
+await exec(`
   CREATE TABLE IF NOT EXISTS favorites (
     id SERIAL PRIMARY KEY,
     event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
@@ -184,19 +184,19 @@ await sql.unsafe(`
 
 
 // Uniqueness: only 1 RSVP per user per event
-await sql.unsafe(`
+await exec(`
   CREATE UNIQUE INDEX IF NOT EXISTS idx_favorites_event_user
   ON favorites(event_id, user_id) WHERE user_id IS NOT NULL;
 `);
 
-await sql.unsafe(`
+await exec(`
   CREATE UNIQUE INDEX IF NOT EXISTS idx_favorites_event_tg
   ON favorites(event_id, telegram_user_id) WHERE telegram_user_id IS NOT NULL;
 `);
 
 
     // rsvps
-    await sql.unsafe(`
+    await exec(`
       CREATE TABLE IF NOT EXISTS rsvps (
         id SERIAL PRIMARY KEY,
         event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
@@ -210,27 +210,27 @@ await sql.unsafe(`
     `)
 
     // Uniqueness: only 1 like per user per event
-    await sql.unsafe(`
+    await exec(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_rsvps_event_user
       ON rsvps(event_id, user_id) WHERE user_id IS NOT NULL;
     `)
-    await sql.unsafe(`
+    await exec(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_rsvps_event_tg
       ON rsvps(event_id, telegram_user_id) WHERE telegram_user_id IS NOT NULL;
     `)
 
     // Indexes for performance
-    await sql.unsafe(`CREATE INDEX IF NOT EXISTS idx_rsvps_event ON rsvps(event_id);`)
-    await sql.unsafe(`CREATE INDEX IF NOT EXISTS idx_rsvps_web ON rsvps(user_id);`)
-    await sql.unsafe(`CREATE INDEX IF NOT EXISTS idx_rsvps_tg ON rsvps(telegram_user_id);`)
+    await exec(`CREATE INDEX IF NOT EXISTS idx_rsvps_event ON rsvps(event_id);`)
+    await exec(`CREATE INDEX IF NOT EXISTS idx_rsvps_web ON rsvps(user_id);`)
+    await exec(`CREATE INDEX IF NOT EXISTS idx_rsvps_tg ON rsvps(telegram_user_id);`)
 
 // Indexes for performance
-await sql.unsafe(`CREATE INDEX IF NOT EXISTS idx_favorites_event ON favorites(event_id);`);
-await sql.unsafe(`CREATE INDEX IF NOT EXISTS idx_favorites_web ON favorites(user_id);`);
-await sql.unsafe(`CREATE INDEX IF NOT EXISTS idx_favorites_tg ON favorites(telegram_user_id);`);
+await exec(`CREATE INDEX IF NOT EXISTS idx_favorites_event ON favorites(event_id);`);
+await exec(`CREATE INDEX IF NOT EXISTS idx_favorites_web ON favorites(user_id);`);
+await exec(`CREATE INDEX IF NOT EXISTS idx_favorites_tg ON favorites(telegram_user_id);`);
 
     // updated_at trigger
-    await sql.unsafe(`
+    await exec(`
       CREATE OR REPLACE FUNCTION update_updated_at_column()
       RETURNS TRIGGER AS $$
       BEGIN
@@ -239,22 +239,22 @@ await sql.unsafe(`CREATE INDEX IF NOT EXISTS idx_favorites_tg ON favorites(teleg
       END;
       $$ LANGUAGE 'plpgsql';
     `)
-    await sql.unsafe(`DROP TRIGGER IF EXISTS trg_update_user_profiles_updated_at ON user_profiles;`)
-    await sql.unsafe(`DROP TRIGGER IF EXISTS trg_update_telegram_user_profiles_updated_at ON telegram_user_profiles;`)
-    await sql.unsafe(`DROP TRIGGER IF EXISTS trg_update_events_updated_at ON events;`)
-    await sql.unsafe(`
+    await exec(`DROP TRIGGER IF EXISTS trg_update_user_profiles_updated_at ON user_profiles;`)
+    await exec(`DROP TRIGGER IF EXISTS trg_update_telegram_user_profiles_updated_at ON telegram_user_profiles;`)
+    await exec(`DROP TRIGGER IF EXISTS trg_update_events_updated_at ON events;`)
+    await exec(`
       CREATE TRIGGER trg_update_user_profiles_updated_at
       BEFORE UPDATE ON user_profiles
       FOR EACH ROW
       EXECUTE FUNCTION update_updated_at_column();
     `)
-    await sql.unsafe(`
+    await exec(`
       CREATE TRIGGER trg_update_telegram_user_profiles_updated_at
       BEFORE UPDATE ON telegram_user_profiles
       FOR EACH ROW
       EXECUTE FUNCTION update_updated_at_column();
     `)
-    await sql.unsafe(`
+    await exec(`
       CREATE TRIGGER trg_update_events_updated_at
       BEFORE UPDATE ON events
       FOR EACH ROW
