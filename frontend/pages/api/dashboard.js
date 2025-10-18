@@ -84,7 +84,7 @@ export default async function handler(req, res) {
     // ------------------------------
     let eventData = null
     try {
-      const cache = await getCDumpCache()
+      const cache = getCDumpCache()
       if (cache?.data?.events) eventData = cache.data.events
       else {
         const { rows } = await pool.query(`
