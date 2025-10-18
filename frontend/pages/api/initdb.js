@@ -76,7 +76,7 @@ await sql.unsafe(`
     max_attendees INTEGER DEFAULT 40,
     is_confirmed BOOLEAN DEFAULT FALSE,
     description TEXT,
-    details TEXT,
+    details TEXT,F
     venue TEXT,
     venue_type TEXT,
     basic_perk TEXT,
@@ -266,5 +266,5 @@ await sql.unsafe(`CREATE INDEX IF NOT EXISTS idx_favorites_tg ON favorites(teleg
   } catch (err) {
     console.error('❌ InitDB error:', err)
     res.status(500).json({ error: 'Server error', details: err.message })
-  } finally { }
+  } 
 }
