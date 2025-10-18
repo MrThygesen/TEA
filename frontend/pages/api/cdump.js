@@ -1,6 +1,6 @@
 // pages/api/cdump.js
 import { pool } from '../../lib/postgres.js'
-import { getCDumpCache, setCDumpCache, globalEventCache } from '../../lib/cache.js'
+import { globalCache } from '../../lib/cache.js'
 
 export default async function handler(req, res) {
   const cache = getCDumpCache()
