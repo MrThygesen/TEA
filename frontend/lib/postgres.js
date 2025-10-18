@@ -1,28 +1,21 @@
 // frontend/lib/postgres.js
-import pkg from 'pg'
-const { Pool } = pkg
+import { neon } from '@neondatabase/serverless'
 
-// ✅ Use Neon pooled endpoint (with ?sslmode=require)
-const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL
+const connectionString = process.env.DATABASE_URL
 
-if (!global._pgPool) {
-  global._pgPool = new Pool({
-    connectionString,
-    ssl: { rejectUnauthorized: false }, // Neon requires SSL
-    max: 10, // keep small for serverless, each is expensive
-    idleTimeoutMillis: 10000,
-    connectionTimeoutMillis: 5000,
-  })
+// ✅ Use one lazy client across all API routes
+export const sql = neon(connectionString)
 
-  // 💤 keep-alive ping (avoids Neon cold-start timeouts)
-  setInterval(async () => {
-    try {
-      await global._pgPool.query('SELECT 1')
-    } catch (err) {
-      console.warn('Postgres keep-alive failed:', err.message)
-    }
-  }, 600000) // every 10 minutes
+// ⚙️ Optional helper for pg-like API
+export const pool = {
+  query: async (text, params) => {
+    // neon uses template literals, not parameter arrays
+    // so we convert for compatibility
+    const query = text.replace(/\$(\d+)/g, (_, i) =>
+      typeof params[i - 1] === 'string' ? `'${params[i - 1].replace(/'/g, "''")}'` : params[i - 1]
+    )
+    const result = await sql.unsafe(query)
+    return { rows: result }
+  },
 }
-
-export const pool = global._pgPool
 
