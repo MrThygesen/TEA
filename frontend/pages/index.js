@@ -7,8 +7,6 @@ import { toast } from 'react-hot-toast'
 import YourAccountModal from '../components/YourAccountModal'
 import Image from 'next/image'
 import { useRouter } from 'next/router'
-//import { pool } from '../lib/postgres'
-
 
  // ---------------------------
 // Helpers: Auth persistence Test

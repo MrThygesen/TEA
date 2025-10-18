@@ -1,4 +1,5 @@
-import { pool } from '../../../lib/postgres.js'
+// pages/api/events/hearts.js
+import { sql, pool } from '../../../lib/postgres.js'
 
 export default async function handler(req, res) {
   const { eventId } = req.query

@@ -1,5 +1,5 @@
 // pages/api/user/myTickets.js
-import { pool } from '../../../lib/postgres.js'
+import { sql, pool } from '../../../lib/postgres.js'
 import { auth } from '../../../lib/auth.js'
 
 export default async function handler(req, res) {

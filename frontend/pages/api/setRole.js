@@ -1,5 +1,7 @@
+// pages/api/setRole.js
+
 import { useAccount, useWriteContract, usePublicClient } from 'wagmi'
-import { pool } from '../../lib/postgres'
+import { sql, pool } from '../../lib/postgres'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

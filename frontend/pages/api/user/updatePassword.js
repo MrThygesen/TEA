@@ -1,7 +1,7 @@
-//updatePassword.
+//pages/api/user/updatePassword.js
 
 import bcrypt from 'bcryptjs';
-import { pool } from '../../../lib/postgres.js';
+import { sql, pool } from '../../../lib/postgres.js';
 import { getUserFromJWT } from '../../../lib/auth.js';
 import { auth } from '../../../lib/auth.js'
 

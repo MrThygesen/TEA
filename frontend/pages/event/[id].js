@@ -1,3 +1,5 @@
+
+
 //pages/event/[id].js
 
 'use client'
@@ -37,25 +39,32 @@ const [showDetails, setShowDetails] = useState(false)
   }, [id])
 
   async function handleBooking() {
-    if (!agreed) return
-    setLoading(true)
-    try {
-      const token = localStorage.getItem('token')
-      const res = await fetch('/api/events/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
-        body: JSON.stringify({ eventId: event.id, quantity })
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || t('BookingFailed'))
-      if (data.checkoutUrl) window.location.href = data.checkoutUrl
-      else alert(t('TicketBooked'))
-    } catch (err) {
-      alert(err.message)
-    } finally {
-      setLoading(false)
+  if (!agreed) return
+  setLoading(true)
+  try {
+    const token = localStorage.getItem('token')
+    const res = await fetch('/api/events/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: token ? `Bearer ${token}` : '',
+      },
+      body: JSON.stringify({ eventId: event.id, quantity }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || t('BookingFailed'))
+    if (data.checkoutUrl) {
+      window.location.href = data.checkoutUrl
+    } else {
+      alert(t('TicketBooked'))
     }
+  } catch (err) {
+    alert(err.message)
+  } finally {
+    setLoading(false)
   }
+}
+
 
   function resolveImageUrl(url) {
     if (!url) return null
@@ -271,12 +280,15 @@ const [showDetails, setShowDetails] = useState(false)
             </label>
 
             <button
-              onClick={handleBooking}
-              disabled={!agreed || loading}
-              className="w-full mt-4 py-3 px-6 rounded-xl font-bold text-white shadow-lg transition duration-200 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-700/40 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Processing...' : 'Get ticket'}
-            </button>
+  onClick={handleBooking}
+  disabled={!agreed || loading}
+  className={`w-full mt-4 py-3 px-6 rounded-xl font-bold text-white shadow-lg transition duration-200 ${
+    loading ? 'bg-blue-800/60' : 'bg-blue-600 hover:bg-blue-700'
+  }`}
+>
+  {loading ? 'Redirecting to checkout...' : 'Get ticket'}
+</button>
+
 
             <div className="text-gray-400 text-xs mt-3">
               <p>Show the QR code from the email at the venue.</p>

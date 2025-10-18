@@ -1,6 +1,6 @@
 // pages/api/user/metrics.js
 import jwt from 'jsonwebtoken'
-import { pool } from '../../../lib/postgres.js'
+import { sql, pool } from '../../../lib/postgres.js'
 
 const TOKEN_KEY = process.env.JWT_SECRET || 'dev_secret'
 

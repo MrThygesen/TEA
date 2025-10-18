@@ -1,5 +1,5 @@
 // pages/api/user/update-email.js
-import { pool } from '../../../lib/postgres.js'
+import { sql, pool } from '../../../lib/postgres.js'
 import { auth } from '../../../lib/auth.js'
 import { sendVerificationEmail } from '../../../lib/email.js'
 

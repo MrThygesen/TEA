@@ -1,7 +1,7 @@
 // pages/api/login.js
 import bcrypt from 'bcryptjs' // keep same lib as before
 import jwt from 'jsonwebtoken'
-import { pool } from '../../lib/postgres.js'
+import { sql, pool } from '../../lib/postgres.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST' })

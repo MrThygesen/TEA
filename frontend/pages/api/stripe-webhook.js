@@ -1,80 +1,115 @@
 // pages/api/stripe-webhook.js
 import Stripe from 'stripe'
+import { buffer } from 'micro'
 import { pool } from '../../lib/postgres.js'
 import { sendTicketEmail } from '../../lib/email.js'
+import { setEventCache, invalidateEventCache } from '../../lib/cache.js'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
-export const config = { api: { bodyParser: false } }
-
-async function buffer(readable) {
-  const chunks = []
-  for await (const chunk of readable)
-    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk)
-  return Buffer.concat(chunks)
+export const config = {
+  api: { bodyParser: false }, // Stripe kræver rå body for at verificere signature
 }
 
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
+
 export default async function handler(req, res) {
-  if (req.method !== 'POST')
-    return res.status(405).json({ error: 'Method not allowed' })
+  if (req.method !== 'POST') {
+    return res.status(405).send('Method Not Allowed')
+  }
 
   const sig = req.headers['stripe-signature']
-  const buf = await buffer(req)
-  let event
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
 
+  let event
   try {
-    event = stripe.webhooks.constructEvent(buf, sig, process.env.STRIPE_WEBHOOK_SECRET)
+    const buf = await buffer(req)
+    event = stripe.webhooks.constructEvent(buf, sig, webhookSecret)
   } catch (err) {
-    console.error('❌ Stripe webhook signature verification failed', err.message)
+    console.error('❌ Stripe signature verification failed:', err.message)
     return res.status(400).send(`Webhook Error: ${err.message}`)
   }
 
-  if (event.type === 'checkout.session.completed') {
-    const session = event.data.object
-    const { eventId, userId, email, quantity } = session.metadata || {}
-    const dbUserId = userId === 'guest' ? null : userId
+  try {
+    // 🎯 Handle successful payment intent
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object
+      const email = session.customer_details?.email
+      const eventId = session.metadata?.eventId
+      const userId = session.metadata?.userId
+      const quantity = parseInt(session.metadata?.quantity || '1', 10)
 
-    try {
-      const { rows: eventRows } = await pool.query('SELECT * FROM events WHERE id=$1', [eventId])
-      if (!eventRows.length) throw new Error('Event not found')
-      const eventInfo = eventRows[0]
+      if (!email || !eventId || !userId) {
+        console.warn('⚠️ Missing metadata in Stripe session:', session.id)
+        return res.status(200).json({ received: true })
+      }
 
-      // Only select **prebooked tickets**, ignore free tickets already marked as booked
-      const { rows: sessionTickets } = await pool.query(
-        `SELECT * FROM registrations
-         WHERE event_id=$1
-           AND (user_id=$2 OR email=$3)
-           AND stage='prebook'
-         ORDER BY id ASC
-         LIMIT $4`,
-        [eventId, dbUserId, email, quantity]
+      console.log(`💰 Payment success for ${email} → ${quantity} ticket(s) to event ${eventId}`)
+
+      // ✅ 1. Mark registrations as paid or create new ones
+      const existing = await pool.query(
+        `SELECT id FROM registrations WHERE event_id=$1 AND user_id=$2`,
+        [eventId, userId]
       )
 
-      if (!sessionTickets.length) return res.status(200).json({ received: true })
+      if (existing.rows.length) {
+        await pool.query(
+          `UPDATE registrations
+           SET has_paid=TRUE, updated_at=NOW()
+           WHERE event_id=$1 AND user_id=$2`,
+          [eventId, userId]
+        )
+      } else {
+        for (let i = 0; i < quantity; i++) {
+          const ticketCode = `ticket:${eventId}:${userId}:${Date.now()}-${i}`
+          await pool.query(
+            `INSERT INTO registrations (event_id, user_id, email, stage, has_paid, ticket_code)
+             VALUES ($1, $2, $3, 'book', TRUE, $4)`,
+            [eventId, userId, email, ticketCode]
+          )
+        }
+      }
 
-      const ticketIds = sessionTickets.map(t => t.id)
+      // ✅ 2. Fetch event + user info for email
+      const { rows: events } = await pool.query('SELECT * FROM events WHERE id=$1', [eventId])
+      const { rows: users } = await pool.query('SELECT * FROM user_profiles WHERE id=$1', [userId])
+      const eventData = events[0]
+      const user = users[0]
 
-      // Mark tickets as paid
-      await pool.query(
-        `UPDATE registrations
-         SET has_paid = TRUE,
-             stage = 'book'
-         WHERE id = ANY($1::int[])`,
-        [ticketIds]
-      )
+      if (eventData && user) {
+        // ✅ 3. Send professional confirmation email
+        await sendTicketEmail(email, eventData, user, pool)
 
-      // Send paid ticket email
-      if (email) {
-        await sendTicketEmail(email, eventInfo, { id: dbUserId, email }, pool, ticketIds)
-        console.log(`✅ Sent ${ticketIds.length} paid ticket(s) to ${email}`)
+        // ✅ 4. Update cache layer (cdump + per-event)
+        await setEventCache(`registration-${eventId}`, { total: quantity })
+        await invalidateEventCache(`registration-${eventId}`)
       }
 
       return res.status(200).json({ received: true })
-    } catch (err) {
-      console.error('❌ Stripe webhook handling error:', err)
-      return res.status(500).json({ error: err.message })
     }
-  }
 
-  res.status(200).json({ received: true })
+    // 🧾 Handle refund or failed payment
+    if (event.type === 'charge.refunded') {
+      const charge = event.data.object
+      const eventId = charge.metadata?.eventId
+      const userId = charge.metadata?.userId
+
+      if (eventId && userId) {
+        await pool.query(
+          `UPDATE registrations
+           SET has_paid=FALSE, updated_at=NOW()
+           WHERE event_id=$1 AND user_id=$2`,
+          [eventId, userId]
+        )
+        await invalidateEventCache(`registration-${eventId}`)
+        console.log(`💸 Refund processed for user ${userId} (event ${eventId})`)
+      }
+      return res.status(200).json({ received: true })
+    }
+
+    // Default handler
+    return res.status(200).json({ received: true })
+  } catch (err) {
+    console.error('❌ Stripe webhook handler error:', err)
+    return res.status(500).send(`Webhook handler failed: ${err.message}`)
+  }
 }
 
